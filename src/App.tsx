@@ -7,16 +7,14 @@ import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
 import { AppToolbar } from "./components/AppToolbar";
 import { WorkspaceNav } from "./components/WorkspaceNav";
-import { setRecordFavorite, setRecordProtected } from "./api";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
+import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
-import type { ModRecord } from "./types";
-import { normalizeDependencyName } from "./utils/dependencies";
-import { isDraftEnabled, readError } from "./utils/format";
+import { isDraftEnabled } from "./utils/format";
 import type { ActiveView } from "./viewTypes";
 
 export function App() {
@@ -72,135 +70,25 @@ export function App() {
   );
   const enabledCount = scan.maps.filter((map) => profileDraft.enabledMapDraft.has(map.id)).length;
   const enabledModCount = scan.otherMods.filter((modItem) => profileDraft.enabledModDraft.has(modItem.id)).length;
-  const protectedVisibleMaps = filters.filteredMaps.filter((record) => record.protected);
-  const protectedVisibleMods = filters.filteredMods.filter((record) => record.protected);
-
-  function toggleMapLikeRecord(record: ModRecord) {
-    if (!canToggleProfileRecord(record)) return;
-    if (record.kind === "mod") profileDraft.toggleMapMod(record.id);
-    else profileDraft.toggleMap(record.id);
-  }
-
-  function toggleModRecord(record: ModRecord) {
-    if (!canToggleProfileRecord(record)) return;
-    profileDraft.toggleMod(record.id);
-  }
-
-  function canToggleProfileRecord(record: ModRecord) {
-    const enabled = isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft);
-    if (record.protected) {
-      setMessage(`${record.name} 已设为 Protected，不能通过 Profile 启用或禁用。`);
-      return false;
-    }
-    if (record.kind === "mod" && enabled && profileDraft.dependencyModDraft.has(record.id)) {
-      setMessage(`${record.name} 被以下已启用项目依赖，不能直接禁用：${dependentSummary(record)}。`);
-      return false;
-    }
-    return true;
-  }
-
-  function dependentSummary(record: ModRecord) {
-    const names = findEnabledDependents(record).map((item) => item.name);
-    if (!names.length) return "未知项目";
-    const visible = names.slice(0, 6).join("、");
-    return names.length > 6 ? `${visible} 等 ${names.length} 个项目` : visible;
-  }
-
-  function findEnabledDependents(target: ModRecord) {
-    const targetAliases = new Set(
-      [target.id, target.name, target.metadata.name, target.fileName, target.fileName.replace(/\.zip$/i, ""), target.relativePath]
-        .map(normalizeDependencyName)
-        .filter(Boolean)
-    );
-    const enabledMaps = scan.maps.filter((map) => profileDraft.enabledMapDraft.has(map.id));
-    const enabledMods = scan.otherMods.filter((modItem) => modItem.id !== target.id && profileDraft.enabledModDraft.has(modItem.id));
-    return [...enabledMaps, ...enabledMods].filter((item) =>
-      item.dependencies.some((dependency) => targetAliases.has(normalizeDependencyName(dependency.name)))
-    );
-  }
-
-  function enableVisibleMaps() {
-    const skipped = protectedVisibleMaps.length;
-    const mapIds = filters.filteredMaps.filter((record) => record.kind === "map" && !record.protected).map((record) => record.id);
-    const modIds = filters.filteredMaps.filter((record) => record.kind === "mod" && !record.protected).map((record) => record.id);
-    profileDraft.setEnabledMapDraft((current) => new Set([...current, ...mapIds]));
-    profileDraft.setEnabledMapModDraft((current) => new Set([...current, ...modIds]));
-    showProtectedSkip(skipped);
-  }
-
-  function disableVisibleMaps() {
-    const skipped = protectedVisibleMaps.length;
-    const mapIds = new Set(filters.filteredMaps.filter((record) => record.kind === "map" && !record.protected).map((record) => record.id));
-    const modIds = new Set(filters.filteredMaps.filter((record) => record.kind === "mod" && !record.protected).map((record) => record.id));
-    profileDraft.setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
-    profileDraft.setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-    showProtectedSkip(skipped);
-  }
-
-  function enableAllInCurrentView() {
-    if (activeView === "maps") {
-      enableVisibleMaps();
-    } else if (activeView === "mods") {
-      const skipped = protectedVisibleMods.length;
-      const modIds = filters.filteredMods.filter((modItem) => !modItem.protected).map((modItem) => modItem.id);
-      profileDraft.setEnabledExplicitModDraft((current) => new Set([...current, ...modIds]));
-      showProtectedSkip(skipped);
-    }
-  }
-
-  function disableAllInCurrentView() {
-    if (activeView === "maps") {
-      disableVisibleMaps();
-    } else if (activeView === "mods") {
-      const skipped = protectedVisibleMods.length;
-      const modIds = new Set(filters.filteredMods.filter((modItem) => !modItem.protected).map((modItem) => modItem.id));
-      profileDraft.setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-      showProtectedSkip(skipped);
-    }
-  }
-
-  function showProtectedSkip(skipped: number) {
-    if (skipped > 0) setMessage(`已跳过 ${skipped} 个受保护项目。`);
-  }
-
-  async function updateRecordFavorite(record: ModRecord) {
-    const favorite = !record.favorite;
-    setLoading(true);
-    setMessage("");
-    setRecordFavoriteInScan(record.id, favorite);
-    try {
-      const result = await setRecordFavorite(celestePath, record.id, favorite);
-      setScan(result);
-      setMessage(favorite ? "已加入收藏。" : "已取消收藏。");
-    } catch (error) {
-      setRecordFavoriteInScan(record.id, record.favorite);
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function setRecordFavoriteInScan(recordId: string, favorite: boolean) {
-    setScan((current) => ({
-      ...current,
-      maps: current.maps.map((map) => (map.id === recordId ? { ...map, favorite } : map)),
-      otherMods: current.otherMods.map((modItem) => (modItem.id === recordId ? { ...modItem, favorite } : modItem))
-    }));
-  }
-
-  async function updateRecordProtected(record: ModRecord) {
-    setLoading(true);
-    setMessage("");
-    try {
-      const result = await setRecordProtected(celestePath, record.id, !record.protected);
-      setScan(result);
-      setMessage(record.protected ? "已取消保护。" : "已设为保护。");
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const recordActions = useRecordActions({
+    activeView,
+    celestePath,
+    dependencyModDraft: profileDraft.dependencyModDraft,
+    enabledMapDraft: profileDraft.enabledMapDraft,
+    enabledModDraft: profileDraft.enabledModDraft,
+    filteredMaps: filters.filteredMaps,
+    filteredMods: filters.filteredMods,
+    scan,
+    setEnabledExplicitModDraft: profileDraft.setEnabledExplicitModDraft,
+    setEnabledMapDraft: profileDraft.setEnabledMapDraft,
+    setEnabledMapModDraft: profileDraft.setEnabledMapModDraft,
+    setLoading,
+    setMessage,
+    setScan,
+    toggleMap: profileDraft.toggleMap,
+    toggleMapMod: profileDraft.toggleMapMod,
+    toggleMod: profileDraft.toggleMod
+  });
 
   function changeActiveView(view: ActiveView) {
     setActiveView(view);
@@ -335,16 +223,16 @@ export function App() {
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
             scrollMemory={scrollMemory}
-            onDisableAll={disableAllInCurrentView}
-            onEnableAll={enableAllInCurrentView}
+            onDisableAll={recordActions.disableAllInCurrentView}
+            onEnableAll={recordActions.enableAllInCurrentView}
             onMapSelect={selectMap}
-            onMapToggle={toggleMapLikeRecord}
+            onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={selectMod}
-            onModToggle={toggleModRecord}
-            onFavoriteToggle={updateRecordFavorite}
-            onProtectedToggle={updateRecordProtected}
-            isMapEnabled={(record) => isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)}
-            isModEnabled={(id) => profileDraft.enabledModDraft.has(id)}
+            onModToggle={recordActions.toggleModRecord}
+            onFavoriteToggle={recordActions.updateRecordFavorite}
+            onProtectedToggle={recordActions.updateRecordProtected}
+            isMapEnabled={recordActions.isMapEnabled}
+            isModEnabled={recordActions.isModEnabled}
           />
         )}
       </section>
