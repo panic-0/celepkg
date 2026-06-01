@@ -6,12 +6,12 @@ use crate::parsers::save_stats::{
     is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
 };
 use crate::services::game::resolve_game_executable;
-use crate::storage::{read_json, scan_cache_path, write_json};
+use crate::storage::{read_json, scan_cache_path, write_json, write_text_file};
 use crate::utils::{normalize_slash, path_basename, stable_id};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
@@ -513,10 +513,8 @@ pub fn write_profile_blacklist(
         }
     }
     fs::create_dir_all(&mods_path).map_err(|error| format!("创建 Mods 目录失败：{error}"))?;
-    let mut file =
-        File::create(&blacklist.file).map_err(|error| format!("写入 blacklist 失败：{error}"))?;
     let content = format!("{}\n", lines.join("\n").trim());
-    file.write_all(content.as_bytes())
+    write_text_file(&blacklist.file, &content)
         .map_err(|error| format!("写入 blacklist 失败：{error}"))
 }
 
@@ -551,7 +549,7 @@ pub fn write_favorite_state(
         lines.push(record.relative_path.clone());
     }
     let content = format!("{}\n", lines.join("\n").trim());
-    fs::write(file, content).map_err(|error| format!("写入 favorites.txt 失败：{error}"))
+    write_text_file(&file, &content).map_err(|error| format!("写入 favorites.txt 失败：{error}"))
 }
 
 pub fn set_scan_favorite_state(

@@ -2,6 +2,7 @@ use crate::domain::{Profile, ProfilesState};
 use crate::utils::{now_string, stable_id};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,12 +122,25 @@ pub fn read_json<T: for<'de> Deserialize<'de>>(file: &Path) -> Option<T> {
 }
 
 pub fn write_json<T: Serialize>(file: &Path, value: &T) -> Result<(), String> {
+    let text =
+        serde_json::to_string_pretty(value).map_err(|error| format!("序列化配置失败：{error}"))?;
+    write_text_file(file, &text)
+}
+
+pub fn write_text_file(file: &Path, text: &str) -> Result<(), String> {
     if let Some(parent) = file.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建配置目录失败：{error}"))?;
     }
-    let text =
-        serde_json::to_string_pretty(value).map_err(|error| format!("序列化配置失败：{error}"))?;
-    fs::write(file, text).map_err(|error| format!("写入配置失败：{error}"))
+    let parent = file.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|error| format!("创建临时文件失败：{error}"))?;
+    temp.write_all(text.as_bytes())
+        .map_err(|error| format!("写入临时文件失败：{error}"))?;
+    temp.flush()
+        .map_err(|error| format!("刷新临时文件失败：{error}"))?;
+    temp.persist(file)
+        .map(|_| ())
+        .map_err(|error| format!("替换文件失败：{}", error.error))
 }
 
 fn find_default_celeste_path() -> String {

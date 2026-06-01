@@ -30,7 +30,7 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
         } else {
             profile.name.trim().to_string()
         },
-        profile_type: profile_type.clone(),
+        profile_type: profile_type.to_string(),
         enabled_map_ids: if profile_type == PROFILE_TYPE_MAPS {
             profile.enabled_map_ids
         } else {
@@ -82,7 +82,8 @@ pub fn delete_profile(profile_id: String) -> Result<ProfilesState, String> {
             .find(|item| item.profile_type == PROFILE_TYPE_MAPS)
             .map(|item| item.id.clone())
             .unwrap_or_else(|| "default-maps".to_string());
-    } else if profile.profile_type == PROFILE_TYPE_MODS && data.active_mod_profile_id == profile_id {
+    } else if profile.profile_type == PROFILE_TYPE_MODS && data.active_mod_profile_id == profile_id
+    {
         data.active_mod_profile_id = data
             .profiles
             .iter()
@@ -280,10 +281,10 @@ fn normalize_dependency_name(value: &str) -> String {
         .to_lowercase()
 }
 
-fn normalize_profile_type(value: &str) -> Result<String, String> {
+fn normalize_profile_type(value: &str) -> Result<&'static str, String> {
     match value {
-        PROFILE_TYPE_MAPS => Ok(PROFILE_TYPE_MAPS.to_string()),
-        PROFILE_TYPE_MODS => Ok(PROFILE_TYPE_MODS.to_string()),
+        PROFILE_TYPE_MAPS => Ok(PROFILE_TYPE_MAPS),
+        PROFILE_TYPE_MODS => Ok(PROFILE_TYPE_MODS),
         _ => Err("Profile 类型无效".to_string()),
     }
 }
