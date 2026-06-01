@@ -22,6 +22,7 @@ import { useProfileDraft } from "./hooks/useProfileDraft";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import type { BackupInfo, ModRecord, RestoreScope } from "./types";
+import { normalizeDependencyName } from "./utils/dependencies";
 import { isDraftEnabled, readError } from "./utils/format";
 import type { ActiveView } from "./viewTypes";
 
@@ -423,15 +424,4 @@ export function App() {
       )}
     </main>
   );
-}
-
-function normalizeDependencyName(value: string) {
-  return value
-    .replace(/\\/g, "/")
-    .replace(/\.zip$/i, "")
-    .replace(/[_-]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .join(" ")
-    .toLowerCase();
 }

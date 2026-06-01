@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
+import { normalizeDependencyName } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
 
@@ -185,17 +186,6 @@ function findReferencedModIds(scan: ScanResult) {
     }
   }
   return referenced;
-}
-
-function normalizeDependencyName(value: string) {
-  return value
-    .replace(/\\/g, "/")
-    .replace(/\.zip$/i, "")
-    .replace(/[_-]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .join(" ")
-    .toLowerCase();
 }
 
 function mapSearchText(map: ModRecord) {

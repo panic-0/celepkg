@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, launchProfile, saveProfile } from "../api";
 import type { Profile, ScanResult } from "../types";
+import { normalizeDependencyName } from "../utils/dependencies";
 import { readError } from "../utils/format";
 
 type ProfileDraftOptions = {
@@ -327,15 +328,4 @@ function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseM
     modItem?.dependencies.forEach((dependency) => addDependency(dependency.name));
   }
   return inferred;
-}
-
-function normalizeDependencyName(value: string) {
-  return value
-    .replace(/\\/g, "/")
-    .replace(/\.zip$/i, "")
-    .replace(/[_-]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .join(" ")
-    .toLowerCase();
 }
