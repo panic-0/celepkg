@@ -1,5 +1,5 @@
 use crate::domain::{Profile, ProfilesState};
-use crate::utils::now_string;
+use crate::utils::{now_string, stable_id};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -74,16 +74,24 @@ fn state_path() -> PathBuf {
     app_dir().join("state.json")
 }
 
-fn read_json<T: for<'de> Deserialize<'de>>(file: &Path) -> Option<T> {
+pub fn scan_cache_path(celeste_path: &Path) -> PathBuf {
+    app_dir().join("scan-cache").join(format!(
+        "{}.json",
+        stable_id(&celeste_path.to_string_lossy().to_lowercase())
+    ))
+}
+
+pub fn read_json<T: for<'de> Deserialize<'de>>(file: &Path) -> Option<T> {
     let text = fs::read_to_string(file).ok()?;
     serde_json::from_str(&text).ok()
 }
 
-fn write_json<T: Serialize>(file: &Path, value: &T) -> Result<(), String> {
+pub fn write_json<T: Serialize>(file: &Path, value: &T) -> Result<(), String> {
     if let Some(parent) = file.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建配置目录失败：{error}"))?;
     }
-    let text = serde_json::to_string_pretty(value).map_err(|error| format!("序列化配置失败：{error}"))?;
+    let text =
+        serde_json::to_string_pretty(value).map_err(|error| format!("序列化配置失败：{error}"))?;
     fs::write(file, text).map_err(|error| format!("写入配置失败：{error}"))
 }
 

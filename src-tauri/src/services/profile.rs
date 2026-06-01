@@ -1,6 +1,6 @@
 use crate::domain::{LaunchResult, Profile, ProfileInput, ProfilesState, ScanResult};
 use crate::services::game::{resolve_game_executable, split_launch_args};
-use crate::services::scan::{full_scan, scan_mods, write_profile_blacklist};
+use crate::services::scan::{full_scan_cached, write_profile_blacklist};
 use crate::storage::{load_state, resolve_input_path, write_state};
 use crate::utils::{now_string, stable_id};
 use std::path::PathBuf;
@@ -40,7 +40,7 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
 
 pub fn apply_profile(celeste_path: String, profile_id: String) -> Result<ScanResult, String> {
     let applied = apply_profile_to_blacklist(celeste_path, profile_id)?;
-    Ok(full_scan(&applied.path, applied.profiles))
+    Ok(full_scan_cached(&applied.path, applied.profiles))
 }
 
 pub fn launch_profile(celeste_path: String, profile_id: String) -> Result<LaunchResult, String> {
@@ -68,7 +68,10 @@ struct AppliedProfile {
     profiles: ProfilesState,
 }
 
-fn apply_profile_to_blacklist(celeste_path: String, profile_id: String) -> Result<AppliedProfile, String> {
+fn apply_profile_to_blacklist(
+    celeste_path: String,
+    profile_id: String,
+) -> Result<AppliedProfile, String> {
     let path = resolve_input_path(&celeste_path);
     let mut state = load_state();
     let mut profiles = state.profiles_state();
@@ -78,15 +81,21 @@ fn apply_profile_to_blacklist(celeste_path: String, profile_id: String) -> Resul
         .find(|item| item.id == profile_id)
         .cloned()
         .ok_or_else(|| "Profile 不存在".to_string())?;
-    let scan = scan_mods(&path, &profiles);
-    let enabled_map_ids = profile
-        .enabled_map_ids
-        .clone()
-        .unwrap_or_else(|| scan.maps.iter().filter(|map| map.enabled).map(|map| map.id.clone()).collect());
-    let enabled_mod_ids = profile
-        .enabled_mod_ids
-        .clone()
-        .unwrap_or_else(|| scan.other_mods.iter().filter(|mod_item| mod_item.enabled).map(|mod_item| mod_item.id.clone()).collect());
+    let scan = full_scan_cached(&path, profiles.clone());
+    let enabled_map_ids = profile.enabled_map_ids.clone().unwrap_or_else(|| {
+        scan.maps
+            .iter()
+            .filter(|map| map.enabled)
+            .map(|map| map.id.clone())
+            .collect()
+    });
+    let enabled_mod_ids = profile.enabled_mod_ids.clone().unwrap_or_else(|| {
+        scan.other_mods
+            .iter()
+            .filter(|mod_item| mod_item.enabled)
+            .map(|mod_item| mod_item.id.clone())
+            .collect()
+    });
     write_profile_blacklist(&path, &enabled_map_ids, &enabled_mod_ids, &scan)?;
     profiles.active_profile_id = profile.id.clone();
     state.set_profiles_state(profiles.clone());

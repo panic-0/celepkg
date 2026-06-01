@@ -94,7 +94,7 @@ pub struct ConfigResponse {
     pub profiles: ProfilesState,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanResult {
     pub celeste_path: String,
