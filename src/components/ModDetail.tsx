@@ -1,4 +1,5 @@
 import { ArrowLeft, FolderOpen } from "lucide-react";
+import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
 import type { ModDetailTab } from "../hooks/useUiLayout";
 import { Info } from "./common";
@@ -7,11 +8,15 @@ type ModDetailProps = {
   activeTab: ModDetailTab;
   draftEnabled: boolean;
   modItem?: ModRecord;
+  scrollMemory: ScrollMemory;
   onBack: () => void;
   onTabChange: (tab: ModDetailTab) => void;
 };
 
-export function ModDetail({ activeTab, draftEnabled, modItem, onBack, onTabChange }: ModDetailProps) {
+export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBack, onTabChange }: ModDetailProps) {
+  const modId = modItem?.id ?? "empty";
+  const detailPanelRef = useScrollMemory<HTMLDivElement>(`mod:${modId}:${activeTab}:panel`, scrollMemory);
+
   if (!modItem) {
     return (
       <section className="detail-pane">
@@ -48,7 +53,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, onBack, onTabChang
       </div>
 
       {activeTab === "overview" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>Mod 信息</h3>
             <Info label="作者" value={modItem.metadata.author || "未知"} />
@@ -60,7 +65,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, onBack, onTabChang
       )}
 
       {activeTab === "dependencies" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>依赖</h3>
             {modItem.dependencies.length ? (
@@ -96,7 +101,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, onBack, onTabChang
       )}
 
       {activeTab === "files" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>文件</h3>
             <LongValue label="文件" value={modItem.relativePath} />

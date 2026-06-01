@@ -1,21 +1,32 @@
 import { ArrowLeft, Clock, CircleDot, FolderOpen, Heart, Search, Skull } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MutableRefObject } from "react";
+import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
 import { formatCompletionStatus, formatHeartCassette, formatTime } from "../utils/format";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
 
+export type MapDetailMemoryState = {
+  selectedSubMapId: string;
+  subMapQuery: string;
+};
+
 type MapDetailProps = {
   activeTab: MapDetailTab;
   draftEnabled: boolean;
   map?: ModRecord;
+  mapDetailMemory: MutableRefObject<Record<string, MapDetailMemoryState>>;
+  scrollMemory: ScrollMemory;
   onBack: () => void;
   onTabChange: (tab: MapDetailTab) => void;
 };
 
-export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }: MapDetailProps) {
+export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrollMemory, onBack, onTabChange }: MapDetailProps) {
   const [selectedSubMapId, setSelectedSubMapId] = useState("");
   const [subMapQuery, setSubMapQuery] = useState("");
+  const mapId = map?.id ?? "empty";
+  const detailPanelRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:${activeTab}:panel`, scrollMemory);
+  const subMapTableRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:submaps:table`, scrollMemory);
   const selectedSubMap = useMemo(() => {
     if (!map) return undefined;
     return map.subMaps.find((subMap) => subMap.id === selectedSubMapId) ?? map.subMaps[0];
@@ -30,9 +41,32 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
   }, [map, subMapQuery]);
 
   useEffect(() => {
-    setSelectedSubMapId("");
-    setSubMapQuery("");
-  }, [map?.id]);
+    const saved = map ? mapDetailMemory.current[map.id] : undefined;
+    setSelectedSubMapId(saved?.selectedSubMapId ?? "");
+    setSubMapQuery(saved?.subMapQuery ?? "");
+  }, [map?.id, mapDetailMemory]);
+
+  function updateMapDetailMemory(value: Partial<MapDetailMemoryState>) {
+    if (!map) return;
+    const current = mapDetailMemory.current[map.id] ?? {
+      selectedSubMapId: "",
+      subMapQuery: ""
+    };
+    mapDetailMemory.current[map.id] = {
+      ...current,
+      ...value
+    };
+  }
+
+  function updateSubMapQuery(value: string) {
+    setSubMapQuery(value);
+    updateMapDetailMemory({ subMapQuery: value });
+  }
+
+  function selectSubMap(id: string) {
+    setSelectedSubMapId(id);
+    updateMapDetailMemory({ selectedSubMapId: id });
+  }
 
   if (!map) {
     return (
@@ -71,7 +105,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
       </div>
 
       {activeTab === "overview" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           <div className="stat-grid">
             <DetailStat icon={<Skull size={18} />} label="死亡" value={map.stats?.deaths ?? "-"} />
             <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
@@ -90,18 +124,18 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
       )}
 
       {activeTab === "submaps" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           {map.subMaps.length ? (
             <>
               <label className="sub-map-search">
                 <Search size={15} />
                 <input
                   value={subMapQuery}
-                  onChange={(event) => setSubMapQuery(event.target.value)}
+                  onChange={(event) => updateSubMapQuery(event.target.value)}
                   placeholder="筛选小图名称、SID、章节"
                 />
               </label>
-              <div className="sub-map-table-wrap">
+              <div className="sub-map-table-wrap" ref={subMapTableRef}>
                 <table className="sub-map-table">
                   <colgroup>
                     <col className="w-sub-name" />
@@ -130,7 +164,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
                       <tr
                         className={selectedSubMap?.id === subMap.id ? "active" : ""}
                         key={subMap.id}
-                        onClick={() => setSelectedSubMapId(subMap.id)}
+                        onClick={() => selectSubMap(subMap.id)}
                       >
                         <td title={subMap.displayName}>{subMap.displayName || "未知"}</td>
                         <td title={subMap.chapter}>{subMap.chapter || "未知"}</td>
@@ -164,7 +198,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
       )}
 
       {activeTab === "dependencies" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>文件</h3>
             <LongValue label="文件" value={map.relativePath} />
@@ -192,7 +226,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
       )}
 
       {activeTab === "saves" && (
-        <div className="detail-tab-panel">
+        <div className="detail-tab-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>存档来源</h3>
             <LongList values={map.stats?.saveFiles ?? []} emptyText="未在 Saves/*.celeste 中匹配到该地图统计。" />

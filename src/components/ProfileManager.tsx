@@ -1,4 +1,5 @@
 import { Check, Gamepad2, Layers, Play, Save, Sparkles, ToggleRight } from "lucide-react";
+import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { Profile } from "../types";
 import { profileSummary } from "../utils/format";
 
@@ -14,6 +15,7 @@ type ProfileManagerProps = {
   modProfiles: Profile[];
   selectedMapProfileId: string;
   selectedModProfileId: string;
+  scrollMemory: ScrollMemory;
   totalMapCount: number;
   totalModCount: number;
   onApplyProfile: () => void;
@@ -41,6 +43,7 @@ export function ProfileManager({
   modProfiles,
   selectedMapProfileId,
   selectedModProfileId,
+  scrollMemory,
   totalMapCount,
   totalModCount,
   onApplyProfile,
@@ -89,6 +92,8 @@ export function ProfileManager({
           onSave={() => onSaveMapProfile(false)}
           onSaveAndApply={() => onSaveMapProfile(true)}
           onSaveAs={onSaveAsMapProfile}
+          scrollKey="profiles:maps"
+          scrollMemory={scrollMemory}
           loading={loading}
         >
           <label className="field">
@@ -116,6 +121,8 @@ export function ProfileManager({
           onSave={() => onSaveModProfile(false)}
           onSaveAndApply={() => onSaveModProfile(true)}
           onSaveAs={onSaveAsModProfile}
+          scrollKey="profiles:mods"
+          scrollMemory={scrollMemory}
           loading={loading}
         >
           <div className="profile-stats">
@@ -144,7 +151,9 @@ function ProfileColumn({
   onProfileSelect,
   onSave,
   onSaveAndApply,
-  onSaveAs
+  onSaveAs,
+  scrollKey,
+  scrollMemory
 }: {
   children?: React.ReactNode;
   icon: React.ReactNode;
@@ -160,8 +169,11 @@ function ProfileColumn({
   onSave: () => void;
   onSaveAndApply: () => void;
   onSaveAs: () => void;
+  scrollKey: string;
+  scrollMemory: ScrollMemory;
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
+  const profileListRef = useScrollMemory<HTMLDivElement>(scrollKey, scrollMemory);
 
   return (
     <aside className="profile-editor">
@@ -173,7 +185,7 @@ function ProfileColumn({
         <strong title={selectedProfile?.name || "未选择"}>{selectedProfile?.name || "未选择"}</strong>
         <span>{summary}</span>
       </div>
-      <div className="profile-list table-like">
+      <div className="profile-list table-like" ref={profileListRef}>
         {profiles.map((profile) => (
           <button
             className={profile.id === selectedProfileId ? "profile active" : "profile"}

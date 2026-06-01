@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
-import { useMemo, useState } from "react";
-import { MapDetail } from "./components/MapDetail";
+import { useMemo, useRef, useState } from "react";
+import { MapDetail, type MapDetailMemoryState } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
 import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
@@ -10,6 +10,7 @@ import { setRecordFavorite, setRecordProtected } from "./api";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
+import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import type { ModRecord } from "./types";
 import { isDraftEnabled, readError } from "./utils/format";
@@ -31,6 +32,8 @@ export function App() {
   const [mainMode, setMainMode] = useState<"list" | "detail">("list");
   const [selectedMapId, setSelectedMapId] = useState("");
   const [selectedModId, setSelectedModId] = useState("");
+  const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
+  const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
 
   const profileDraft = useProfileDraft({
@@ -207,6 +210,7 @@ export function App() {
             selectedModProfileId={profileDraft.selectedModProfileId}
             totalMapCount={scan.maps.length}
             totalModCount={scan.otherMods.length}
+            scrollMemory={scrollMemory}
             onApplyProfile={profileDraft.applySelectedProfiles}
             onLaunch={profileDraft.launchSelectedProfiles}
             onLaunchArgsChange={profileDraft.setLaunchArgs}
@@ -223,7 +227,9 @@ export function App() {
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
             map={selectedMap}
+            mapDetailMemory={mapDetailMemory}
             draftEnabled={selectedMap ? isDraftEnabled(selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft) : false}
+            scrollMemory={scrollMemory}
             onBack={() => setMainMode("list")}
             onTabChange={uiLayout.setMapDetailTab}
           />
@@ -232,6 +238,7 @@ export function App() {
             activeTab={uiLayout.modDetailTab}
             modItem={selectedMod}
             draftEnabled={selectedMod ? profileDraft.enabledModDraft.has(selectedMod.id) : false}
+            scrollMemory={scrollMemory}
             onBack={() => setMainMode("list")}
             onTabChange={uiLayout.setModDetailTab}
           />
@@ -244,6 +251,7 @@ export function App() {
             selectedMod={selectedMod}
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
+            scrollMemory={scrollMemory}
             onDisableAll={disableAllInCurrentView}
             onEnableAll={enableAllInCurrentView}
             onMapSelect={selectMap}

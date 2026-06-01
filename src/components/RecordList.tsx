@@ -1,4 +1,5 @@
 import { CircleDot, Clock, FolderOpen, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
+import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
 import { formatCompletionStatus, formatTime } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
@@ -11,6 +12,7 @@ type RecordListProps = {
   filteredMods: ModRecord[];
   selectedMap?: ModRecord;
   selectedMod?: ModRecord;
+  scrollMemory: ScrollMemory;
   visibleMapCount: number;
   modCount: number;
   onDisableAll: () => void;
@@ -31,6 +33,7 @@ export function RecordList({
   filteredMods,
   selectedMap,
   selectedMod,
+  scrollMemory,
   visibleMapCount,
   modCount,
   onDisableAll,
@@ -47,6 +50,7 @@ export function RecordList({
   const records = activeView === "maps" ? filteredMaps : filteredMods;
   const total = activeView === "maps" ? visibleMapCount : modCount;
   const hasRecords = records.length > 0;
+  const tableScrollRef = useScrollMemory<HTMLDivElement>(`records:${activeView}`, scrollMemory);
 
   return (
     <section className="record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
@@ -65,7 +69,7 @@ export function RecordList({
         </button>
       </div>
 
-      <div className="record-table-scroll">
+      <div className="record-table-scroll" ref={tableScrollRef}>
         {activeView === "maps" ? (
           <MapTable
             maps={filteredMaps}
