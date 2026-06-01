@@ -9,13 +9,16 @@ type SidebarProps = {
   helperMapCount: number;
   progressFilter: ProgressFilter;
   query: string;
+  referencedModCount: number;
   showHelperMaps: boolean;
+  showOnlyUnreferencedMods: boolean;
   sortKey: SortKey;
   onActiveViewChange: (view: ActiveView) => void;
   onEnabledFilterChange: (value: EnabledFilter) => void;
   onProgressFilterChange: (value: ProgressFilter) => void;
   onQueryChange: (value: string) => void;
   onShowHelperMapsChange: (value: boolean) => void;
+  onShowOnlyUnreferencedModsChange: (value: boolean) => void;
   onSortKeyChange: (value: SortKey) => void;
 };
 
@@ -25,13 +28,16 @@ export function Sidebar({
   helperMapCount,
   progressFilter,
   query,
+  referencedModCount,
   showHelperMaps,
+  showOnlyUnreferencedMods,
   sortKey,
   onActiveViewChange,
   onEnabledFilterChange,
   onProgressFilterChange,
   onQueryChange,
   onShowHelperMapsChange,
+  onShowOnlyUnreferencedModsChange,
   onSortKeyChange
 }: SidebarProps) {
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -40,7 +46,8 @@ export function Sidebar({
     Number(enabledFilter !== "all") +
     Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
     Number(activeView === "maps" && sortKey !== "name") +
-    Number(activeView === "maps" && showHelperMaps);
+    Number(activeView === "maps" && showHelperMaps) +
+    Number(activeView === "mods" && showOnlyUnreferencedMods);
 
   return (
     <aside className="sidebar">
@@ -113,14 +120,25 @@ export function Sidebar({
                   </button>
                 </>
               ) : (
-                <Select
-                  label="警告"
-                  value={progressFilter === "warnings" ? "warnings" : "all"}
-                  onChange={(value) => onProgressFilterChange(value as ProgressFilter)}
-                >
-                  <option value="all">全部 Mod</option>
-                  <option value="warnings">有警告</option>
-                </Select>
+                <>
+                  <Select
+                    label="警告"
+                    value={progressFilter === "warnings" ? "warnings" : "all"}
+                    onChange={(value) => onProgressFilterChange(value as ProgressFilter)}
+                  >
+                    <option value="all">全部 Mod</option>
+                    <option value="warnings">有警告</option>
+                  </Select>
+                  <button
+                    className={showOnlyUnreferencedMods ? "inline-toggle active" : "inline-toggle"}
+                    onClick={() => onShowOnlyUnreferencedModsChange(!showOnlyUnreferencedMods)}
+                    title="只显示没有被地图或其他 Mod 声明为依赖的 Mod"
+                  >
+                    {showOnlyUnreferencedMods ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                    不被依赖
+                    <small>{referencedModCount}</small>
+                  </button>
+                </>
               )}
             </div>
           )}

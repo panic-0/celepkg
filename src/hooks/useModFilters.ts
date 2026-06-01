@@ -15,12 +15,14 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
   const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [showHelperMaps, setShowHelperMaps] = useState(false);
+  const [showOnlyUnreferencedMods, setShowOnlyUnreferencedMods] = useState(false);
 
   const helperMapMods = useMemo(() => scan.otherMods.filter((modItem) => modItem.subMaps.length > 0), [scan.otherMods]);
   const visibleMapRecords = useMemo(
     () => (showHelperMaps ? [...scan.maps, ...helperMapMods] : scan.maps),
     [helperMapMods, scan.maps, showHelperMaps]
   );
+  const referencedModIds = useMemo(() => findReferencedModIds(scan), [scan]);
 
   const filteredMaps = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -50,6 +52,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
       if (enabledFilter === "enabled" && !draftEnabled) return false;
       if (enabledFilter === "disabled" && draftEnabled) return false;
       if (progressFilter === "warnings" && !modItem.warnings.length) return false;
+      if (showOnlyUnreferencedMods && referencedModIds.has(modItem.id)) return false;
       if (!normalizedQuery) return true;
       return [
         modItem.name,
@@ -63,7 +66,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
         .includes(normalizedQuery);
     });
     return [...mods].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-  }, [enabledFilter, enabledModDraft, progressFilter, query, scan.otherMods]);
+  }, [enabledFilter, enabledModDraft, progressFilter, query, referencedModIds, scan.otherMods, showOnlyUnreferencedMods]);
 
   return {
     enabledFilter,
@@ -72,15 +75,54 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
     helperMapMods,
     progressFilter,
     query,
+    referencedModIds,
     setEnabledFilter,
     setProgressFilter,
     setQuery,
     setShowHelperMaps,
+    setShowOnlyUnreferencedMods,
     setSortKey,
     showHelperMaps,
+    showOnlyUnreferencedMods,
     sortKey,
     visibleMapRecords
   };
+}
+
+function findReferencedModIds(scan: ScanResult) {
+  const aliasToModId = new Map<string, string>();
+  for (const modItem of scan.otherMods) {
+    for (const alias of [
+      modItem.id,
+      modItem.name,
+      modItem.metadata.name,
+      modItem.fileName,
+      modItem.fileName.replace(/\.zip$/i, ""),
+      modItem.relativePath
+    ]) {
+      const normalized = normalizeDependencyName(alias);
+      if (normalized) aliasToModId.set(normalized, modItem.id);
+    }
+  }
+  const referenced = new Set<string>();
+  for (const record of [...scan.maps, ...scan.otherMods]) {
+    for (const dependency of record.dependencies) {
+      const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
+      if (modId && modId !== record.id) referenced.add(modId);
+    }
+  }
+  return referenced;
+}
+
+function normalizeDependencyName(value: string) {
+  return value
+    .replace(/\\/g, "/")
+    .replace(/\.zip$/i, "")
+    .replace(/[_-]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .join(" ")
+    .toLowerCase();
 }
 
 function mapSearchText(map: ModRecord) {

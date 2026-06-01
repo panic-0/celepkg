@@ -129,13 +129,16 @@ export function App() {
           helperMapCount={filters.helperMapMods.length}
           progressFilter={filters.progressFilter}
           query={filters.query}
+          referencedModCount={filters.referencedModIds.size}
           showHelperMaps={filters.showHelperMaps}
+          showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
           sortKey={filters.sortKey}
           onActiveViewChange={changeActiveView}
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
           onShowHelperMapsChange={filters.setShowHelperMaps}
+          onShowOnlyUnreferencedModsChange={filters.setShowOnlyUnreferencedMods}
           onSortKeyChange={filters.setSortKey}
         />
 
