@@ -779,7 +779,10 @@ h1 {
 }
 
 .detail-pane {
-  overflow: auto;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -834,7 +837,9 @@ h1 {
   display: flex;
   gap: 5px;
   overflow-x: auto;
-  padding: 10px 0 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf1f4;
+  background: #ffffff;
 }
 
 .tab-button {
@@ -852,6 +857,10 @@ h1 {
 .detail-tab-panel {
   display: grid;
   gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-top: 10px;
+  padding-right: 2px;
 }
 
 .stat-grid {
@@ -1004,7 +1013,8 @@ h1 {
 }
 
 .sub-map-table-wrap {
-  max-height: min(560px, 52vh);
+  max-height: none;
+  min-height: 0;
   overflow: auto;
   border: 1px solid #dce4ec;
   border-radius: 8px;
