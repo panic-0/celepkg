@@ -60,6 +60,41 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
     Ok(data)
 }
 
+pub fn delete_profile(profile_id: String) -> Result<ProfilesState, String> {
+    if profile_id == "default-maps" || profile_id == "default-mods" {
+        return Err("默认 Profile 不能删除".to_string());
+    }
+    let mut state = load_state();
+    let mut data = state.profiles_state();
+    let Some(profile) = data
+        .profiles
+        .iter()
+        .find(|item| item.id == profile_id)
+        .cloned()
+    else {
+        return Err("Profile 不存在".to_string());
+    };
+    data.profiles.retain(|item| item.id != profile_id);
+    if profile.profile_type == PROFILE_TYPE_MAPS && data.active_map_profile_id == profile_id {
+        data.active_map_profile_id = data
+            .profiles
+            .iter()
+            .find(|item| item.profile_type == PROFILE_TYPE_MAPS)
+            .map(|item| item.id.clone())
+            .unwrap_or_else(|| "default-maps".to_string());
+    } else if profile.profile_type == PROFILE_TYPE_MODS && data.active_mod_profile_id == profile_id {
+        data.active_mod_profile_id = data
+            .profiles
+            .iter()
+            .find(|item| item.profile_type == PROFILE_TYPE_MODS)
+            .map(|item| item.id.clone())
+            .unwrap_or_else(|| "default-mods".to_string());
+    }
+    state.set_profiles_state(data.clone());
+    write_state(&state)?;
+    Ok(data)
+}
+
 pub fn apply_profile(
     celeste_path: String,
     map_profile_id: String,

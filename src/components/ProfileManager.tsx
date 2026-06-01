@@ -1,4 +1,4 @@
-import { Check, Gamepad2, Layers, Play, Save, Sparkles, ToggleRight } from "lucide-react";
+import { Check, Gamepad2, Layers, Play, Save, Sparkles, ToggleRight, Trash2 } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { Profile } from "../types";
 import { profileSummary } from "../utils/format";
@@ -25,6 +25,8 @@ type ProfileManagerProps = {
   onMapProfileSelect: (profile: Profile) => void;
   onModProfileNameChange: (value: string) => void;
   onModProfileSelect: (profile: Profile) => void;
+  onMapProfileDelete: (profile: Profile) => void;
+  onModProfileDelete: (profile: Profile) => void;
   onSaveAsMapProfile: () => void;
   onSaveAsModProfile: () => void;
   onSaveMapProfile: (applyAfterSave: boolean) => void;
@@ -53,6 +55,8 @@ export function ProfileManager({
   onMapProfileSelect,
   onModProfileNameChange,
   onModProfileSelect,
+  onMapProfileDelete,
+  onModProfileDelete,
   onSaveAsMapProfile,
   onSaveAsModProfile,
   onSaveMapProfile,
@@ -98,9 +102,10 @@ export function ProfileManager({
           profiles={mapProfiles}
           selectedProfileId={selectedMapProfileId}
           nameDraft={mapProfileName}
-          nameLabel="另存为地图 Profile"
+          nameLabel="地图 Profile 名称"
           summary={selectedMapProfile ? profileSummary(selectedMapProfile) : "请选择地图 Profile"}
           onNameChange={onMapProfileNameChange}
+          onProfileDelete={onMapProfileDelete}
           onProfileSelect={onMapProfileSelect}
           onSave={() => onSaveMapProfile(false)}
           onSaveAndApply={() => onSaveMapProfile(true)}
@@ -116,9 +121,10 @@ export function ProfileManager({
           profiles={modProfiles}
           selectedProfileId={selectedModProfileId}
           nameDraft={modProfileName}
-          nameLabel="另存为 Mod Profile"
+          nameLabel="Mod Profile 名称"
           summary={selectedModProfile ? profileSummary(selectedModProfile) : "请选择 Mod Profile"}
           onNameChange={onModProfileNameChange}
+          onProfileDelete={onModProfileDelete}
           onProfileSelect={onModProfileSelect}
           onSave={() => onSaveModProfile(false)}
           onSaveAndApply={() => onSaveModProfile(true)}
@@ -151,6 +157,7 @@ function ProfileColumn({
   summary,
   title,
   onNameChange,
+  onProfileDelete,
   onProfileSelect,
   onSave,
   onSaveAndApply,
@@ -167,6 +174,7 @@ function ProfileColumn({
   summary: string;
   title: string;
   onNameChange: (value: string) => void;
+  onProfileDelete: (profile: Profile) => void;
   onProfileSelect: (profile: Profile) => void;
   onSave: () => void;
   onSaveAndApply: () => void;
@@ -189,14 +197,23 @@ function ProfileColumn({
       </div>
       <div className="profile-list table-like" ref={profileListRef}>
         {profiles.map((profile) => (
-          <button
-            className={profile.id === selectedProfileId ? "profile active" : "profile"}
-            key={profile.id}
-            onClick={() => onProfileSelect(profile)}
-          >
-            <span>{profile.name}</span>
-            <small>{profileSummary(profile)}</small>
-          </button>
+          <div className={profile.id === selectedProfileId ? "profile-row active" : "profile-row"} key={profile.id}>
+            <button className="profile" onClick={() => onProfileSelect(profile)}>
+              <span>{profile.name}</span>
+              <small>{profileSummary(profile)}</small>
+            </button>
+            <button
+              className="profile-delete-button"
+              disabled={loading || isDefaultProfile(profile)}
+              title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (window.confirm(`删除 Profile「${profile.name}」？`)) onProfileDelete(profile);
+              }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         ))}
       </div>
       <label className="field">
@@ -219,4 +236,8 @@ function ProfileColumn({
       </button>
     </aside>
   );
+}
+
+function isDefaultProfile(profile: Profile) {
+  return profile.id === "default-maps" || profile.id === "default-mods";
 }

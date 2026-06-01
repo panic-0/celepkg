@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { applyProfile, launchProfile, saveProfile } from "../api";
+import { applyProfile, deleteProfile, launchProfile, saveProfile } from "../api";
 import type { Profile, ScanResult } from "../types";
 import { normalizeDependencyName } from "../utils/dependencies";
 import { readError } from "../utils/format";
@@ -47,6 +47,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   const hydrateMapDraft = useCallback(
     (profile: Profile | undefined) => {
       setSelectedMapProfileId(profile?.id ?? "default-maps");
+      setMapProfileName(profile?.name ?? "新地图 Profile");
       setLaunchArgs(profile?.launchArgs ?? "");
       const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
       setEnabledMapDraft(
@@ -64,6 +65,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   const hydrateModDraft = useCallback(
     (profile: Profile | undefined) => {
       setSelectedModProfileId(profile?.id ?? "default-mods");
+      setModProfileName(profile?.name ?? "新 Mod Profile");
       setEnabledExplicitModDraft(
         new Set(profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
       );
@@ -127,7 +129,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     const current = selectedMapProfile;
     const profiles = await saveProfile({
       id: current?.id,
-      name: current?.name || mapProfileName,
+      name: mapProfileName || current?.name || "未命名地图 Profile",
       profileType: "maps",
       enabledMapIds: [...enabledMapDraft],
       enabledModIds: [...enabledMapModDraft],
@@ -145,7 +147,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     const current = selectedModProfile;
     const profiles = await saveProfile({
       id: current?.id,
-      name: current?.name || modProfileName,
+      name: modProfileName || current?.name || "未命名 Mod Profile",
       profileType: "mods",
       enabledModIds: [...enabledExplicitModDraft],
       createdAt: current?.createdAt
@@ -185,6 +187,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setMapDirty(false);
       setScan((value) => ({ ...value, profiles }));
       setSelectedMapProfileId(profiles.activeMapProfileId);
+      setMapProfileName(profiles.profiles.find((profile) => profile.id === profiles.activeMapProfileId)?.name ?? mapProfileName);
       setMessage("新的地图 Profile 已保存。");
     });
   }
@@ -199,7 +202,32 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setModDirty(false);
       setScan((value) => ({ ...value, profiles }));
       setSelectedModProfileId(profiles.activeModProfileId);
+      setModProfileName(profiles.profiles.find((profile) => profile.id === profiles.activeModProfileId)?.name ?? modProfileName);
       setMessage("新的 Mod Profile 已保存。");
+    });
+  }
+
+  async function deleteMapProfile(profile: Profile) {
+    await runProfileTask(async () => {
+      const profiles = await deleteProfile(profile.id);
+      setMapDirty(false);
+      setScan((value) => ({ ...value, profiles }));
+      const nextProfile = profiles.profiles.find((item) => item.id === profiles.activeMapProfileId);
+      setSelectedMapProfileId(profiles.activeMapProfileId);
+      setMapProfileName(nextProfile?.name ?? "新地图 Profile");
+      setMessage("地图 Profile 已删除。");
+    });
+  }
+
+  async function deleteModProfile(profile: Profile) {
+    await runProfileTask(async () => {
+      const profiles = await deleteProfile(profile.id);
+      setModDirty(false);
+      setScan((value) => ({ ...value, profiles }));
+      const nextProfile = profiles.profiles.find((item) => item.id === profiles.activeModProfileId);
+      setSelectedModProfileId(profiles.activeModProfileId);
+      setModProfileName(nextProfile?.name ?? "新 Mod Profile");
+      setMessage("Mod Profile 已删除。");
     });
   }
 
@@ -255,6 +283,8 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
 
   return {
     applySelectedProfiles,
+    deleteMapProfile,
+    deleteModProfile,
     dependencyModDraft: inferredDependencyModDraft,
     enabledExplicitModDraft,
     enabledMapDraft,

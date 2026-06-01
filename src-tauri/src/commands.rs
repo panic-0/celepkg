@@ -150,6 +150,11 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
 }
 
 #[tauri::command]
+pub fn delete_profile(profile_id: String) -> Result<ProfilesState, String> {
+    services::profile::delete_profile(profile_id)
+}
+
+#[tauri::command]
 pub async fn apply_profile(
     celeste_path: String,
     map_profile_id: String,

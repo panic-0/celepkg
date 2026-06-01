@@ -16,6 +16,7 @@ pub fn run() {
             commands::set_record_favorite,
             commands::set_record_protected,
             commands::save_profile,
+            commands::delete_profile,
             commands::apply_profile,
             commands::launch_profile,
             commands::create_backup,

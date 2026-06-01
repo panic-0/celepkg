@@ -152,8 +152,10 @@ export function App() {
             onApplyProfile={profileDraft.applySelectedProfiles}
             onLaunch={profileDraft.launchSelectedProfiles}
             onLaunchArgsChange={profileDraft.setLaunchArgs}
+            onMapProfileDelete={profileDraft.deleteMapProfile}
             onMapProfileNameChange={profileDraft.setMapProfileName}
             onMapProfileSelect={profileDraft.setMapProfileDraft}
+            onModProfileDelete={profileDraft.deleteModProfile}
             onModProfileNameChange={profileDraft.setModProfileName}
             onModProfileSelect={profileDraft.setModProfileDraft}
             onSaveAsMapProfile={profileDraft.saveAsMapProfile}

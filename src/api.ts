@@ -38,6 +38,10 @@ export async function saveProfile(profile: Partial<Profile> & { name: string }):
   return invokeChecked("save_profile", validateProfilesState, { profile });
 }
 
+export async function deleteProfile(profileId: string): Promise<ProfilesState> {
+  return invokeChecked("delete_profile", validateProfilesState, { profileId });
+}
+
 export async function applyProfile(celestePath: string, mapProfileId: string, modProfileId: string): Promise<ScanResult> {
   return invokeChecked("apply_profile", validateScanResult, { celestePath, mapProfileId, modProfileId });
 }

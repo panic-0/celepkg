@@ -517,6 +517,13 @@ h1 {
   margin-top: 10px;
 }
 
+.profile-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+}
+
 .profile {
   display: grid;
   justify-items: start;
@@ -525,13 +532,26 @@ h1 {
   text-align: left;
 }
 
-.profile.active {
+.profile-row.active .profile {
   border-color: #0f77ad;
   background: #eef8fc;
 }
 
 .profile small {
   color: #697786;
+}
+
+.profile-delete-button {
+  width: 26px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 5px;
+  color: #8a96a3;
+}
+
+.profile-delete-button:hover {
+  background: #fff1f1;
+  color: #b42318;
 }
 
 .profile-layout {
