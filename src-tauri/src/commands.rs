@@ -1,14 +1,17 @@
 use crate::domain::{
-    AppConfig, ConfigResponse, LaunchResult, ProfileInput, ProfilesState, ScanResult,
+    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
 use crate::storage::{load_state, resolve_input_path, write_state};
+use std::path::Path;
+use std::process::Command;
 
 #[tauri::command]
 pub fn get_config() -> Result<ConfigResponse, String> {
     let state = load_state();
     Ok(ConfigResponse {
         celeste_path: state.celeste_path.clone(),
+        auto_backup_enabled: state.auto_backup_enabled,
         profiles: state.profiles_state(),
     })
 }
@@ -20,6 +23,18 @@ pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
     write_state(&state)?;
     Ok(AppConfig {
         celeste_path: state.celeste_path,
+    })
+}
+
+#[tauri::command]
+pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigResponse, String> {
+    let mut state = load_state();
+    state.auto_backup_enabled = auto_backup_enabled;
+    write_state(&state)?;
+    Ok(ConfigResponse {
+        celeste_path: state.celeste_path.clone(),
+        auto_backup_enabled: state.auto_backup_enabled,
+        profiles: state.profiles_state(),
     })
 }
 
@@ -52,6 +67,7 @@ pub async fn set_record_favorite(
             state.profiles_state(),
             &state.protected_record_ids,
         );
+        services::backup::create_auto_backup_if_enabled(&path, state.auto_backup_enabled)?;
         services::scan::write_favorite_state(&path, &record_id, favorite, &scan)?;
         services::scan::set_scan_favorite_state(&mut scan, &record_id, favorite)?;
         services::scan::write_scan_cache(&path, &scan);
@@ -132,4 +148,92 @@ pub async fn launch_profile(
     })
     .await
     .map_err(|error| format!("启动任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn create_backup(celeste_path: String, kind: String) -> Result<BackupInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = resolve_input_path(&celeste_path);
+        match kind.as_str() {
+            "manual" => services::backup::create_manual_backup(&path),
+            "auto" => services::backup::create_auto_backup(&path),
+            _ => Err("备份类型无效".to_string()),
+        }
+    })
+    .await
+    .map_err(|error| format!("备份任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn list_backups() -> Result<Vec<BackupInfo>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let path = resolve_input_path("");
+        services::backup::list_backups(&path)
+    })
+    .await
+    .map_err(|error| format!("读取备份任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn restore_backup(backup_id: String, scope: String) -> Result<BackupInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = resolve_input_path("");
+        services::backup::restore_backup(&path, &backup_id, &scope)
+    })
+    .await
+    .map_err(|error| format!("还原任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn open_backup_folder(celeste_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = resolve_input_path(&celeste_path);
+        let backups_path = services::backup::backups_dir(&path);
+        std::fs::create_dir_all(&backups_path)
+            .map_err(|error| format!("创建备份目录失败：{error}"))?;
+        open_directory(&backups_path)
+    })
+    .await
+    .map_err(|error| format!("打开备份目录任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn open_backup_location(backup_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = Path::new(&backup_path);
+        if !path.is_dir() {
+            return Err("备份目录不存在".to_string());
+        }
+        open_directory(path)
+    })
+    .await
+    .map_err(|error| format!("打开备份位置任务失败：{error}"))?
+}
+
+fn open_directory(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("explorer");
+        command.arg(path);
+        command
+    };
+
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg(path);
+        command
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = Command::new("xdg-open");
+        command.arg(path);
+        command
+    };
+
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("打开文件夹失败：{error}"))
 }

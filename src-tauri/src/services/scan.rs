@@ -781,10 +781,8 @@ mod tests {
             "Maps/pack/one.bin".to_string(),
             "Maps/pack/two.bin".to_string(),
         ];
-        let strawberry_counts = HashMap::from([
-            ("pack/one".to_string(), 3),
-            ("pack/two".to_string(), 5),
-        ]);
+        let strawberry_counts =
+            HashMap::from([("pack/one".to_string(), 3), ("pack/two".to_string(), 5)]);
 
         let record = create_mod_record(
             &mod_path,

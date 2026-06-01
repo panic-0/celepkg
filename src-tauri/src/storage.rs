@@ -10,6 +10,8 @@ pub struct AppState {
     pub celeste_path: String,
     pub active_map_profile_id: String,
     pub active_mod_profile_id: String,
+    #[serde(default = "default_auto_backup_enabled")]
+    pub auto_backup_enabled: bool,
     #[serde(default)]
     pub protected_record_ids: Vec<String>,
     pub profiles: Vec<Profile>,
@@ -58,6 +60,7 @@ fn default_state() -> AppState {
         celeste_path: find_default_celeste_path(),
         active_map_profile_id: "default-maps".to_string(),
         active_mod_profile_id: "default-mods".to_string(),
+        auto_backup_enabled: default_auto_backup_enabled(),
         protected_record_ids: vec![],
         profiles: vec![
             Profile {
@@ -84,13 +87,17 @@ fn default_state() -> AppState {
     }
 }
 
-fn app_dir() -> PathBuf {
+fn default_auto_backup_enabled() -> bool {
+    true
+}
+
+pub fn app_dir() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
         .join("celepkg")
 }
 
-fn state_path() -> PathBuf {
+pub fn state_path() -> PathBuf {
     app_dir().join("state.json")
 }
 
@@ -142,6 +149,7 @@ mod tests {
 
         assert_eq!(state.active_map_profile_id, "default-maps");
         assert_eq!(state.active_mod_profile_id, "default-mods");
+        assert!(state.auto_backup_enabled);
         assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);
         assert_eq!(state.profiles[0].profile_type, "maps");

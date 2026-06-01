@@ -4,7 +4,7 @@ import type { ModRecord } from "../types";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
 
-type RecordView = Exclude<ActiveView, "profiles">;
+type RecordView = Extract<ActiveView, "maps" | "mods">;
 
 type RecordListProps = {
   activeView: RecordView;

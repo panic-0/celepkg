@@ -16,7 +16,11 @@ pub fn stable_id(value: &str) -> String {
 }
 
 pub fn normalize_slash(value: &str) -> String {
-    value.replace('\\', "/").trim_start_matches('/').trim().to_string()
+    value
+        .replace('\\', "/")
+        .trim_start_matches('/')
+        .trim()
+        .to_string()
 }
 
 pub fn path_basename(value: &str) -> String {

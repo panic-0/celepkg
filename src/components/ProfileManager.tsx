@@ -68,14 +68,16 @@ export function ProfileManager({
           <h2>Profile</h2>
           <p>{`启用 ${enabledMapCount}/${totalMapCount} 图，${enabledModCount}/${totalModCount} Mod，其中 ${dependencyModCount} 个由依赖推导`}</p>
         </div>
-        <button onClick={onLaunch} disabled={loading || !selectedMapProfile || !selectedModProfile}>
-          <Play size={16} />
-          启动
-        </button>
-        <button onClick={onApplyProfile} disabled={loading || !selectedMapProfile || !selectedModProfile}>
-          <ToggleRight size={16} />
-          应用
-        </button>
+        <div className="profile-header-actions">
+          <button onClick={onLaunch} disabled={loading || !selectedMapProfile || !selectedModProfile}>
+            <Play size={16} />
+            启动
+          </button>
+          <button onClick={onApplyProfile} disabled={loading || !selectedMapProfile || !selectedModProfile}>
+            <ToggleRight size={16} />
+            应用
+          </button>
+        </div>
       </div>
 
       <div className="profile-combo-bar">

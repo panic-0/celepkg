@@ -17,7 +17,9 @@ pub fn read_dialog_titles(mut files: Vec<(String, String)>) -> HashMap<String, S
             }
             let Some((key, value)) = line.split_once('=') else {
                 if let Some(key) = pending_key.take() {
-                    titles.entry(key).or_insert_with(|| clean_dialog_value(line));
+                    titles
+                        .entry(key)
+                        .or_insert_with(|| clean_dialog_value(line));
                 }
                 continue;
             };
@@ -110,10 +112,19 @@ mod tests {
     #[test]
     fn prefers_chinese_titles_and_multiline_values() {
         let titles = read_dialog_titles(vec![
-            ("Dialog/English.txt".to_string(), "area_pack_map_name=English".to_string()),
-            ("Dialog/ChineseSimplified.txt".to_string(), "area_pack_map_name=\n中文标题".to_string()),
+            (
+                "Dialog/English.txt".to_string(),
+                "area_pack_map_name=English".to_string(),
+            ),
+            (
+                "Dialog/ChineseSimplified.txt".to_string(),
+                "area_pack_map_name=\n中文标题".to_string(),
+            ),
         ]);
 
-        assert_eq!(dialog_title_for_sid("pack/map", &titles), Some("中文标题".to_string()));
+        assert_eq!(
+            dialog_title_for_sid("pack/map", &titles),
+            Some("中文标题".to_string())
+        );
     }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getConfig, scanCeleste, setCelestePath } from "../api";
+import { getConfig, scanCeleste, setAutoBackupEnabled, setCelestePath } from "../api";
 import type { ScanResult } from "../types";
 import { readError } from "../utils/format";
 
@@ -18,6 +18,7 @@ const emptyScan: ScanResult = {
 export function useCelePkgData() {
   const [celestePath, setPathInput] = useState("");
   const [scan, setScan] = useState<ScanResult>(emptyScan);
+  const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -39,6 +40,29 @@ export function useCelePkgData() {
 
   const refresh = useCallback((nextPath = celestePath) => refreshPath(nextPath), [celestePath, refreshPath]);
 
+  const loadConfigAndRefresh = useCallback(async () => {
+    const config = await getConfig();
+    setPathInput(config.celestePath);
+    setAutoBackupEnabledState(config.autoBackupEnabled);
+    setScan((current) => ({ ...current, profiles: config.profiles }));
+    return refreshPath(config.celestePath);
+  }, [refreshPath]);
+
+  const updateAutoBackupEnabled = useCallback(async (enabled: boolean) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const config = await setAutoBackupEnabled(enabled);
+      setAutoBackupEnabledState(config.autoBackupEnabled);
+      setScan((current) => ({ ...current, profiles: config.profiles }));
+      setMessage(config.autoBackupEnabled ? "已开启修改前自动备份。" : "已关闭修改前自动备份。");
+    } catch (error) {
+      setMessage(readError(error));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const savePathAndRefresh = useCallback(async () => {
     setLoading(true);
     setMessage("");
@@ -52,18 +76,14 @@ export function useCelePkgData() {
   }, [celestePath, refreshPath]);
 
   useEffect(() => {
-    getConfig()
-      .then((config) => {
-        setPathInput(config.celestePath);
-        setScan((current) => ({ ...current, profiles: config.profiles }));
-        return refreshPath(config.celestePath);
-      })
-      .catch((error) => setMessage(readError(error)));
-  }, [refreshPath]);
+    loadConfigAndRefresh().catch((error) => setMessage(readError(error)));
+  }, [loadConfigAndRefresh]);
 
   return {
+    autoBackupEnabled,
     celestePath,
     loading,
+    loadConfigAndRefresh,
     message,
     refresh,
     savePathAndRefresh,
@@ -71,6 +91,7 @@ export function useCelePkgData() {
     setLoading,
     setMessage,
     setPathInput,
-    setScan
+    setScan,
+    updateAutoBackupEnabled
   };
 }

@@ -1,4 +1,15 @@
-import { ChevronDown, ChevronRight, Gamepad2, Layers, Search, SlidersHorizontal, ToggleLeft, ToggleRight, UserRound } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  ChevronRight,
+  Gamepad2,
+  Layers,
+  Search,
+  SlidersHorizontal,
+  ToggleLeft,
+  ToggleRight,
+  UserRound
+} from "lucide-react";
 import { useState } from "react";
 import type { ActiveView, EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { Select } from "./common";
@@ -59,6 +70,7 @@ export function WorkspaceNav({
   onSortKeyChange
 }: WorkspaceNavProps) {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const showsRecordFilters = activeView === "maps" || activeView === "mods";
   const filterCount =
     Number(query.trim().length > 0) +
     Number(enabledFilter !== "all") +
@@ -84,6 +96,10 @@ export function WorkspaceNav({
           <UserRound size={18} />
           <span>Profile</span>
         </button>
+        <button className={activeView === "backups" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("backups")}>
+          <Archive size={18} />
+          <span>备份还原</span>
+        </button>
       </section>
 
       <section className="nav-summary">
@@ -99,7 +115,7 @@ export function WorkspaceNav({
         </div>
       </section>
 
-      {activeView !== "profiles" && (
+      {showsRecordFilters && (
         <section className="nav-section filter-dock">
           <button className="filter-toggle" onClick={() => setFiltersExpanded((value) => !value)}>
             {filtersExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}

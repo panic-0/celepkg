@@ -143,6 +143,7 @@ fn apply_profile_to_blacklist(
     });
     enabled_mod_ids.extend(mod_profile_mod_ids);
     enabled_mod_ids = resolve_required_mod_ids(&scan, &enabled_map_ids, &enabled_mod_ids);
+    crate::services::backup::create_auto_backup_if_enabled(&path, state.auto_backup_enabled)?;
     write_profile_blacklist(&path, &enabled_map_ids, &enabled_mod_ids, &scan)?;
     profiles.active_map_profile_id = map_profile.id.clone();
     profiles.active_mod_profile_id = mod_profile.id.clone();

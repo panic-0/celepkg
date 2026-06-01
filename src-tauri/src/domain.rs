@@ -100,6 +100,7 @@ pub struct AppConfig {
 #[serde(rename_all = "camelCase")]
 pub struct ConfigResponse {
     pub celeste_path: String,
+    pub auto_backup_enabled: bool,
     pub profiles: ProfilesState,
 }
 
@@ -136,4 +137,25 @@ pub struct LaunchResult {
     pub executable: String,
     pub map_profile_id: String,
     pub mod_profile_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupFileEntry {
+    pub category: String,
+    pub label: String,
+    pub target_path: String,
+    pub backup_path: String,
+    pub existed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupInfo {
+    pub id: String,
+    pub created_at: String,
+    pub kind: String,
+    pub celeste_path: String,
+    pub backup_path: String,
+    pub files: Vec<BackupFileEntry>,
 }

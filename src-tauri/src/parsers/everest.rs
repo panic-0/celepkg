@@ -6,14 +6,24 @@ pub fn parse_metadata(text: &str) -> ModMetadata {
         return ModMetadata::default();
     }
     let value: Value = serde_yaml::from_str(text).unwrap_or(Value::Null);
-    let root = value.as_sequence().and_then(|seq| seq.first()).unwrap_or(&value);
+    let root = value
+        .as_sequence()
+        .and_then(|seq| seq.first())
+        .unwrap_or(&value);
     ModMetadata {
         name: yaml_string(root, &["Name", "name"]),
         version: yaml_string(root, &["Version", "version"]),
         author: yaml_string(root, &["Author", "author", "Authors", "authors"]),
         description: yaml_string(root, &["Description", "description"]),
         dependencies: yaml_dependencies(root, &["Dependencies", "dependencies"]),
-        optional_dependencies: yaml_dependencies(root, &["OptionalDependencies", "optionalDependencies", "optional_dependencies"]),
+        optional_dependencies: yaml_dependencies(
+            root,
+            &[
+                "OptionalDependencies",
+                "optionalDependencies",
+                "optional_dependencies",
+            ],
+        ),
     }
 }
 
@@ -61,13 +71,19 @@ fn normalize_dependency(value: &Value) -> Option<Dependency> {
             version: String::new(),
         }),
         Value::Mapping(_) => {
-            let name = yaml_string(value, &["Name", "name", "Dependency", "dependency", "Mod", "mod"]);
+            let name = yaml_string(
+                value,
+                &["Name", "name", "Dependency", "dependency", "Mod", "mod"],
+            );
             if name.is_empty() {
                 None
             } else {
                 Some(Dependency {
                     name,
-                    version: yaml_string(value, &["Version", "version", "MinimumVersion", "minimumVersion"]),
+                    version: yaml_string(
+                        value,
+                        &["Version", "version", "MinimumVersion", "minimumVersion"],
+                    ),
                 })
             }
         }

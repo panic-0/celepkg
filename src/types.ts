@@ -76,6 +76,31 @@ export type ProfilesState = {
   profiles: Profile[];
 };
 
+export type ConfigResponse = {
+  celestePath: string;
+  autoBackupEnabled: boolean;
+  profiles: ProfilesState;
+};
+
+export type BackupFileEntry = {
+  category: "state" | "game";
+  label: string;
+  targetPath: string;
+  backupPath: string;
+  existed: boolean;
+};
+
+export type BackupInfo = {
+  id: string;
+  createdAt: string;
+  kind: "manual" | "auto";
+  celestePath: string;
+  backupPath: string;
+  files: BackupFileEntry[];
+};
+
+export type RestoreScope = "game";
+
 export type ScanResult = {
   celestePath: string;
   modsPath: string;
