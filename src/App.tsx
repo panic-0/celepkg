@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useRef } from "react";
 import { BackupManager } from "./components/BackupManager";
 import { MapDetail, type MapDetailMemoryState } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
@@ -14,8 +14,8 @@ import { useProfileDraft } from "./hooks/useProfileDraft";
 import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
+import { useWorkspaceView } from "./hooks/useWorkspaceView";
 import { isDraftEnabled } from "./utils/format";
-import type { ActiveView } from "./viewTypes";
 
 export function App() {
   const {
@@ -33,10 +33,6 @@ export function App() {
     updateAutoBackupEnabled,
     updateSelectedSaveFiles
   } = useCelePkgData();
-  const [activeView, setActiveView] = useState<ActiveView>("maps");
-  const [mainMode, setMainMode] = useState<"list" | "detail">("list");
-  const [selectedMapId, setSelectedMapId] = useState("");
-  const [selectedModId, setSelectedModId] = useState("");
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
@@ -59,19 +55,20 @@ export function App() {
     enabledModDraft: profileDraft.enabledModDraft,
     scan
   });
-
-  const selectedMap = useMemo(
-    () => filters.visibleMapRecords.find((map) => map.id === selectedMapId) ?? filters.visibleMapRecords[0],
-    [filters.visibleMapRecords, selectedMapId]
-  );
-  const selectedMod = useMemo(
-    () => scan.otherMods.find((modItem) => modItem.id === selectedModId) ?? scan.otherMods[0],
-    [scan.otherMods, selectedModId]
-  );
-  const enabledCount = scan.maps.filter((map) => profileDraft.enabledMapDraft.has(map.id)).length;
-  const enabledModCount = scan.otherMods.filter((modItem) => profileDraft.enabledModDraft.has(modItem.id)).length;
+  const workspaceView = useWorkspaceView({
+    enabledMapDraft: profileDraft.enabledMapDraft,
+    enabledModDraft: profileDraft.enabledModDraft,
+    mapProfiles: profileDraft.mapProfiles,
+    maps: scan.maps,
+    modProfiles: profileDraft.modProfiles,
+    otherMods: scan.otherMods,
+    selectedMapProfileId: profileDraft.selectedMapProfileId,
+    selectedModProfileId: profileDraft.selectedModProfileId,
+    visibleMapRecords: filters.visibleMapRecords,
+    onBackupsOpen: () => void backups.refreshBackups()
+  });
   const recordActions = useRecordActions({
-    activeView,
+    activeView: workspaceView.activeView,
     celestePath,
     dependencyModDraft: profileDraft.dependencyModDraft,
     enabledMapDraft: profileDraft.enabledMapDraft,
@@ -90,46 +87,30 @@ export function App() {
     toggleMod: profileDraft.toggleMod
   });
 
-  function changeActiveView(view: ActiveView) {
-    setActiveView(view);
-    setMainMode("list");
-    if (view === "backups") void backups.refreshBackups();
-  }
-
-  function selectMap(id: string) {
-    setSelectedMapId(id);
-    setMainMode("detail");
-  }
-
-  function selectMod(id: string) {
-    setSelectedModId(id);
-    setMainMode("detail");
-  }
-
   return (
     <main className="app-shell">
       <AppToolbar
         celestePath={celestePath}
         loading={loading}
         canLaunch={Boolean(scan.gameExecutable)}
-        enabledMapCount={enabledCount}
-        enabledModCount={enabledModCount}
+        enabledMapCount={workspaceView.enabledMapCount}
+        enabledModCount={workspaceView.enabledModCount}
         scan={scan}
         onLaunch={profileDraft.launchSelectedProfiles}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
       />
 
-      <section className={`workspace ${activeView === "profiles" || activeView === "backups" ? "management-view" : ""}`}>
+      <section className={`workspace ${workspaceView.activeView === "profiles" || workspaceView.activeView === "backups" ? "management-view" : ""}`}>
         <WorkspaceNav
-          activeView={activeView}
+          activeView={workspaceView.activeView}
           dependencyModCount={profileDraft.dependencyModDraft.size}
           enabledFilter={filters.enabledFilter}
-          enabledMapCount={enabledCount}
-          enabledModCount={enabledModCount}
+          enabledMapCount={workspaceView.enabledMapCount}
+          enabledModCount={workspaceView.enabledModCount}
           helperMapCount={filters.helperMapMods.length}
-          mapProfileName={profileDraft.mapProfiles.find((profile) => profile.id === profileDraft.selectedMapProfileId)?.name ?? ""}
-          modProfileName={profileDraft.modProfiles.find((profile) => profile.id === profileDraft.selectedModProfileId)?.name ?? ""}
+          mapProfileName={workspaceView.mapProfileName}
+          modProfileName={workspaceView.modProfileName}
           progressFilter={filters.progressFilter}
           query={filters.query}
           referencedModCount={filters.referencedModIds.size}
@@ -141,7 +122,7 @@ export function App() {
           sortKey={filters.sortKey}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
-          onActiveViewChange={changeActiveView}
+          onActiveViewChange={workspaceView.changeActiveView}
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
@@ -152,10 +133,10 @@ export function App() {
           onSortKeyChange={filters.setSortKey}
         />
 
-        {activeView === "profiles" ? (
+        {workspaceView.activeView === "profiles" ? (
           <ProfileManager
-            enabledMapCount={enabledCount}
-            enabledModCount={enabledModCount}
+            enabledMapCount={workspaceView.enabledMapCount}
+            enabledModCount={workspaceView.enabledModCount}
             dependencyModCount={profileDraft.dependencyModDraft.size}
             launchArgs={profileDraft.launchArgs}
             loading={loading}
@@ -180,7 +161,7 @@ export function App() {
             onSaveMapProfile={profileDraft.saveMapProfile}
             onSaveModProfile={profileDraft.saveModProfile}
           />
-        ) : activeView === "backups" ? (
+        ) : workspaceView.activeView === "backups" ? (
           <BackupManager
             autoBackupEnabled={autoBackupEnabled}
             backups={backups.backups}
@@ -193,41 +174,45 @@ export function App() {
             onBackupRestore={backups.restoreSelectedBackup}
             onBackupsRefresh={backups.refreshBackups}
           />
-        ) : mainMode === "detail" && activeView === "maps" ? (
+        ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
-            map={selectedMap}
+            map={workspaceView.selectedMap}
             mapDetailMemory={mapDetailMemory}
-            draftEnabled={selectedMap ? isDraftEnabled(selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft) : false}
+            draftEnabled={
+              workspaceView.selectedMap
+                ? isDraftEnabled(workspaceView.selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)
+                : false
+            }
             scrollMemory={scrollMemory}
-            onBack={() => setMainMode("list")}
+            onBack={workspaceView.showList}
             onTabChange={uiLayout.setMapDetailTab}
           />
-        ) : mainMode === "detail" && activeView === "mods" ? (
+        ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "mods" ? (
           <ModDetail
             activeTab={uiLayout.modDetailTab}
-            modItem={selectedMod}
-            draftEnabled={selectedMod ? profileDraft.enabledModDraft.has(selectedMod.id) : false}
+            modItem={workspaceView.selectedMod}
+            draftEnabled={workspaceView.selectedMod ? profileDraft.enabledModDraft.has(workspaceView.selectedMod.id) : false}
             scrollMemory={scrollMemory}
-            onBack={() => setMainMode("list")}
+            onBack={workspaceView.showList}
             onTabChange={uiLayout.setModDetailTab}
           />
         ) : (
           <RecordList
-            activeView={activeView}
+            activeView={workspaceView.activeView}
             filteredMaps={filters.filteredMaps}
             filteredMods={filters.filteredMods}
-            selectedMap={selectedMap}
-            selectedMod={selectedMod}
+            selectedMap={workspaceView.selectedMap}
+            selectedMod={workspaceView.selectedMod}
             showWarningColumn={uiLayout.showWarningColumn}
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
             scrollMemory={scrollMemory}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
-            onMapSelect={selectMap}
+            onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
-            onModSelect={selectMod}
+            onModSelect={workspaceView.selectMod}
             onModToggle={recordActions.toggleModRecord}
             onFavoriteToggle={recordActions.updateRecordFavorite}
             onProtectedToggle={recordActions.updateRecordProtected}
