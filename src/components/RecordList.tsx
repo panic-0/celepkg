@@ -128,8 +128,7 @@ function MapTable({
   return (
     <table className={showWarningColumn ? "record-table map-table show-warning" : "record-table map-table"}>
       <colgroup>
-        <col className="w-toggle" />
-        <col className="w-flags" />
+        <col className="w-actions" />
         <col className="w-name" />
         <col className="w-small" />
         <col className="w-progress" />
@@ -140,8 +139,7 @@ function MapTable({
       </colgroup>
       <thead>
         <tr>
-          <th className="col-toggle">状态</th>
-          <th className="col-flags">标记</th>
+          <th className="col-actions">操作</th>
           <th>名称</th>
           <th className="num">小图</th>
           <th>完成</th>
@@ -156,10 +154,8 @@ function MapTable({
           const enabled = isEnabled(map);
           return (
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
-              <td className="col-toggle">
+              <td className="action-cell">
                 <ToggleButton enabled={enabled} label="地图" onClick={() => onToggle(map)} />
-              </td>
-              <td className="flag-cell">
                 <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
                 <FlagButton active={map.protected} icon={map.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(map)} />
               </td>
@@ -210,8 +206,7 @@ function ModTable({
   return (
     <table className={showWarningColumn ? "record-table mod-table show-warning" : "record-table mod-table"}>
       <colgroup>
-        <col className="w-toggle" />
-        <col className="w-flags" />
+        <col className="w-actions" />
         <col className="w-name" />
         <col className="w-kind" />
         <col className="w-number" />
@@ -220,8 +215,7 @@ function ModTable({
       </colgroup>
       <thead>
         <tr>
-          <th className="col-toggle">状态</th>
-          <th className="col-flags">标记</th>
+          <th className="col-actions">操作</th>
           <th>名称</th>
           <th>类型</th>
           <th className="num">依赖</th>
@@ -234,10 +228,8 @@ function ModTable({
           const enabled = isEnabled(modItem.id);
           return (
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
-              <td className="col-toggle">
+              <td className="action-cell">
                 <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem.id)} />
-              </td>
-              <td className="flag-cell">
                 <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
                 <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
               </td>

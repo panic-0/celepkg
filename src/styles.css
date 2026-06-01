@@ -570,19 +570,19 @@ h1 {
 }
 
 .map-table {
-  min-width: 884px;
+  min-width: 854px;
 }
 
 .map-table.show-warning {
-  min-width: 960px;
+  min-width: 930px;
 }
 
 .mod-table {
-  min-width: 704px;
+  min-width: 674px;
 }
 
 .mod-table.show-warning {
-  min-width: 780px;
+  min-width: 750px;
 }
 
 .profile-table {
@@ -629,25 +629,34 @@ h1 {
   box-shadow: inset 3px 0 0 #0f77ad;
 }
 
-.record-table .col-toggle {
-  width: 58px;
+.record-table .col-actions {
+  width: 100px;
   text-align: center;
 }
 
-.record-table .col-flags {
-  width: 72px;
+.action-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  padding-left: 4px;
+  overflow: visible;
   text-align: center;
-}
-
-.flag-cell {
-  text-align: center;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
+.action-cell .switch,
+.action-cell .flag-button {
+  min-height: 28px;
+}
+
 .flag-button {
+  flex: 0 0 28px;
   width: 28px;
   min-height: 28px;
-  margin: 0 2px;
+  margin: 0;
   padding: 0;
   border-color: transparent;
   background: transparent;
@@ -675,12 +684,8 @@ h1 {
   text-align: right;
 }
 
-.record-table col.w-toggle {
-  width: 58px;
-}
-
-.record-table col.w-flags {
-  width: 72px;
+.record-table col.w-actions {
+  width: 100px;
 }
 
 .record-table col.w-small {
