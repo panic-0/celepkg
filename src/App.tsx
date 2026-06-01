@@ -38,7 +38,8 @@ export function App() {
     setMessage,
     setPathInput,
     setScan,
-    updateAutoBackupEnabled
+    updateAutoBackupEnabled,
+    updateSelectedSaveFiles
   } = useCelePkgData();
   const [activeView, setActiveView] = useState<ActiveView>("maps");
   const [mainMode, setMainMode] = useState<"list" | "detail">("list");
@@ -310,6 +311,8 @@ export function App() {
           progressFilter={filters.progressFilter}
           query={filters.query}
           referencedModCount={filters.referencedModIds.size}
+          saveFiles={scan.availableSaveFiles}
+          selectedSaveFiles={scan.selectedSaveFiles}
           showHelperMaps={filters.showHelperMaps}
           showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
           showWarningColumn={uiLayout.showWarningColumn}
@@ -320,6 +323,7 @@ export function App() {
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
+          onSelectedSaveFilesChange={updateSelectedSaveFiles}
           onShowHelperMapsChange={filters.setShowHelperMaps}
           onShowOnlyUnreferencedModsChange={filters.setShowOnlyUnreferencedMods}
           onShowWarningColumnChange={uiLayout.setShowWarningColumn}

@@ -363,6 +363,73 @@ h1 {
   gap: 8px;
 }
 
+.save-picker {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.select-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #627080;
+  font-size: 12px;
+}
+
+.select-label small {
+  color: #657384;
+}
+
+.save-list {
+  display: grid;
+  gap: 6px;
+  max-height: 210px;
+  overflow: auto;
+}
+
+.save-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: start;
+  gap: 2px 8px;
+  min-height: 58px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.save-option.active {
+  border-color: #0f77ad;
+  background: #eef8fc;
+  color: #075b86;
+}
+
+.save-option span,
+.save-option strong,
+.save-option small {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-option span {
+  font-weight: 800;
+}
+
+.save-option strong {
+  justify-self: end;
+  font-size: 12px;
+}
+
+.save-option small {
+  grid-column: 1 / -1;
+  color: #657384;
+  font-size: 11px;
+}
+
 .search-box,
 .sub-map-search {
   display: grid;

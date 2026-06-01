@@ -12,6 +12,8 @@ pub struct AppState {
     pub active_mod_profile_id: String,
     #[serde(default = "default_auto_backup_enabled")]
     pub auto_backup_enabled: bool,
+    #[serde(default = "default_selected_save_files")]
+    pub selected_save_files: Vec<String>,
     #[serde(default)]
     pub protected_record_ids: Vec<String>,
     pub profiles: Vec<Profile>,
@@ -61,6 +63,7 @@ fn default_state() -> AppState {
         active_map_profile_id: "default-maps".to_string(),
         active_mod_profile_id: "default-mods".to_string(),
         auto_backup_enabled: default_auto_backup_enabled(),
+        selected_save_files: default_selected_save_files(),
         protected_record_ids: vec![],
         profiles: vec![
             Profile {
@@ -89,6 +92,10 @@ fn default_state() -> AppState {
 
 fn default_auto_backup_enabled() -> bool {
     true
+}
+
+fn default_selected_save_files() -> Vec<String> {
+    vec!["0.celeste".to_string()]
 }
 
 pub fn app_dir() -> PathBuf {
@@ -150,6 +157,7 @@ mod tests {
         assert_eq!(state.active_map_profile_id, "default-maps");
         assert_eq!(state.active_mod_profile_id, "default-mods");
         assert!(state.auto_backup_enabled);
+        assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);
         assert_eq!(state.profiles[0].profile_type, "maps");

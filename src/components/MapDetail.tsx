@@ -151,7 +151,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
             <DetailStat
               icon={<CircleDot size={18} />}
               label="草莓"
-              value={formatStrawberries(map.stats?.strawberries, map.strawberryCount)}
+              value={formatStrawberries(map.stats?.strawberries, map.strawberryCount, map.stats?.strawberriesKnown ?? true)}
             />
             <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
           </div>
@@ -245,7 +245,13 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                           <td>{formatCompletionStatus(subMap.completionStatus)}</td>
                           <td className="num">{subMap.stats?.deaths ?? "-"}</td>
                           <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
-                          <td className="num">{formatStrawberries(subMap.stats?.strawberries, subMap.strawberryCount)}</td>
+                          <td className="num">
+                            {formatStrawberries(
+                              subMap.stats?.strawberries,
+                              subMap.strawberryCount,
+                              subMap.stats?.strawberriesKnown ?? true
+                            )}
+                          </td>
                           <td>{formatHeartCassette(subMap.stats)}</td>
                         </tr>
                         {selectedSubMap?.id === subMap.id && (
@@ -255,7 +261,14 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                                 <Info label="名称" value={subMap.displayName || "未知"} />
                                 <Info label="章节" value={subMap.chapter || "未知"} />
                                 <Info label="完成" value={formatCompletionStatus(subMap.completionStatus)} />
-                                <Info label="草莓" value={formatStrawberries(subMap.stats?.strawberries, subMap.strawberryCount)} />
+                                <Info
+                                  label="草莓"
+                                  value={formatStrawberries(
+                                    subMap.stats?.strawberries,
+                                    subMap.strawberryCount,
+                                    subMap.stats?.strawberriesKnown ?? true
+                                  )}
+                                />
                                 <Info label="SID" value={subMap.sid} />
                                 <Info label="文件" value={subMap.filePath} />
                               </div>
@@ -325,6 +338,7 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string) {
   const statsMembers = members.filter((subMap) => subMap.stats);
   const totalStrawberries = members.reduce((sum, subMap) => sum + subMap.strawberryCount, 0);
   const collectedStrawberries = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.strawberries ?? 0), 0);
+  const strawberriesKnown = statsMembers.every((subMap) => subMap.stats?.strawberriesKnown ?? true);
   const deaths = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.deaths ?? 0), 0);
   const timePlayed = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.timePlayed ?? 0), 0);
   const hearts = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.hearts ?? 0), 0);
@@ -337,7 +351,7 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string) {
     completion: completable.length === 0 ? "不适用" : known.length ? `${completed}/${known.length}` : "未知",
     deaths: statsMembers.length ? deaths : "-",
     heartCassette: statsMembers.length ? `${hearts}/${cassettes}` : "-",
-    strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries),
+    strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries, strawberriesKnown),
     time: statsMembers.length ? formatTime(timePlayed) : "-"
   };
 }

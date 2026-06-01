@@ -12,6 +12,7 @@ pub fn get_config() -> Result<ConfigResponse, String> {
     Ok(ConfigResponse {
         celeste_path: state.celeste_path.clone(),
         auto_backup_enabled: state.auto_backup_enabled,
+        selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),
     })
 }
@@ -34,6 +35,23 @@ pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigRespon
     Ok(ConfigResponse {
         celeste_path: state.celeste_path.clone(),
         auto_backup_enabled: state.auto_backup_enabled,
+        selected_save_files: state.selected_save_files.clone(),
+        profiles: state.profiles_state(),
+    })
+}
+
+#[tauri::command]
+pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
+    let mut state = load_state();
+    let path = resolve_input_path("");
+    let available = services::scan::list_available_save_files(&path);
+    state.selected_save_files =
+        crate::parsers::save_stats::normalize_selected_save_files(&available, &save_files);
+    write_state(&state)?;
+    Ok(ConfigResponse {
+        celeste_path: state.celeste_path.clone(),
+        auto_backup_enabled: state.auto_backup_enabled,
+        selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),
     })
 }
@@ -47,6 +65,7 @@ pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
             &path,
             state.profiles_state(),
             &state.protected_record_ids,
+            &state.selected_save_files,
         ))
     })
     .await
@@ -66,6 +85,7 @@ pub async fn set_record_favorite(
             &path,
             state.profiles_state(),
             &state.protected_record_ids,
+            &state.selected_save_files,
         );
         services::backup::create_auto_backup_if_enabled(&path, state.auto_backup_enabled)?;
         services::scan::write_favorite_state(&path, &record_id, favorite, &scan)?;
@@ -90,6 +110,7 @@ pub async fn set_record_protected(
             &path,
             state.profiles_state(),
             &state.protected_record_ids,
+            &state.selected_save_files,
         );
         if !scan
             .maps
@@ -113,6 +134,7 @@ pub async fn set_record_protected(
             &path,
             state.profiles_state(),
             &state.protected_record_ids,
+            &state.selected_save_files,
         ))
     })
     .await

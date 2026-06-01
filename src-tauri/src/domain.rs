@@ -23,12 +23,22 @@ pub struct ModMetadata {
 pub struct MapStats {
     pub deaths: u64,
     pub strawberries: u64,
+    pub strawberries_known: bool,
     pub time_played: u64,
     pub completed: bool,
     pub completion_known: bool,
     pub cassettes: u64,
     pub hearts: u64,
     pub save_files: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveFileInfo {
+    pub name: String,
+    pub player_name: String,
+    pub current_map: String,
+    pub last_modified: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +111,7 @@ pub struct AppConfig {
 pub struct ConfigResponse {
     pub celeste_path: String,
     pub auto_backup_enabled: bool,
+    pub selected_save_files: Vec<String>,
     pub profiles: ProfilesState,
 }
 
@@ -115,6 +126,8 @@ pub struct ScanResult {
     pub maps: Vec<ModRecord>,
     pub other_mods: Vec<ModRecord>,
     pub profiles: ProfilesState,
+    pub available_save_files: Vec<SaveFileInfo>,
+    pub selected_save_files: Vec<String>,
     pub warnings: Vec<String>,
 }
 

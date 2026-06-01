@@ -11,6 +11,7 @@ pub fn run() {
             commands::get_config,
             commands::set_celeste_path,
             commands::set_auto_backup_enabled,
+            commands::set_selected_save_files,
             commands::scan_celeste,
             commands::set_record_favorite,
             commands::set_record_protected,

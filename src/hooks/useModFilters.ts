@@ -71,7 +71,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
     return [...maps].sort((a, b) => {
       if (sortKey === "deaths") return (b.stats?.deaths ?? -1) - (a.stats?.deaths ?? -1);
       if (sortKey === "time") return (b.stats?.timePlayed ?? -1) - (a.stats?.timePlayed ?? -1);
-      if (sortKey === "strawberries") return (b.stats?.strawberries ?? -1) - (a.stats?.strawberries ?? -1);
+      if (sortKey === "strawberries") return strawberrySortValue(b) - strawberrySortValue(a);
       return a.name.localeCompare(b.name, "zh-Hans-CN");
     });
   }, [enabledMapDraft, enabledFilter, enabledModDraft, progressFilter, query, sortKey, visibleMapRecords]);
@@ -144,6 +144,10 @@ function writeSavedFilters(filters: SavedModFilters) {
   } catch {
     // Filter preferences are local UI state; ignore storage failures.
   }
+}
+
+function strawberrySortValue(record: { stats: { strawberries: number; strawberriesKnown: boolean } | null }) {
+  return record.stats?.strawberriesKnown ? record.stats.strawberries : -1;
 }
 
 function isEnabledFilter(value: unknown): value is EnabledFilter {

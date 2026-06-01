@@ -13,6 +13,10 @@ export async function setAutoBackupEnabled(autoBackupEnabled: boolean): Promise<
   return invoke("set_auto_backup_enabled", { autoBackupEnabled });
 }
 
+export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
+  return invoke("set_selected_save_files", { saveFiles });
+}
+
 export async function scanCeleste(celestePath: string): Promise<ScanResult> {
   return invoke("scan_celeste", { celestePath });
 }

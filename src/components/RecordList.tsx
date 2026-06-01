@@ -196,7 +196,9 @@ function MapTable({
               <td>{formatCompletionStatus(map.completionStatus)}</td>
               <td className="num">{map.stats?.deaths ?? "-"}</td>
               <td className="num">{formatTime(map.stats?.timePlayed)}</td>
-              <td className="num">{formatStrawberries(map.stats?.strawberries, map.strawberryCount)}</td>
+              <td className="num">
+                {formatStrawberries(map.stats?.strawberries, map.strawberryCount, map.stats?.strawberriesKnown ?? true)}
+              </td>
               {showWarningColumn && <td>{map.warnings.length ? <span className="warning-pill">{map.warnings.length}</span> : "-"}</td>}
             </tr>
           );

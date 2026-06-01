@@ -1,8 +1,10 @@
-use crate::domain::{ModMetadata, ModRecord, ProfilesState, ScanResult, SubMapInfo};
+use crate::domain::{ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult, SubMapInfo};
 use crate::parsers::dialog::{dialog_title_for_sid, is_dialog_file, read_dialog_titles};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
 use crate::parsers::map_bin::count_strawberries;
-use crate::parsers::save_stats::read_save_stats;
+use crate::parsers::save_stats::{
+    is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
+};
 use crate::services::game::resolve_game_executable;
 use crate::storage::{read_json, scan_cache_path, write_json};
 use crate::utils::{normalize_slash, path_basename, stable_id};
@@ -15,13 +17,14 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 3;
+const SCAN_CACHE_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 struct ScanSignature {
     version: u32,
     celeste_path: String,
+    selected_save_files: Vec<String>,
     files: Vec<FileStamp>,
 }
 
@@ -50,18 +53,29 @@ pub fn full_scan_cached(
     celeste_path: &Path,
     profiles: ProfilesState,
     protected_record_ids: &[String],
+    selected_save_files: &[String],
 ) -> ScanResult {
-    let signature = build_scan_signature(celeste_path);
+    let available_save_files = list_save_files(celeste_path);
+    let selected_save_files =
+        normalize_selected_save_files(&available_save_files, selected_save_files);
+    let signature = build_scan_signature(celeste_path, &selected_save_files);
     let cache_path = scan_cache_path(celeste_path);
     if let Some(mut cached) = read_json::<CachedScan>(&cache_path) {
         if cached.signature == signature {
             cached.result.profiles = profiles;
+            cached.result.available_save_files = available_save_files;
+            cached.result.selected_save_files = selected_save_files;
             apply_protected_flags(&mut cached.result, protected_record_ids);
             return cached.result;
         }
     }
 
-    let mut result = full_scan(celeste_path, profiles);
+    let mut result = full_scan(
+        celeste_path,
+        profiles,
+        available_save_files,
+        selected_save_files,
+    );
     apply_protected_flags(&mut result, protected_record_ids);
     let cache = CachedScan {
         signature,
@@ -71,17 +85,28 @@ pub fn full_scan_cached(
     result
 }
 
+pub fn list_available_save_files(celeste_path: &Path) -> Vec<SaveFileInfo> {
+    list_save_files(celeste_path)
+}
+
 pub fn write_scan_cache(celeste_path: &Path, result: &ScanResult) {
     let cache = CachedScan {
-        signature: build_scan_signature(celeste_path),
+        signature: build_scan_signature(celeste_path, &result.selected_save_files),
         result: result.clone(),
     };
     let _ = write_json(&scan_cache_path(celeste_path), &cache);
 }
 
-pub fn full_scan(celeste_path: &Path, profiles: ProfilesState) -> ScanResult {
+pub fn full_scan(
+    celeste_path: &Path,
+    profiles: ProfilesState,
+    available_save_files: Vec<SaveFileInfo>,
+    selected_save_files: Vec<String>,
+) -> ScanResult {
     let mut scan = scan_mods(celeste_path, &profiles);
-    scan.maps = read_save_stats(celeste_path, scan.maps);
+    scan.maps = read_save_stats(celeste_path, scan.maps, &selected_save_files);
+    scan.available_save_files = available_save_files;
+    scan.selected_save_files = selected_save_files;
     scan
 }
 
@@ -92,7 +117,7 @@ fn apply_protected_flags(scan: &mut ScanResult, protected_record_ids: &[String])
     }
 }
 
-fn build_scan_signature(celeste_path: &Path) -> ScanSignature {
+fn build_scan_signature(celeste_path: &Path, selected_save_files: &[String]) -> ScanSignature {
     let mut files = vec![];
     collect_tree_stamps(celeste_path, &celeste_path.join("Mods"), "Mods", &mut files);
     collect_save_stamps(celeste_path, &mut files);
@@ -102,6 +127,7 @@ fn build_scan_signature(celeste_path: &Path) -> ScanSignature {
     ScanSignature {
         version: SCAN_CACHE_VERSION,
         celeste_path: normalize_slash(&celeste_path.to_string_lossy()).to_lowercase(),
+        selected_save_files: selected_save_files.to_vec(),
         files,
     }
 }
@@ -145,7 +171,7 @@ fn collect_save_stamps(celeste_path: &Path, files: &mut Vec<FileStamp>) {
                 continue;
             }
             let file_name = entry.file_name().to_string_lossy().to_string();
-            if !is_primary_save_file_name(&file_name) {
+            if !is_selectable_save_file(&file_name) {
                 continue;
             }
             let relative = path.strip_prefix(celeste_path).unwrap_or(&path);
@@ -174,17 +200,6 @@ fn collect_file_stamp(path: &Path, relative: &str, files: &mut Vec<FileStamp>) {
     });
 }
 
-fn is_primary_save_file_name(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    if lower == "debug.celeste" {
-        return true;
-    }
-    lower
-        .strip_suffix(".celeste")
-        .map(|stem| !stem.is_empty() && stem.chars().all(|ch| ch.is_ascii_digit()))
-        .unwrap_or(false)
-}
-
 pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
     let mods_path = celeste_path.join("Mods");
     if !mods_path.exists() {
@@ -200,6 +215,8 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
             maps: vec![],
             other_mods: vec![],
             profiles: profiles.clone(),
+            available_save_files: vec![],
+            selected_save_files: vec![],
             warnings: vec!["没有找到 Celeste/Mods 目录。".to_string()],
         };
     }
@@ -281,6 +298,8 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         maps,
         other_mods,
         profiles: profiles.clone(),
+        available_save_files: vec![],
+        selected_save_files: vec![],
         warnings: vec![],
     }
 }
@@ -824,6 +843,8 @@ mod tests {
                 active_mod_profile_id: "default-mods".to_string(),
                 profiles: vec![],
             },
+            available_save_files: vec![],
+            selected_save_files: vec![],
             warnings: vec![],
         };
 
@@ -862,6 +883,8 @@ mod tests {
             maps: vec![],
             other_mods: vec![enabled_protected, disabled_protected],
             profiles: empty_profiles(),
+            available_save_files: vec![],
+            selected_save_files: vec![],
             warnings: vec![],
         };
 
@@ -880,15 +903,15 @@ mod tests {
         write_dir_map(&root, "FavoriteMap", "maps/favorite/one");
         let cache_file = scan_cache_path(&root);
         let _ = fs::remove_file(&cache_file);
-        let scan = full_scan_cached(&root, empty_profiles(), &[]);
+        let scan = full_scan_cached(&root, empty_profiles(), &[], &[]);
         let record_id = scan.maps[0].id.clone();
 
         write_favorite_state(&root, &record_id, true, &scan).expect("write favorite");
-        let favorite_scan = full_scan_cached(&root, empty_profiles(), &[]);
+        let favorite_scan = full_scan_cached(&root, empty_profiles(), &[], &[]);
         assert!(favorite_scan.maps[0].favorite);
 
         write_favorite_state(&root, &record_id, false, &favorite_scan).expect("remove favorite");
-        let plain_scan = full_scan_cached(&root, empty_profiles(), &[]);
+        let plain_scan = full_scan_cached(&root, empty_profiles(), &[], &[]);
 
         let _ = fs::remove_file(cache_file);
         let _ = fs::remove_dir_all(root);
@@ -902,11 +925,11 @@ mod tests {
         write_dir_map(&root, "ProtectedMap", "maps/protected/one");
         let cache_file = scan_cache_path(&root);
         let _ = fs::remove_file(&cache_file);
-        let first = full_scan_cached(&root, empty_profiles(), &[]);
+        let first = full_scan_cached(&root, empty_profiles(), &[], &[]);
         let record_id = first.maps[0].id.clone();
         assert!(!first.maps[0].protected);
 
-        let second = full_scan_cached(&root, empty_profiles(), &[record_id]);
+        let second = full_scan_cached(&root, empty_profiles(), &[record_id], &[]);
 
         let _ = fs::remove_file(cache_file);
         let _ = fs::remove_dir_all(root);
@@ -929,6 +952,7 @@ mod tests {
                 profiles: vec![],
             },
             &[],
+            &[],
         );
         assert_eq!(first.profiles.active_map_profile_id, "one");
         assert_eq!(first.maps.len(), 1);
@@ -942,6 +966,7 @@ mod tests {
                 profiles: vec![],
             },
             &[],
+            &[],
         );
         assert_eq!(cached.profiles.active_map_profile_id, "two");
         assert!(cached.maps[0].enabled);
@@ -954,6 +979,7 @@ mod tests {
                 active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
+            &[],
             &[],
         );
 
@@ -974,7 +1000,7 @@ mod tests {
         let cache_file = scan_cache_path(&root);
         let _ = fs::remove_file(&cache_file);
 
-        let first = full_scan_cached(&root, empty_profiles(), &[]);
+        let first = full_scan_cached(&root, empty_profiles(), &[], &[]);
         assert_eq!(
             first.maps[0].stats.as_ref().map(|stats| stats.deaths),
             Some(1)
@@ -985,7 +1011,7 @@ mod tests {
             format!("{}\n<!-- changed -->", save_xml("maps/cache/save", 7)),
         )
         .expect("save file update");
-        let second = full_scan_cached(&root, empty_profiles(), &[]);
+        let second = full_scan_cached(&root, empty_profiles(), &[], &[]);
 
         let _ = fs::remove_file(cache_file);
         let _ = fs::remove_dir_all(root);
@@ -993,6 +1019,68 @@ mod tests {
         assert_eq!(
             second.maps[0].stats.as_ref().map(|stats| stats.deaths),
             Some(7)
+        );
+    }
+
+    #[test]
+    fn selected_save_files_control_scanned_stats() {
+        let root = temp_celeste_root("selected-save");
+        write_dir_map(&root, "SaveMap", "maps/selected/save");
+        let saves_path = root.join("Saves");
+        fs::create_dir_all(&saves_path).expect("saves dir");
+        fs::write(
+            saves_path.join("0.celeste"),
+            save_xml("maps/selected/save", 1),
+        )
+        .expect("save 0");
+        fs::write(
+            saves_path.join("2.celeste"),
+            save_xml("maps/selected/save", 9),
+        )
+        .expect("save 2");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let default_scan = full_scan_cached(&root, empty_profiles(), &[], &[]);
+        let selected_scan = full_scan_cached(
+            &root,
+            empty_profiles(),
+            &[],
+            &["2.celeste".to_string(), "debug.celeste".to_string()],
+        );
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(
+            default_scan.selected_save_files,
+            vec!["0.celeste".to_string()]
+        );
+        assert_eq!(
+            selected_scan
+                .available_save_files
+                .iter()
+                .map(|save| save.name.clone())
+                .collect::<Vec<_>>(),
+            vec!["0.celeste".to_string(), "2.celeste".to_string()]
+        );
+        assert_eq!(
+            selected_scan.selected_save_files,
+            vec!["2.celeste".to_string()]
+        );
+        assert_eq!(
+            default_scan.maps[0]
+                .stats
+                .as_ref()
+                .map(|stats| stats.deaths),
+            Some(1)
+        );
+        assert_eq!(
+            selected_scan.maps[0]
+                .stats
+                .as_ref()
+                .map(|stats| stats.deaths),
+            Some(9)
         );
     }
 

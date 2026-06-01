@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { getConfig, scanCeleste, setAutoBackupEnabled, setCelestePath } from "../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getConfig, scanCeleste, setAutoBackupEnabled, setCelestePath, setSelectedSaveFiles } from "../api";
 import type { ScanResult } from "../types";
 import { readError } from "../utils/format";
 
@@ -12,6 +12,8 @@ const emptyScan: ScanResult = {
   maps: [],
   otherMods: [],
   profiles: { activeMapProfileId: "default-maps", activeModProfileId: "default-mods", profiles: [] },
+  availableSaveFiles: [],
+  selectedSaveFiles: ["0.celeste"],
   warnings: []
 };
 
@@ -21,6 +23,7 @@ export function useCelePkgData() {
   const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const selectedSaveRequestRef = useRef(0);
 
   const refreshPath = useCallback(async (nextPath: string) => {
     setLoading(true);
@@ -44,7 +47,7 @@ export function useCelePkgData() {
     const config = await getConfig();
     setPathInput(config.celestePath);
     setAutoBackupEnabledState(config.autoBackupEnabled);
-    setScan((current) => ({ ...current, profiles: config.profiles }));
+    setScan((current) => ({ ...current, profiles: config.profiles, selectedSaveFiles: config.selectedSaveFiles }));
     return refreshPath(config.celestePath);
   }, [refreshPath]);
 
@@ -60,6 +63,31 @@ export function useCelePkgData() {
       setMessage(readError(error));
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const updateSelectedSaveFiles = useCallback(async (saveFiles: string[]) => {
+    const requestId = selectedSaveRequestRef.current + 1;
+    selectedSaveRequestRef.current = requestId;
+    setScan((current) => ({ ...current, selectedSaveFiles: saveFiles }));
+    setLoading(true);
+    setMessage("");
+    try {
+      const config = await setSelectedSaveFiles(saveFiles);
+      if (selectedSaveRequestRef.current !== requestId) return;
+      setScan((current) => ({ ...current, profiles: config.profiles, selectedSaveFiles: config.selectedSaveFiles }));
+      const result = await scanCeleste(config.celestePath);
+      if (selectedSaveRequestRef.current !== requestId) return;
+      setScan(result);
+      setPathInput(result.celestePath);
+    } catch (error) {
+      if (selectedSaveRequestRef.current === requestId) {
+        setMessage(readError(error));
+      }
+    } finally {
+      if (selectedSaveRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -92,6 +120,7 @@ export function useCelePkgData() {
     setMessage,
     setPathInput,
     setScan,
-    updateAutoBackupEnabled
+    updateAutoBackupEnabled,
+    updateSelectedSaveFiles
   };
 }

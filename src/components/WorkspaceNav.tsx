@@ -11,6 +11,7 @@ import {
   UserRound
 } from "lucide-react";
 import { useState } from "react";
+import type { SaveFileInfo } from "../types";
 import type { ActiveView, EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { Select } from "./common";
 
@@ -26,6 +27,8 @@ type WorkspaceNavProps = {
   progressFilter: ProgressFilter;
   query: string;
   referencedModCount: number;
+  saveFiles: SaveFileInfo[];
+  selectedSaveFiles: string[];
   showHelperMaps: boolean;
   showOnlyUnreferencedMods: boolean;
   showWarningColumn: boolean;
@@ -36,6 +39,7 @@ type WorkspaceNavProps = {
   onEnabledFilterChange: (value: EnabledFilter) => void;
   onProgressFilterChange: (value: ProgressFilter) => void;
   onQueryChange: (value: string) => void;
+  onSelectedSaveFilesChange: (value: string[]) => void;
   onShowHelperMapsChange: (value: boolean) => void;
   onShowOnlyUnreferencedModsChange: (value: boolean) => void;
   onShowWarningColumnChange: (value: boolean) => void;
@@ -54,6 +58,8 @@ export function WorkspaceNav({
   progressFilter,
   query,
   referencedModCount,
+  saveFiles,
+  selectedSaveFiles,
   showHelperMaps,
   showOnlyUnreferencedMods,
   showWarningColumn,
@@ -64,6 +70,7 @@ export function WorkspaceNav({
   onEnabledFilterChange,
   onProgressFilterChange,
   onQueryChange,
+  onSelectedSaveFilesChange,
   onShowHelperMapsChange,
   onShowOnlyUnreferencedModsChange,
   onShowWarningColumnChange,
@@ -71,6 +78,7 @@ export function WorkspaceNav({
 }: WorkspaceNavProps) {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const showsRecordFilters = activeView === "maps" || activeView === "mods";
+  const selectedSaveSet = new Set(selectedSaveFiles);
   const filterCount =
     Number(query.trim().length > 0) +
     Number(enabledFilter !== "all") +
@@ -149,6 +157,12 @@ export function WorkspaceNav({
               </button>
               {activeView === "maps" ? (
                 <>
+                  <SaveFilePicker
+                    saveFiles={saveFiles}
+                    selectedSaveFiles={selectedSaveFiles}
+                    selectedSaveSet={selectedSaveSet}
+                    onChange={onSelectedSaveFilesChange}
+                  />
                   <Select label="进度" value={progressFilter} onChange={(value) => onProgressFilterChange(value as ProgressFilter)}>
                     <option value="all">全部进度</option>
                     <option value="completed">已完成</option>
@@ -199,4 +213,70 @@ export function WorkspaceNav({
       )}
     </aside>
   );
+}
+
+function SaveFilePicker({
+  saveFiles,
+  selectedSaveFiles,
+  selectedSaveSet,
+  onChange
+}: {
+  saveFiles: SaveFileInfo[];
+  selectedSaveFiles: string[];
+  selectedSaveSet: Set<string>;
+  onChange: (value: string[]) => void;
+}) {
+  const selectedAvailableCount = saveFiles.filter((save) => selectedSaveSet.has(save.name)).length;
+
+  function toggleSave(name: string) {
+    if (selectedSaveSet.has(name)) {
+      if (selectedSaveFiles.length <= 1) return;
+      onChange(selectedSaveFiles.filter((item) => item !== name));
+      return;
+    }
+    onChange([...selectedSaveFiles, name]);
+  }
+
+  return (
+    <div className="save-picker">
+      <div className="select-label">
+        存档
+        <small>{saveFiles.length ? `${selectedAvailableCount}/${saveFiles.length}` : "未找到"}</small>
+      </div>
+      {saveFiles.length ? (
+        <div className="save-list">
+          {saveFiles.map((save) => {
+            const selected = selectedSaveSet.has(save.name);
+            return (
+              <button
+                className={selected ? "save-option active" : "save-option"}
+                disabled={selected && selectedSaveFiles.length <= 1}
+                key={save.name}
+                onClick={() => toggleSave(save.name)}
+                title={save.currentMap || "未知当前地图"}
+              >
+                <span>{save.name}</span>
+                <strong>{save.playerName || "未知玩家"}</strong>
+                <small>{save.currentMap || "未知当前地图"}</small>
+                <small>{formatSaveModified(save.lastModified)}</small>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="filter-summary">没有找到数字存档。</p>
+      )}
+    </div>
+  );
+}
+
+function formatSaveModified(value: string) {
+  try {
+    const nanos = BigInt(value);
+    if (nanos <= 0n) return "未知时间";
+    const milliseconds = Number(nanos / 1_000_000n);
+    return new Date(milliseconds).toLocaleString();
+  } catch {
+    return "未知时间";
+  }
 }

@@ -15,12 +15,20 @@ export type ModMetadata = {
 export type MapStats = {
   deaths: number;
   strawberries: number;
+  strawberriesKnown: boolean;
   timePlayed: number;
   completed: boolean;
   completionKnown: boolean;
   cassettes: number;
   hearts: number;
   saveFiles: string[];
+};
+
+export type SaveFileInfo = {
+  name: string;
+  playerName: string;
+  currentMap: string;
+  lastModified: string;
 };
 
 export type CompletionStatus = "completed" | "unfinished" | "unknown" | "notApplicable";
@@ -79,6 +87,7 @@ export type ProfilesState = {
 export type ConfigResponse = {
   celestePath: string;
   autoBackupEnabled: boolean;
+  selectedSaveFiles: string[];
   profiles: ProfilesState;
 };
 
@@ -110,5 +119,7 @@ export type ScanResult = {
   maps: ModRecord[];
   otherMods: ModRecord[];
   profiles: ProfilesState;
+  availableSaveFiles: SaveFileInfo[];
+  selectedSaveFiles: string[];
   warnings: string[];
 };

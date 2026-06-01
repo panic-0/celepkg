@@ -33,7 +33,10 @@ export function formatHeartCassette(stats?: MapStats | null) {
   return stats ? `${stats.hearts}/${stats.cassettes}` : "-";
 }
 
-export function formatStrawberries(collected?: number | null, total?: number | null) {
+export function formatStrawberries(collected?: number | null, total?: number | null, known = true) {
+  if (!known) {
+    return typeof total === "number" ? `未知/${total}` : "未知";
+  }
   if (typeof total === "number") {
     return `${collected ?? 0}/${total}`;
   }

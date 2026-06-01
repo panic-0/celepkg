@@ -71,6 +71,7 @@ pub fn apply_profile(
         &applied.path,
         applied.profiles,
         &state.protected_record_ids,
+        &state.selected_save_files,
     ))
 }
 
@@ -125,7 +126,12 @@ fn apply_profile_to_blacklist(
         .find(|item| item.id == mod_profile_id && item.profile_type == PROFILE_TYPE_MODS)
         .cloned()
         .ok_or_else(|| "Mod Profile 不存在".to_string())?;
-    let scan = full_scan_cached(&path, profiles.clone(), &state.protected_record_ids);
+    let scan = full_scan_cached(
+        &path,
+        profiles.clone(),
+        &state.protected_record_ids,
+        &state.selected_save_files,
+    );
     let enabled_map_ids = map_profile.enabled_map_ids.clone().unwrap_or_else(|| {
         scan.maps
             .iter()
@@ -289,6 +295,8 @@ mod tests {
                 active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
+            available_save_files: vec![],
+            selected_save_files: vec![],
             warnings: vec![],
         };
 
