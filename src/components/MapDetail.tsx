@@ -63,12 +63,12 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
   }, [filteredSubMaps, map, selectedSubMapId]);
 
   useEffect(() => {
-    const saved = map ? mapDetailMemory.current[map.id] : undefined;
+    const saved = mapId === "empty" ? undefined : mapDetailMemory.current[mapId];
     const savedPath = saved?.subMapPath === subMapRootPath ? ALL_SUB_MAP_FOLDER : saved?.subMapPath;
     setSelectedSubMapId(saved?.selectedSubMapId ?? "");
     setSubMapPath(savedPath ?? ALL_SUB_MAP_FOLDER);
     setSubMapQuery(saved?.subMapQuery ?? "");
-  }, [map?.id, mapDetailMemory, subMapRootPath]);
+  }, [mapId, mapDetailMemory, subMapRootPath]);
 
   function updateMapDetailMemory(value: Partial<MapDetailMemoryState>) {
     if (!map) return;

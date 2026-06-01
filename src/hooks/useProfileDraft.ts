@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, launchProfile, saveProfile } from "../api";
 import type { Profile, ScanResult } from "../types";
 import { readError } from "../utils/format";
@@ -43,6 +43,31 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     [enabledExplicitModDraft, enabledMapModDraft, inferredDependencyModDraft]
   );
 
+  const hydrateMapDraft = useCallback(
+    (profile: Profile | undefined) => {
+      setSelectedMapProfileId(profile?.id ?? "default-maps");
+      setLaunchArgs(profile?.launchArgs ?? "");
+      setEnabledMapDraft(new Set(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)));
+      const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
+      setEnabledMapModDraft(
+        new Set(profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
+      );
+      setMapDirty(false);
+    },
+    [scan.maps, scan.otherMods]
+  );
+
+  const hydrateModDraft = useCallback(
+    (profile: Profile | undefined) => {
+      setSelectedModProfileId(profile?.id ?? "default-mods");
+      setEnabledExplicitModDraft(
+        new Set(profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
+      );
+      setModDirty(false);
+    },
+    [scan.otherMods]
+  );
+
   useEffect(() => {
     const activeMap = mapProfiles.find((profile) => profile.id === scan.profiles.activeMapProfileId) ?? mapProfiles[0];
     const activeMod = modProfiles.find((profile) => profile.id === scan.profiles.activeModProfileId) ?? modProfiles[0];
@@ -54,34 +79,15 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     }
     initializedRef.current = true;
   }, [
+    hydrateMapDraft,
+    hydrateModDraft,
     mapDirty,
     mapProfiles,
     modDirty,
     modProfiles,
-    scan.maps,
-    scan.otherMods,
     scan.profiles.activeMapProfileId,
     scan.profiles.activeModProfileId
   ]);
-
-  function hydrateMapDraft(profile: Profile | undefined) {
-    setSelectedMapProfileId(profile?.id ?? "default-maps");
-    setLaunchArgs(profile?.launchArgs ?? "");
-    setEnabledMapDraft(new Set(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)));
-    const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
-    setEnabledMapModDraft(
-      new Set(profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
-    );
-    setMapDirty(false);
-  }
-
-  function hydrateModDraft(profile: Profile | undefined) {
-    setSelectedModProfileId(profile?.id ?? "default-mods");
-    setEnabledExplicitModDraft(
-      new Set(profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
-    );
-    setModDirty(false);
-  }
 
   function setMapProfileDraft(profile: Profile | undefined) {
     if (!profile) return;

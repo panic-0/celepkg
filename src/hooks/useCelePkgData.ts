@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getConfig, scanCeleste, setCelestePath } from "../api";
 import type { ScanResult } from "../types";
 import { readError } from "../utils/format";
@@ -21,7 +21,7 @@ export function useCelePkgData() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  async function refresh(nextPath = celestePath) {
+  const refreshPath = useCallback(async (nextPath: string) => {
     setLoading(true);
     setMessage("");
     try {
@@ -35,29 +35,31 @@ export function useCelePkgData() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function savePathAndRefresh() {
+  const refresh = useCallback((nextPath = celestePath) => refreshPath(nextPath), [celestePath, refreshPath]);
+
+  const savePathAndRefresh = useCallback(async () => {
     setLoading(true);
     setMessage("");
     try {
       await setCelestePath(celestePath);
-      await refresh(celestePath);
+      await refreshPath(celestePath);
     } catch (error) {
       setMessage(readError(error));
       setLoading(false);
     }
-  }
+  }, [celestePath, refreshPath]);
 
   useEffect(() => {
     getConfig()
       .then((config) => {
         setPathInput(config.celestePath);
         setScan((current) => ({ ...current, profiles: config.profiles }));
-        return refresh(config.celestePath);
+        return refreshPath(config.celestePath);
       })
       .catch((error) => setMessage(readError(error)));
-  }, []);
+  }, [refreshPath]);
 
   return {
     celestePath,
