@@ -42,7 +42,10 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
           </button>
           <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
         </div>
-        <h2 title={modItem.name}>{modItem.name}</h2>
+        <div className="detail-title-row">
+          <h2 title={modItem.name}>{modItem.name}</h2>
+          <span title={modItem.fileName}>{modItem.fileName}</span>
+        </div>
         <p title={modItem.metadata.description || modItem.fileName}>{modItem.metadata.description || modItem.fileName}</p>
       </div>
 

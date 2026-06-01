@@ -1,13 +1,15 @@
-import { ArrowLeft, Clock, CircleDot, FolderOpen, Heart, Search, Skull } from "lucide-react";
-import { useEffect, useMemo, useState, type MutableRefObject } from "react";
+import { ArrowLeft, Clock, CircleDot, Folder, FolderOpen, Heart, Search, Skull } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState, type MutableRefObject } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
-import type { ModRecord } from "../types";
+import type { ModRecord, SubMapInfo } from "../types";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
+import { ALL_SUB_MAP_FOLDER, collectSubMapFolderOptions, getSubMapRootPath, normalizeFolderPath, subMapIsDirectChildOfFolder, subMapMatchesFolder } from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
 
 export type MapDetailMemoryState = {
   selectedSubMapId: string;
+  subMapPath: string;
   subMapQuery: string;
 };
 
@@ -23,33 +25,43 @@ type MapDetailProps = {
 
 export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrollMemory, onBack, onTabChange }: MapDetailProps) {
   const [selectedSubMapId, setSelectedSubMapId] = useState("");
+  const [subMapPath, setSubMapPath] = useState(ALL_SUB_MAP_FOLDER);
   const [subMapQuery, setSubMapQuery] = useState("");
   const mapId = map?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:${activeTab}:panel`, scrollMemory);
   const subMapTableRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:submaps:table`, scrollMemory);
-  const selectedSubMap = useMemo(() => {
-    if (!map) return undefined;
-    return map.subMaps.find((subMap) => subMap.id === selectedSubMapId) ?? map.subMaps[0];
-  }, [map, selectedSubMapId]);
+  const subMapRootPath = useMemo(() => (map ? getSubMapRootPath(map.subMaps) : ALL_SUB_MAP_FOLDER), [map]);
+  const effectiveSubMapPath = subMapPath === ALL_SUB_MAP_FOLDER ? subMapRootPath : subMapPath;
+  const subMapBreadcrumbs = useMemo(() => buildSubMapBreadcrumbs(effectiveSubMapPath, subMapRootPath), [effectiveSubMapPath, subMapRootPath]);
+  const subMapFolderOptions = useMemo(() => (map ? collectSubMapFolderOptions(map.subMaps, effectiveSubMapPath) : []), [effectiveSubMapPath, map]);
   const filteredSubMaps = useMemo(() => {
     if (!map) return [];
     const needle = subMapQuery.trim().toLowerCase();
-    if (!needle) return map.subMaps;
-    return map.subMaps.filter((subMap) =>
-      [subMap.displayName, subMap.sid, subMap.chapter, subMap.filePath].join(" ").toLowerCase().includes(needle)
-    );
-  }, [map, subMapQuery]);
+    return map.subMaps.filter((subMap) => {
+      if (!subMapMatchesFolder(subMap, effectiveSubMapPath)) return false;
+      if (!needle && subMapFolderOptions.length > 0 && !subMapIsDirectChildOfFolder(subMap, effectiveSubMapPath)) return false;
+      if (!needle) return true;
+      return [subMap.displayName, subMap.sid, subMap.chapter, subMap.filePath].join(" ").toLowerCase().includes(needle);
+    });
+  }, [effectiveSubMapPath, map, subMapFolderOptions.length, subMapQuery]);
+  const selectedSubMap = useMemo(() => {
+    if (!map) return undefined;
+    return filteredSubMaps.find((subMap) => subMap.id === selectedSubMapId);
+  }, [filteredSubMaps, map, selectedSubMapId]);
 
   useEffect(() => {
     const saved = map ? mapDetailMemory.current[map.id] : undefined;
+    const savedPath = saved?.subMapPath === subMapRootPath ? ALL_SUB_MAP_FOLDER : saved?.subMapPath;
     setSelectedSubMapId(saved?.selectedSubMapId ?? "");
+    setSubMapPath(savedPath ?? ALL_SUB_MAP_FOLDER);
     setSubMapQuery(saved?.subMapQuery ?? "");
-  }, [map?.id, mapDetailMemory]);
+  }, [map?.id, mapDetailMemory, subMapRootPath]);
 
   function updateMapDetailMemory(value: Partial<MapDetailMemoryState>) {
     if (!map) return;
     const current = mapDetailMemory.current[map.id] ?? {
       selectedSubMapId: "",
+      subMapPath: ALL_SUB_MAP_FOLDER,
       subMapQuery: ""
     };
     mapDetailMemory.current[map.id] = {
@@ -61,6 +73,12 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
   function updateSubMapQuery(value: string) {
     setSubMapQuery(value);
     updateMapDetailMemory({ subMapQuery: value });
+  }
+
+  function updateSubMapPath(value: string) {
+    setSubMapPath(value);
+    setSelectedSubMapId("");
+    updateMapDetailMemory({ selectedSubMapId: "", subMapPath: value });
   }
 
   function selectSubMap(id: string) {
@@ -132,15 +150,27 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                 <input
                   value={subMapQuery}
                   onChange={(event) => updateSubMapQuery(event.target.value)}
-                  placeholder="筛选小图名称、SID、章节"
+                  placeholder={effectiveSubMapPath === ALL_SUB_MAP_FOLDER ? "筛选小图名称、SID" : `当前：${effectiveSubMapPath}`}
                 />
               </label>
+              <nav className="sub-map-breadcrumbs" aria-label="小图目录">
+                {subMapBreadcrumbs.map((crumb, index) => (
+                  <span key={`${crumb.path}-${index}`} className="breadcrumb-part">
+                    {index > 0 && <span className="breadcrumb-separator">/</span>}
+                    <button
+                      className={crumb.path === effectiveSubMapPath ? "breadcrumb-button active" : "breadcrumb-button"}
+                      onClick={() => updateSubMapPath(crumb.path)}
+                      title={crumb.path === ALL_SUB_MAP_FOLDER ? "小图根目录" : crumb.path}
+                    >
+                      {crumb.label}
+                    </button>
+                  </span>
+                ))}
+              </nav>
               <div className="sub-map-table-wrap" ref={subMapTableRef}>
                 <table className="sub-map-table">
                   <colgroup>
                     <col className="w-sub-name" />
-                    <col className="w-sub-chapter" />
-                    <col className="w-sub-sid" />
                     <col className="w-sub-progress" />
                     <col className="w-sub-number" />
                     <col className="w-sub-time" />
@@ -150,8 +180,6 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                   <thead>
                     <tr>
                       <th>名称</th>
-                      <th>章节</th>
-                      <th>SID</th>
                       <th>完成</th>
                       <th className="num">死亡</th>
                       <th className="num">用时</th>
@@ -160,37 +188,63 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                     </tr>
                   </thead>
                   <tbody>
+                    {subMapFolderOptions.map((folder) => {
+                      const summary = summarizeSubMapFolder(map.subMaps, folder.path);
+                      return (
+                        <tr className="folder-row" key={folder.path} onClick={() => updateSubMapPath(folder.path)}>
+                          <td title={folder.path}>
+                            <span className="folder-row-content">
+                              <Folder size={16} />
+                              <strong>{folder.label}</strong>
+                              <small>{folder.count} 张</small>
+                            </span>
+                          </td>
+                          <td>{summary.completion}</td>
+                          <td className="num">{summary.deaths}</td>
+                          <td className="num">{summary.time}</td>
+                          <td className="num">{summary.strawberries}</td>
+                          <td>{summary.heartCassette}</td>
+                        </tr>
+                      );
+                    })}
                     {filteredSubMaps.map((subMap) => (
-                      <tr
-                        className={selectedSubMap?.id === subMap.id ? "active" : ""}
-                        key={subMap.id}
-                        onClick={() => selectSubMap(subMap.id)}
-                      >
-                        <td title={subMap.displayName}>{subMap.displayName || "未知"}</td>
-                        <td title={subMap.chapter}>{subMap.chapter || "未知"}</td>
-                        <td title={subMap.sid}>{subMap.sid}</td>
-                        <td>{formatCompletionStatus(subMap.completionStatus)}</td>
-                        <td className="num">{subMap.stats?.deaths ?? "-"}</td>
-                        <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
-                        <td className="num">{formatStrawberries(subMap.stats?.strawberries, subMap.strawberryCount)}</td>
-                        <td>{formatHeartCassette(subMap.stats)}</td>
-                      </tr>
+                      <Fragment key={subMap.id}>
+                        <tr
+                          className={selectedSubMap?.id === subMap.id ? "active" : ""}
+                          onClick={() => selectSubMap(subMap.id)}
+                        >
+                          <td title={subMap.sid}>
+                            <span className="sub-map-name-cell">
+                              <strong>{subMap.displayName || "未知"}</strong>
+                              <small>{subMapSidName(subMap.sid)}</small>
+                            </span>
+                          </td>
+                          <td>{formatCompletionStatus(subMap.completionStatus)}</td>
+                          <td className="num">{subMap.stats?.deaths ?? "-"}</td>
+                          <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
+                          <td className="num">{formatStrawberries(subMap.stats?.strawberries, subMap.strawberryCount)}</td>
+                          <td>{formatHeartCassette(subMap.stats)}</td>
+                        </tr>
+                        {selectedSubMap?.id === subMap.id && (
+                          <tr className="sub-map-inline-detail">
+                            <td colSpan={6}>
+                              <div className="inline-detail-grid">
+                                <Info label="名称" value={subMap.displayName || "未知"} />
+                                <Info label="章节" value={subMap.chapter || "未知"} />
+                                <Info label="完成" value={formatCompletionStatus(subMap.completionStatus)} />
+                                <Info label="草莓" value={formatStrawberries(subMap.stats?.strawberries, subMap.strawberryCount)} />
+                                <Info label="SID" value={subMap.sid} />
+                                <Info label="文件" value={subMap.filePath} />
+                              </div>
+                              <p className="muted">{subMap.stats?.saveFiles.join(", ") || "未在存档中匹配到这张小图。"}</p>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {selectedSubMap && (
-                <section className="detail-section sub-map-detail">
-                  <h3>当前小图</h3>
-                  <Info label="名称" value={selectedSubMap.displayName || "未知"} />
-                  <Info label="章节" value={selectedSubMap.chapter || "未知"} />
-                  <Info label="完成" value={formatCompletionStatus(selectedSubMap.completionStatus)} />
-                  <Info label="草莓" value={formatStrawberries(selectedSubMap.stats?.strawberries, selectedSubMap.strawberryCount)} />
-                  <Info label="SID" value={selectedSubMap.sid} />
-                  <Info label="文件" value={selectedSubMap.filePath} />
-                  <p className="muted">{selectedSubMap.stats?.saveFiles.join(", ") || "未在存档中匹配到这张小图。"}</p>
-                </section>
-              )}
             </>
           ) : (
             <p className="muted">未检测到 Maps/*.bin。</p>
@@ -236,6 +290,58 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
       )}
     </section>
   );
+}
+
+function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string) {
+  const members = subMaps.filter((subMap) => subMapMatchesFolder(subMap, path));
+  const statsMembers = members.filter((subMap) => subMap.stats);
+  const totalStrawberries = members.reduce((sum, subMap) => sum + subMap.strawberryCount, 0);
+  const collectedStrawberries = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.strawberries ?? 0), 0);
+  const deaths = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.deaths ?? 0), 0);
+  const timePlayed = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.timePlayed ?? 0), 0);
+  const hearts = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.hearts ?? 0), 0);
+  const cassettes = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.cassettes ?? 0), 0);
+  const completable = members.filter((subMap) => subMap.completionStatus !== "notApplicable");
+  const known = completable.filter((subMap) => subMap.completionStatus !== "unknown");
+  const completed = known.filter((subMap) => subMap.completionStatus === "completed").length;
+
+  return {
+    completion: completable.length === 0 ? "不适用" : known.length ? `${completed}/${known.length} 完成` : "未知",
+    deaths: statsMembers.length ? deaths : "-",
+    heartCassette: statsMembers.length ? `${hearts}/${cassettes}` : "-",
+    strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries),
+    time: statsMembers.length ? formatTime(timePlayed) : "-"
+  };
+}
+
+function buildSubMapBreadcrumbs(activePath: string, rootPath: string) {
+  const rootSegments = normalizeFolderPath(rootPath);
+  const activeSegments = normalizeFolderPath(activePath);
+  const breadcrumbs: Array<{ label: string; path: string }> = [];
+
+  if (!rootSegments.length) {
+    breadcrumbs.push({ label: "小图", path: ALL_SUB_MAP_FOLDER });
+    activeSegments.forEach((segment, index) => {
+      breadcrumbs.push({
+        label: segment,
+        path: activeSegments.slice(0, index + 1).join("/")
+      });
+    });
+    return breadcrumbs;
+  }
+
+  breadcrumbs.push({ label: rootSegments.join("/"), path: rootSegments.join("/") });
+  activeSegments.slice(rootSegments.length).forEach((segment, index) => {
+    breadcrumbs.push({
+      label: segment,
+      path: [...rootSegments, ...activeSegments.slice(rootSegments.length, rootSegments.length + index + 1)].join("/")
+    });
+  });
+  return breadcrumbs;
+}
+
+function subMapSidName(sid: string) {
+  return sid.split("/").filter(Boolean).at(-1) ?? sid;
 }
 
 function LongValue({ label, value }: { label: string; value: string }) {

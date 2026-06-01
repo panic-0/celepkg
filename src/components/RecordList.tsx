@@ -164,9 +164,9 @@ function MapTable({
               <td className="name-cell">
                 <div className="name-title-row">
                   <strong title={map.name}>{map.name}</strong>
+                  <span className="file-name-text" title={map.fileName}>{map.fileName}</span>
                   {map.metadata.version && <span className="version-text" title={map.metadata.version}>{map.metadata.version}</span>}
                 </div>
-                <small title={map.fileName}>{map.fileName}</small>
                 <div className="inline-pills">
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
                   {map.stats && <span>有存档</span>}
@@ -242,7 +242,6 @@ function ModTable({
                   <strong title={modItem.name}>{modItem.name}</strong>
                   {modItem.metadata.version && <span className="version-text" title={modItem.metadata.version}>{modItem.metadata.version}</span>}
                 </div>
-                <small title={modItem.fileName}>{modItem.fileName}</small>
               </td>
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
