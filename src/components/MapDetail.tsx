@@ -77,10 +77,10 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
             <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
             <DetailStat icon={<CircleDot size={18} />} label="草莓" value={map.stats?.strawberries ?? "-"} />
             <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
-            <DetailStat icon={<CircleDot size={18} />} label="完成" value={formatCompletionStatus(map.completionStatus)} />
           </div>
           <section className="detail-section">
             <h3>地图信息</h3>
+            <Info label="完成" value={formatCompletionStatus(map.completionStatus)} />
             <Info label="作者" value={map.metadata.author || "未知"} />
             <Info label="版本" value={map.metadata.version || "未知"} />
             <Info label="类型" value={map.isArchive ? "zip 地图包" : "文件夹地图包"} />

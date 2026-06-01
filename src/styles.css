@@ -900,11 +900,11 @@ h1 {
 }
 
 .sub-map-table {
-  min-width: 720px;
+  min-width: 900px;
 }
 
 .sub-map-table th:nth-child(1) {
-  width: 180px;
+  width: 190px;
 }
 
 .sub-map-table th:nth-child(2) {
@@ -912,13 +912,17 @@ h1 {
 }
 
 .sub-map-table th:nth-child(3) {
-  width: 220px;
+  width: 280px;
 }
 
-.sub-map-table th:nth-child(4),
+.sub-map-table th:nth-child(4) {
+  width: 84px;
+}
+
 .sub-map-table th:nth-child(5),
 .sub-map-table th:nth-child(6),
-.sub-map-table th:nth-child(7) {
+.sub-map-table th:nth-child(7),
+.sub-map-table th:nth-child(8) {
   width: 72px;
 }
 
