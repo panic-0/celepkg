@@ -103,6 +103,16 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
               </label>
               <div className="sub-map-table-wrap">
                 <table className="sub-map-table">
+                  <colgroup>
+                    <col className="w-sub-name" />
+                    <col className="w-sub-chapter" />
+                    <col className="w-sub-sid" />
+                    <col className="w-sub-progress" />
+                    <col className="w-sub-number" />
+                    <col className="w-sub-time" />
+                    <col className="w-sub-number" />
+                    <col className="w-sub-heart" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>名称</th>

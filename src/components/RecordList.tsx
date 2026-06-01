@@ -117,6 +117,19 @@ function MapTable({
 }) {
   return (
     <table className="record-table map-table">
+      <colgroup>
+        <col className="w-toggle" />
+        <col className="w-flags" />
+        <col className="w-name" />
+        <col className="w-author" />
+        <col className="w-version" />
+        <col className="w-small" />
+        <col className="w-progress" />
+        <col className="w-number" />
+        <col className="w-time" />
+        <col className="w-number" />
+        <col className="w-warning" />
+      </colgroup>
       <thead>
         <tr>
           <th className="col-toggle">状态</th>
@@ -187,6 +200,17 @@ function ModTable({
 }) {
   return (
     <table className="record-table mod-table">
+      <colgroup>
+        <col className="w-toggle" />
+        <col className="w-flags" />
+        <col className="w-name" />
+        <col className="w-author" />
+        <col className="w-version" />
+        <col className="w-kind" />
+        <col className="w-number" />
+        <col className="w-progress" />
+        <col className="w-warning" />
+      </colgroup>
       <thead>
         <tr>
           <th className="col-toggle">状态</th>
