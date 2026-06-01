@@ -71,6 +71,14 @@ pub fn full_scan_cached(
     result
 }
 
+pub fn write_scan_cache(celeste_path: &Path, result: &ScanResult) {
+    let cache = CachedScan {
+        signature: build_scan_signature(celeste_path),
+        result: result.clone(),
+    };
+    let _ = write_json(&scan_cache_path(celeste_path), &cache);
+}
+
 pub fn full_scan(celeste_path: &Path, profiles: ProfilesState) -> ScanResult {
     let mut scan = scan_mods(celeste_path, &profiles);
     scan.maps = read_save_stats(celeste_path, scan.maps);
@@ -370,6 +378,21 @@ pub fn write_favorite_state(
     }
     let content = format!("{}\n", lines.join("\n").trim());
     fs::write(file, content).map_err(|error| format!("写入 favorites.txt 失败：{error}"))
+}
+
+pub fn set_scan_favorite_state(
+    scan: &mut ScanResult,
+    record_id: &str,
+    favorite: bool,
+) -> Result<(), String> {
+    let record = scan
+        .maps
+        .iter_mut()
+        .chain(scan.other_mods.iter_mut())
+        .find(|record| record.id == record_id)
+        .ok_or_else(|| "Mod 不存在".to_string())?;
+    record.favorite = favorite;
+    Ok(())
 }
 
 fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {

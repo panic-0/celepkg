@@ -112,17 +112,28 @@ export function App() {
   }
 
   async function updateRecordFavorite(record: ModRecord) {
+    const favorite = !record.favorite;
     setLoading(true);
     setMessage("");
+    setRecordFavoriteInScan(record.id, favorite);
     try {
-      const result = await setRecordFavorite(celestePath, record.id, !record.favorite);
+      const result = await setRecordFavorite(celestePath, record.id, favorite);
       setScan(result);
-      setMessage(record.favorite ? "已取消收藏。" : "已加入收藏。");
+      setMessage(favorite ? "已加入收藏。" : "已取消收藏。");
     } catch (error) {
+      setRecordFavoriteInScan(record.id, record.favorite);
       setMessage(readError(error));
     } finally {
       setLoading(false);
     }
+  }
+
+  function setRecordFavoriteInScan(recordId: string, favorite: boolean) {
+    setScan((current) => ({
+      ...current,
+      maps: current.maps.map((map) => (map.id === recordId ? { ...map, favorite } : map)),
+      otherMods: current.otherMods.map((modItem) => (modItem.id === recordId ? { ...modItem, favorite } : modItem))
+    }));
   }
 
   async function updateRecordProtected(record: ModRecord) {

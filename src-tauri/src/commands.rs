@@ -47,17 +47,15 @@ pub async fn set_record_favorite(
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state();
         let path = resolve_input_path(&celeste_path);
-        let scan = services::scan::full_scan_cached(
+        let mut scan = services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
             &state.protected_record_ids,
         );
         services::scan::write_favorite_state(&path, &record_id, favorite, &scan)?;
-        Ok(services::scan::full_scan_cached(
-            &path,
-            state.profiles_state(),
-            &state.protected_record_ids,
-        ))
+        services::scan::set_scan_favorite_state(&mut scan, &record_id, favorite)?;
+        services::scan::write_scan_cache(&path, &scan);
+        Ok(scan)
     })
     .await
     .map_err(|error| format!("更新 Favorite 任务失败：{error}"))?
