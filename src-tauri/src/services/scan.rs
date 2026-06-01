@@ -1,6 +1,7 @@
 use crate::domain::{ModMetadata, ModRecord, ProfilesState, ScanResult, SubMapInfo};
 use crate::parsers::dialog::{dialog_title_for_sid, is_dialog_file, read_dialog_titles};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
+use crate::parsers::map_bin::count_strawberries;
 use crate::parsers::save_stats::read_save_stats;
 use crate::services::game::resolve_game_executable;
 use crate::storage::{read_json, scan_cache_path, write_json};
@@ -14,7 +15,7 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 2;
+const SCAN_CACHE_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -375,12 +376,20 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut entries = vec![];
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
+    let mut strawberry_counts = HashMap::new();
     for entry in WalkDir::new(dir_path).into_iter().flatten() {
         if !entry.file_type().is_file() {
             continue;
         }
         let relative =
             normalize_slash(&entry.path().strip_prefix(dir_path).ok()?.to_string_lossy());
+        if let Some(sid) = map_sid_from_entry(&relative) {
+            if let Ok(bytes) = fs::read(entry.path()) {
+                if let Some(count) = count_strawberries(&bytes) {
+                    strawberry_counts.insert(sid, count);
+                }
+            }
+        }
         if path_basename(&relative).eq_ignore_ascii_case("everest.yaml")
             || path_basename(&relative).eq_ignore_ascii_case("everest.yml")
         {
@@ -401,6 +410,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         entries,
         parse_metadata(&yaml_text),
         read_dialog_titles(dialog_texts),
+        strawberry_counts,
     ))
 }
 
@@ -410,10 +420,18 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut entries = vec![];
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
+    let mut strawberry_counts = HashMap::new();
     for index in 0..archive.len() {
         let mut file = archive.by_index(index).ok()?;
         let name = normalize_slash(file.name());
         let mut text = String::new();
+        if let Some(sid) = map_sid_from_entry(&name) {
+            let mut bytes = Vec::new();
+            let _ = file.read_to_end(&mut bytes);
+            if let Some(count) = count_strawberries(&bytes) {
+                strawberry_counts.insert(sid, count);
+            }
+        }
         if path_basename(&name).eq_ignore_ascii_case("everest.yaml")
             || path_basename(&name).eq_ignore_ascii_case("everest.yml")
         {
@@ -432,6 +450,7 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         entries,
         parse_metadata(&yaml_text),
         read_dialog_titles(dialog_texts),
+        strawberry_counts,
     ))
 }
 
@@ -442,6 +461,7 @@ fn create_mod_record(
     entries: Vec<String>,
     metadata: ModMetadata,
     dialog_titles: HashMap<String, String>,
+    strawberry_counts: HashMap<String, u64>,
 ) -> ModRecord {
     let relative_path = normalize_slash(
         &absolute_path
@@ -455,14 +475,7 @@ fn create_mod_record(
         .unwrap_or_else(|| relative_path.clone());
     let map_ids: Vec<String> = entries
         .iter()
-        .filter_map(|entry| {
-            let lower = entry.to_lowercase();
-            if lower.starts_with("maps/") && lower.ends_with(".bin") {
-                Some(entry[5..entry.len() - 4].to_string())
-            } else {
-                None
-            }
-        })
+        .filter_map(|entry| map_sid_from_entry(entry))
         .collect();
     let sub_maps: Vec<SubMapInfo> = map_ids
         .iter()
@@ -473,10 +486,15 @@ fn create_mod_record(
                 .unwrap_or_else(|| sub_map_display_name(sid)),
             chapter: sub_map_chapter(sid),
             file_path: format!("Maps/{sid}.bin"),
+            strawberry_count: strawberry_counts.get(sid).copied().unwrap_or(0),
             completion_status: "unknown".to_string(),
             stats: None,
         })
         .collect();
+    let strawberry_count = sub_maps
+        .iter()
+        .map(|sub_map| sub_map.strawberry_count)
+        .sum();
     let is_map_mod = is_map_mod_record(&file_name, &relative_path, &metadata, &map_ids, &entries);
     let fallback_name = file_name.trim_end_matches(".zip").replace(['_', '-'], " ");
     let name = if metadata.name.is_empty() {
@@ -508,7 +526,17 @@ fn create_mod_record(
         sub_maps,
         stats: None,
         completion_status: "unknown".to_string(),
+        strawberry_count,
         warnings: vec![],
+    }
+}
+
+fn map_sid_from_entry(entry: &str) -> Option<String> {
+    let lower = entry.to_lowercase();
+    if lower.starts_with("maps/") && lower.ends_with(".bin") {
+        Some(entry[5..entry.len() - 4].to_string())
+    } else {
+        None
     }
 }
 
@@ -719,6 +747,35 @@ mod tests {
             &map_ids,
             &entries,
         ));
+    }
+
+    #[test]
+    fn create_mod_record_applies_sub_map_and_pack_strawberry_totals() {
+        let root = temp_celeste_root("strawberry-counts");
+        let mods_path = root.join("Mods");
+        let mod_path = mods_path.join("BerryPack.zip");
+        let entries = vec![
+            "Maps/pack/one.bin".to_string(),
+            "Maps/pack/two.bin".to_string(),
+        ];
+        let strawberry_counts = HashMap::from([
+            ("pack/one".to_string(), 3),
+            ("pack/two".to_string(), 5),
+        ]);
+
+        let record = create_mod_record(
+            &mod_path,
+            &mods_path,
+            true,
+            entries,
+            metadata("BerryPack"),
+            HashMap::new(),
+            strawberry_counts,
+        );
+
+        assert_eq!(record.strawberry_count, 8);
+        assert_eq!(record.sub_maps[0].strawberry_count, 3);
+        assert_eq!(record.sub_maps[1].strawberry_count, 5);
     }
 
     #[test]
@@ -934,6 +991,7 @@ mod tests {
             map_ids: vec![],
             sub_maps: vec![],
             map_count: 0,
+            strawberry_count: 0,
             completion_status: "unknown".to_string(),
             dependencies: Vec::<Dependency>::new(),
             optional_dependencies: vec![],

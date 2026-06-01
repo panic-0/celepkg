@@ -1,7 +1,7 @@
 import { CircleDot, Clock, FolderOpen, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
-import { formatCompletionStatus, formatTime } from "../utils/format";
+import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
 
 type RecordView = Exclude<ActiveView, "profiles">;
@@ -175,7 +175,7 @@ function MapTable({
               <td>{formatCompletionStatus(map.completionStatus)}</td>
               <td className="num">{map.stats?.deaths ?? "-"}</td>
               <td className="num">{formatTime(map.stats?.timePlayed)}</td>
-              <td className="num">{map.stats?.strawberries ?? "-"}</td>
+              <td className="num">{formatStrawberries(map.stats?.strawberries, map.strawberryCount)}</td>
               <td>{map.warnings.length ? <span className="warning-pill">{map.warnings.length}</span> : "-"}</td>
             </tr>
           );

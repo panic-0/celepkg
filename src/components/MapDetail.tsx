@@ -2,7 +2,7 @@ import { ArrowLeft, Clock, CircleDot, FolderOpen, Heart, Search, Skull } from "l
 import { useEffect, useMemo, useState, type MutableRefObject } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
-import { formatCompletionStatus, formatHeartCassette, formatTime } from "../utils/format";
+import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
 
@@ -109,7 +109,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
           <div className="stat-grid">
             <DetailStat icon={<Skull size={18} />} label="死亡" value={map.stats?.deaths ?? "-"} />
             <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
-            <DetailStat icon={<CircleDot size={18} />} label="草莓" value={map.stats?.strawberries ?? "-"} />
+            <DetailStat icon={<CircleDot size={18} />} label="草莓" value={formatStrawberries(map.stats?.strawberries, map.strawberryCount)} />
             <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
           </div>
           <section className="detail-section">
@@ -172,7 +172,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                         <td>{formatCompletionStatus(subMap.completionStatus)}</td>
                         <td className="num">{subMap.stats?.deaths ?? "-"}</td>
                         <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
-                        <td className="num">{subMap.stats?.strawberries ?? "-"}</td>
+                        <td className="num">{formatStrawberries(subMap.stats?.strawberries, subMap.strawberryCount)}</td>
                         <td>{formatHeartCassette(subMap.stats)}</td>
                       </tr>
                     ))}
@@ -185,6 +185,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                   <Info label="名称" value={selectedSubMap.displayName || "未知"} />
                   <Info label="章节" value={selectedSubMap.chapter || "未知"} />
                   <Info label="完成" value={formatCompletionStatus(selectedSubMap.completionStatus)} />
+                  <Info label="草莓" value={formatStrawberries(selectedSubMap.stats?.strawberries, selectedSubMap.strawberryCount)} />
                   <Info label="SID" value={selectedSubMap.sid} />
                   <Info label="文件" value={selectedSubMap.filePath} />
                   <p className="muted">{selectedSubMap.stats?.saveFiles.join(", ") || "未在存档中匹配到这张小图。"}</p>

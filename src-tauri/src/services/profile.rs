@@ -337,6 +337,7 @@ mod tests {
             map_ids: vec![],
             sub_maps: vec![],
             map_count: 0,
+            strawberry_count: 0,
             completion_status: "unknown".to_string(),
             dependencies: dependencies.to_vec(),
             optional_dependencies: vec![],

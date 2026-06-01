@@ -33,6 +33,16 @@ export function formatHeartCassette(stats?: MapStats | null) {
   return stats ? `${stats.hearts}/${stats.cassettes}` : "-";
 }
 
+export function formatStrawberries(collected?: number | null, total?: number | null) {
+  if (typeof total === "number") {
+    return `${collected ?? 0}/${total}`;
+  }
+  if (typeof collected === "number") {
+    return `${collected}`;
+  }
+  return "-";
+}
+
 export function formatCompletionStatus(status?: CompletionStatus | null) {
   switch (status) {
     case "completed":
