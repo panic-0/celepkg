@@ -530,7 +530,7 @@ h1 {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   border: 1px solid #d7e0e9;
   background: #ffffff;
   border-radius: 8px;
@@ -553,6 +553,48 @@ h1 {
   color: #6a7887;
   font-size: 13px;
   margin-top: 1px;
+}
+
+.profile-combo-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) minmax(180px, 1.2fr);
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border-bottom: 1px solid #e2e8ef;
+  background: #fbfcfd;
+}
+
+.profile-summary-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.profile-summary-item span,
+.profile-launch-field span {
+  color: #657384;
+  font-size: 12px;
+}
+
+.profile-summary-item strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #253242;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-launch-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-launch-field input {
+  min-height: 32px;
+  padding: 6px 8px;
 }
 
 .record-table-scroll {
@@ -1357,6 +1399,10 @@ h1 {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .profile-combo-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .stat-grid {
     grid-template-columns: repeat(2, minmax(130px, 1fr));
   }
@@ -1402,6 +1448,10 @@ h1 {
 
   .detail-pane {
     min-height: 520px;
+  }
+
+  .profile-combo-bar {
+    grid-template-columns: 1fr;
   }
 
   .stat-grid {

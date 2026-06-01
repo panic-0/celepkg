@@ -78,6 +78,17 @@ export function ProfileManager({
         </button>
       </div>
 
+      <div className="profile-combo-bar">
+        <SummaryItem label="地图 Profile" value={selectedMapProfile?.name || "未选择"} />
+        <SummaryItem label="Mod Profile" value={selectedModProfile?.name || "未选择"} />
+        <SummaryItem label="启用地图" value={`${enabledMapCount}/${totalMapCount}`} />
+        <SummaryItem label="有效 Mod" value={`${enabledModCount}/${totalModCount}，${dependencyModCount} 依赖`} />
+        <label className="profile-launch-field">
+          <span>启动参数</span>
+          <input value={launchArgs} onChange={(event) => onLaunchArgsChange(event.target.value)} placeholder="-debug" />
+        </label>
+      </div>
+
       <div className="profile-layout split">
         <ProfileColumn
           icon={<Gamepad2 size={17} />}
@@ -95,18 +106,7 @@ export function ProfileManager({
           scrollKey="profiles:maps"
           scrollMemory={scrollMemory}
           loading={loading}
-        >
-          <label className="field">
-            <span>启动参数</span>
-            <input value={launchArgs} onChange={(event) => onLaunchArgsChange(event.target.value)} placeholder="-debug" />
-          </label>
-          <div className="profile-stats">
-            <span>草稿地图</span>
-            <strong>{`${enabledMapCount}/${totalMapCount}`}</strong>
-            <span>依赖推导 Mod</span>
-            <strong>{dependencyModCount}</strong>
-          </div>
-        </ProfileColumn>
+        />
 
         <ProfileColumn
           icon={<Layers size={17} />}
@@ -124,21 +124,22 @@ export function ProfileManager({
           scrollKey="profiles:mods"
           scrollMemory={scrollMemory}
           loading={loading}
-        >
-          <div className="profile-stats">
-            <span>有效 Mod</span>
-            <strong>{`${enabledModCount}/${totalModCount}`}</strong>
-            <span>依赖推导</span>
-            <strong>{dependencyModCount}</strong>
-          </div>
-        </ProfileColumn>
+        />
       </div>
     </section>
   );
 }
 
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="profile-summary-item">
+      <span>{label}</span>
+      <strong title={value}>{value}</strong>
+    </div>
+  );
+}
+
 function ProfileColumn({
-  children,
   icon,
   loading,
   nameDraft,
@@ -155,7 +156,6 @@ function ProfileColumn({
   scrollKey,
   scrollMemory
 }: {
-  children?: React.ReactNode;
   icon: React.ReactNode;
   loading: boolean;
   nameDraft: string;
@@ -197,7 +197,6 @@ function ProfileColumn({
           </button>
         ))}
       </div>
-      {children}
       <label className="field">
         <span>{nameLabel}</span>
         <input value={nameDraft} onChange={(event) => onNameChange(event.target.value)} />
