@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { setRecordFavorite, setRecordProtected } from "../api";
 import type { ModRecord, ScanResult } from "../types";
 import { normalizeDependencyName } from "../utils/dependencies";
@@ -46,6 +46,10 @@ export function useRecordActions({
 }: RecordActionsOptions) {
   const protectedVisibleMaps = filteredMaps.filter((record) => record.protected);
   const protectedVisibleMods = filteredMods.filter((record) => record.protected);
+  const dependentNamesByModId = useMemo(
+    () => findDependentNamesByModId(scan, enabledMapDraft, enabledModDraft),
+    [enabledMapDraft, enabledModDraft, scan]
+  );
 
   function toggleMapLikeRecord(record: ModRecord) {
     if (!canToggleProfileRecord(record)) return;
@@ -151,23 +155,10 @@ export function useRecordActions({
   }
 
   function dependentSummary(record: ModRecord) {
-    const names = findEnabledDependents(record).map((item) => item.name);
+    const names = dependentNamesByModId.get(record.id) ?? [];
     if (!names.length) return "未知项目";
     const visible = names.slice(0, 6).join("、");
     return names.length > 6 ? `${visible} 等 ${names.length} 个项目` : visible;
-  }
-
-  function findEnabledDependents(target: ModRecord) {
-    const targetAliases = new Set(
-      [target.id, target.name, target.metadata.name, target.fileName, target.fileName.replace(/\.zip$/i, ""), target.relativePath]
-        .map(normalizeDependencyName)
-        .filter(Boolean)
-    );
-    const enabledMaps = scan.maps.filter((map) => enabledMapDraft.has(map.id));
-    const enabledMods = scan.otherMods.filter((modItem) => modItem.id !== target.id && enabledModDraft.has(modItem.id));
-    return [...enabledMaps, ...enabledMods].filter((item) =>
-      item.dependencies.some((dependency) => targetAliases.has(normalizeDependencyName(dependency.name)))
-    );
   }
 
   function setRecordFavoriteInScan(recordId: string, favorite: boolean) {
@@ -192,4 +183,38 @@ export function useRecordActions({
     updateRecordFavorite,
     updateRecordProtected
   };
+}
+
+function findDependentNamesByModId(scan: ScanResult, enabledMapDraft: Set<string>, enabledModDraft: Set<string>) {
+  const aliasToModId = new Map<string, string>();
+  for (const modItem of scan.otherMods) {
+    for (const alias of [
+      modItem.id,
+      modItem.name,
+      modItem.metadata.name,
+      modItem.fileName,
+      modItem.fileName.replace(/\.zip$/i, ""),
+      modItem.relativePath
+    ]) {
+      const normalized = normalizeDependencyName(alias);
+      if (normalized) aliasToModId.set(normalized, modItem.id);
+    }
+  }
+
+  const dependentNames = new Map<string, Set<string>>();
+  const enabledItems = [
+    ...scan.maps.filter((map) => enabledMapDraft.has(map.id)),
+    ...scan.otherMods.filter((modItem) => enabledModDraft.has(modItem.id))
+  ];
+  for (const item of enabledItems) {
+    for (const dependency of item.dependencies) {
+      const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
+      if (!modId || modId === item.id) continue;
+      const names = dependentNames.get(modId) ?? new Set<string>();
+      names.add(item.name);
+      dependentNames.set(modId, names);
+    }
+  }
+
+  return new Map([...dependentNames].map(([modId, names]) => [modId, [...names].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))]));
 }

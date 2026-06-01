@@ -84,6 +84,12 @@ export function validateBackupList(value: unknown): BackupInfo[] {
   return arrayAt(value, "backups").map((item, index) => validateBackupInfo(item, `backups[${index}]`));
 }
 
+export function validateVoid(value: unknown): void {
+  if (value !== null && typeof value !== "undefined") {
+    throw new Error("API 返回数据格式异常：void 命令不应返回数据。");
+  }
+}
+
 function validateBackupFileEntry(value: unknown, path: string): BackupFileEntry {
   const object = objectAt(value, path);
   return {

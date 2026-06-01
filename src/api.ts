@@ -6,6 +6,7 @@ import {
   validateConfigResponse,
   validateLaunchResult,
   validateProfilesState,
+  validateVoid,
   validateScanResult
 } from "./apiValidation";
 import type { BackupInfo, ConfigResponse, Profile, ProfilesState, RestoreScope, ScanResult } from "./types";
@@ -75,9 +76,9 @@ export async function restoreBackup(backupId: string, scope: RestoreScope): Prom
 }
 
 export async function openBackupFolder(celestePath: string): Promise<void> {
-  return invoke("open_backup_folder", { celestePath });
+  return invokeChecked("open_backup_folder", validateVoid, { celestePath });
 }
 
 export async function openBackupLocation(backupPath: string): Promise<void> {
-  return invoke("open_backup_location", { backupPath });
+  return invokeChecked("open_backup_location", validateVoid, { backupPath });
 }
