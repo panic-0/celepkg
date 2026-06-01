@@ -286,7 +286,7 @@ export function App() {
   }
 
   return (
-    <main className={`app-shell density-${uiLayout.tableDensity}`}>
+    <main className="app-shell">
       <AppToolbar
         celestePath={celestePath}
         loading={loading}

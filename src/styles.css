@@ -547,20 +547,6 @@ h1 {
   grid-template-columns: repeat(2, minmax(280px, 1fr));
 }
 
-.profile-table-card {
-  min-height: 0;
-  min-width: 0;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.profile-table-scroll {
-  height: 100%;
-  min-height: 0;
-  overflow: auto;
-}
-
 .profile-editor {
   min-height: 0;
   border: 1px solid #dce4ec;
@@ -795,10 +781,6 @@ h1 {
   min-width: 750px;
 }
 
-.profile-table {
-  min-width: 760px;
-}
-
 .record-table th,
 .record-table td,
 .sub-map-table th,
@@ -947,15 +929,6 @@ h1 {
 
 .record-table col.w-kind {
   width: 82px;
-}
-
-.profile-table th:nth-child(1) {
-  width: 34%;
-}
-
-.profile-table th:nth-child(2),
-.profile-table th:nth-child(4) {
-  width: 150px;
 }
 
 .name-cell {

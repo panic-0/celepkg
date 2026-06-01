@@ -1,14 +1,5 @@
 import type { ReactNode } from "react";
 
-export function Metric({ label, value, tone }: { label: string; value: number; tone?: "ok" | "warn" }) {
-  return (
-    <div className={tone ? `metric ${tone}` : "metric"}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 export function Select({
   label,
   value,
@@ -37,15 +28,6 @@ export function DetailStat({ icon, label, value }: { icon: ReactNode; label: str
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-export function StatIcon({ icon, value }: { icon: ReactNode; value: ReactNode }) {
-  return (
-    <span className="stat-icon">
-      {icon}
-      {value}
-    </span>
   );
 }
 

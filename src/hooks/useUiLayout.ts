@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-type TableDensity = "compact" | "comfortable";
 export type MapDetailTab = "overview" | "submaps" | "dependencies" | "saves";
 export type ModDetailTab = "overview" | "dependencies" | "files";
 
@@ -8,15 +7,13 @@ type UiLayoutState = {
   mapDetailTab: MapDetailTab;
   modDetailTab: ModDetailTab;
   showWarningColumn: boolean;
-  tableDensity: TableDensity;
 };
 
 const STORAGE_KEY = "celepkg.ui.layout";
 const defaultLayout: UiLayoutState = {
   mapDetailTab: "overview",
   modDetailTab: "overview",
-  showWarningColumn: false,
-  tableDensity: "compact"
+  showWarningColumn: false
 };
 
 export function useUiLayout() {
@@ -30,8 +27,7 @@ export function useUiLayout() {
     ...layout,
     setMapDetailTab: (mapDetailTab: MapDetailTab) => setLayout((current) => ({ ...current, mapDetailTab })),
     setModDetailTab: (modDetailTab: ModDetailTab) => setLayout((current) => ({ ...current, modDetailTab })),
-    setShowWarningColumn: (showWarningColumn: boolean) => setLayout((current) => ({ ...current, showWarningColumn })),
-    setTableDensity: (tableDensity: TableDensity) => setLayout((current) => ({ ...current, tableDensity }))
+    setShowWarningColumn: (showWarningColumn: boolean) => setLayout((current) => ({ ...current, showWarningColumn }))
   };
 }
 
@@ -43,8 +39,7 @@ function readLayout(): UiLayoutState {
     return {
       mapDetailTab: isMapTab(value.mapDetailTab) ? value.mapDetailTab : defaultLayout.mapDetailTab,
       modDetailTab: isModTab(value.modDetailTab) ? value.modDetailTab : defaultLayout.modDetailTab,
-      showWarningColumn: value.showWarningColumn === true,
-      tableDensity: value.tableDensity === "comfortable" ? "comfortable" : "compact"
+      showWarningColumn: value.showWarningColumn === true
     };
   } catch {
     return defaultLayout;
