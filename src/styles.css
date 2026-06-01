@@ -570,11 +570,11 @@ h1 {
 }
 
 .map-table {
-  min-width: 1120px;
+  min-width: 960px;
 }
 
 .mod-table {
-  min-width: 930px;
+  min-width: 780px;
 }
 
 .profile-table {
@@ -675,14 +675,6 @@ h1 {
   width: 72px;
 }
 
-.record-table col.w-author {
-  width: 150px;
-}
-
-.record-table col.w-version {
-  width: 100px;
-}
-
 .record-table col.w-small {
   width: 68px;
 }
@@ -720,7 +712,27 @@ h1 {
   min-width: 0;
 }
 
+.name-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.name-title-row strong {
+  flex: 1 1 auto;
+}
+
+.name-title-row .version-text {
+  flex: 0 1 auto;
+  max-width: 96px;
+  color: #7b8794;
+  font-size: 11px;
+  text-align: right;
+}
+
 .name-cell strong,
+.name-cell .version-text,
 .name-cell small {
   display: block;
   min-width: 0;

@@ -125,7 +125,7 @@ export function WorkspaceNav({
                 <input
                   value={query}
                   onChange={(event) => onQueryChange(event.target.value)}
-                  placeholder={activeView === "maps" ? "搜索地图、作者、SID" : "搜索 Mod、作者、依赖"}
+                  placeholder={activeView === "maps" ? "搜索地图、SID" : "搜索 Mod、依赖"}
                 />
               </label>
               <Select label="启用状态" value={enabledFilter} onChange={(value) => onEnabledFilterChange(value as EnabledFilter)}>

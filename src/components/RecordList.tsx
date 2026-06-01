@@ -125,8 +125,6 @@ function MapTable({
         <col className="w-toggle" />
         <col className="w-flags" />
         <col className="w-name" />
-        <col className="w-author" />
-        <col className="w-version" />
         <col className="w-small" />
         <col className="w-progress" />
         <col className="w-number" />
@@ -139,8 +137,6 @@ function MapTable({
           <th className="col-toggle">状态</th>
           <th className="col-flags">标记</th>
           <th>名称</th>
-          <th>作者</th>
-          <th>版本</th>
           <th className="num">小图</th>
           <th>完成</th>
           <th className="num"><Skull size={14} />死亡</th>
@@ -162,15 +158,16 @@ function MapTable({
                 <FlagButton active={map.protected} icon={map.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(map)} />
               </td>
               <td className="name-cell">
-                <strong title={map.name}>{map.name}</strong>
+                <div className="name-title-row">
+                  <strong title={map.name}>{map.name}</strong>
+                  {map.metadata.version && <span className="version-text" title={map.metadata.version}>{map.metadata.version}</span>}
+                </div>
                 <small title={map.fileName}>{map.fileName}</small>
                 <div className="inline-pills">
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
                   {map.stats && <span>有存档</span>}
                 </div>
               </td>
-              <td title={map.metadata.author || "未知"}>{map.metadata.author || "未知"}</td>
-              <td title={map.metadata.version || "无版本号"}>{map.metadata.version || "无版本号"}</td>
               <td className="num">{map.mapCount || 1}</td>
               <td>{formatCompletionStatus(map.completionStatus)}</td>
               <td className="num">{map.stats?.deaths ?? "-"}</td>
@@ -208,8 +205,6 @@ function ModTable({
         <col className="w-toggle" />
         <col className="w-flags" />
         <col className="w-name" />
-        <col className="w-author" />
-        <col className="w-version" />
         <col className="w-kind" />
         <col className="w-number" />
         <col className="w-progress" />
@@ -220,8 +215,6 @@ function ModTable({
           <th className="col-toggle">状态</th>
           <th className="col-flags">标记</th>
           <th>名称</th>
-          <th>作者</th>
-          <th>版本</th>
           <th>类型</th>
           <th className="num">依赖</th>
           <th>测试图</th>
@@ -241,11 +234,12 @@ function ModTable({
                 <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
               </td>
               <td className="name-cell">
-                <strong title={modItem.name}>{modItem.name}</strong>
+                <div className="name-title-row">
+                  <strong title={modItem.name}>{modItem.name}</strong>
+                  {modItem.metadata.version && <span className="version-text" title={modItem.metadata.version}>{modItem.metadata.version}</span>}
+                </div>
                 <small title={modItem.fileName}>{modItem.fileName}</small>
               </td>
-              <td title={modItem.metadata.author || "未知"}>{modItem.metadata.author || "未知"}</td>
-              <td title={modItem.metadata.version || "无版本号"}>{modItem.metadata.version || "无版本号"}</td>
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
               <td>{modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "-"}</td>
