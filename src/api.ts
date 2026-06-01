@@ -1,32 +1,45 @@
 import { invoke } from "@tauri-apps/api/core";
+import {
+  validateBackupInfo,
+  validateBackupList,
+  validateCelestePathResponse,
+  validateConfigResponse,
+  validateLaunchResult,
+  validateProfilesState,
+  validateScanResult
+} from "./apiValidation";
 import type { BackupInfo, ConfigResponse, Profile, ProfilesState, RestoreScope, ScanResult } from "./types";
 
+async function invokeChecked<T>(command: string, validator: (value: unknown) => T, args?: Record<string, unknown>): Promise<T> {
+  return validator(await invoke<unknown>(command, args));
+}
+
 export async function getConfig(): Promise<ConfigResponse> {
-  return invoke("get_config");
+  return invokeChecked("get_config", validateConfigResponse);
 }
 
 export async function setCelestePath(celestePath: string): Promise<{ celestePath: string }> {
-  return invoke("set_celeste_path", { celestePath });
+  return invokeChecked("set_celeste_path", validateCelestePathResponse, { celestePath });
 }
 
 export async function setAutoBackupEnabled(autoBackupEnabled: boolean): Promise<ConfigResponse> {
-  return invoke("set_auto_backup_enabled", { autoBackupEnabled });
+  return invokeChecked("set_auto_backup_enabled", validateConfigResponse, { autoBackupEnabled });
 }
 
 export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
-  return invoke("set_selected_save_files", { saveFiles });
+  return invokeChecked("set_selected_save_files", validateConfigResponse, { saveFiles });
 }
 
 export async function scanCeleste(celestePath: string): Promise<ScanResult> {
-  return invoke("scan_celeste", { celestePath });
+  return invokeChecked("scan_celeste", validateScanResult, { celestePath });
 }
 
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {
-  return invoke("save_profile", { profile });
+  return invokeChecked("save_profile", validateProfilesState, { profile });
 }
 
 export async function applyProfile(celestePath: string, mapProfileId: string, modProfileId: string): Promise<ScanResult> {
-  return invoke("apply_profile", { celestePath, mapProfileId, modProfileId });
+  return invokeChecked("apply_profile", validateScanResult, { celestePath, mapProfileId, modProfileId });
 }
 
 export async function launchProfile(
@@ -34,27 +47,27 @@ export async function launchProfile(
   mapProfileId: string,
   modProfileId: string
 ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
-  return invoke("launch_profile", { celestePath, mapProfileId, modProfileId });
+  return invokeChecked("launch_profile", validateLaunchResult, { celestePath, mapProfileId, modProfileId });
 }
 
 export async function setRecordFavorite(celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {
-  return invoke("set_record_favorite", { celestePath, recordId, favorite });
+  return invokeChecked("set_record_favorite", validateScanResult, { celestePath, recordId, favorite });
 }
 
 export async function setRecordProtected(celestePath: string, recordId: string, protectedValue: boolean): Promise<ScanResult> {
-  return invoke("set_record_protected", { celestePath, recordId, protected: protectedValue });
+  return invokeChecked("set_record_protected", validateScanResult, { celestePath, recordId, protected: protectedValue });
 }
 
 export async function createBackup(celestePath: string, kind: "manual" | "auto" = "manual"): Promise<BackupInfo> {
-  return invoke("create_backup", { celestePath, kind });
+  return invokeChecked("create_backup", validateBackupInfo, { celestePath, kind });
 }
 
 export async function listBackups(): Promise<BackupInfo[]> {
-  return invoke("list_backups");
+  return invokeChecked("list_backups", validateBackupList);
 }
 
 export async function restoreBackup(backupId: string, scope: RestoreScope): Promise<BackupInfo> {
-  return invoke("restore_backup", { backupId, scope });
+  return invokeChecked("restore_backup", validateBackupInfo, { backupId, scope });
 }
 
 export async function openBackupFolder(celestePath: string): Promise<void> {

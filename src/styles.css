@@ -71,6 +71,29 @@ select:focus {
   background: #e9edf2;
 }
 
+.fatal-shell {
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  padding: 24px;
+}
+
+.fatal-error {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 22px;
+  border: 1px solid #d6b48b;
+  border-radius: 8px;
+  background: #fff8ef;
+  color: #5c3218;
+}
+
+.fatal-error p {
+  color: #6b4a35;
+  overflow-wrap: anywhere;
+}
+
 .app-toolbar {
   display: grid;
   grid-template-columns: 150px minmax(260px, 1fr) auto auto;

@@ -1,5 +1,6 @@
 import { Archive, FolderOpen, RefreshCw, RotateCcw, ToggleLeft, ToggleRight } from "lucide-react";
 import type { BackupInfo, RestoreScope } from "../types";
+import { formatUnixNanoseconds } from "../utils/time";
 
 type BackupManagerProps = {
   autoBackupEnabled: boolean;
@@ -116,10 +117,5 @@ function BackupItem({
 }
 
 function formatBackupTime(value: string) {
-  try {
-    const milliseconds = Number(BigInt(value.split("-")[0]) / 1_000_000n);
-    return new Date(milliseconds).toLocaleString();
-  } catch {
-    return value;
-  }
+  return formatUnixNanoseconds(value.split("-")[0], value);
 }

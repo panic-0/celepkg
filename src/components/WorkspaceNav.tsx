@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { SaveFileInfo } from "../types";
+import { formatUnixNanoseconds } from "../utils/time";
 import type { ActiveView, EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { Select } from "./common";
 
@@ -271,12 +272,5 @@ function SaveFilePicker({
 }
 
 function formatSaveModified(value: string) {
-  try {
-    const nanos = BigInt(value);
-    if (nanos <= 0n) return "未知时间";
-    const milliseconds = Number(nanos / 1_000_000n);
-    return new Date(milliseconds).toLocaleString();
-  } catch {
-    return "未知时间";
-  }
+  return formatUnixNanoseconds(value, "未知时间");
 }
