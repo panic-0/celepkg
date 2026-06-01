@@ -11,6 +11,8 @@ pub fn run() {
             commands::get_config,
             commands::set_celeste_path,
             commands::scan_celeste,
+            commands::set_record_favorite,
+            commands::set_record_protected,
             commands::save_profile,
             commands::apply_profile,
             commands::launch_profile

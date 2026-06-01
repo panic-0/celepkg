@@ -7,12 +7,13 @@ import { RecordList } from "./components/RecordList";
 import { Sidebar } from "./components/Sidebar";
 import { StatusStrip } from "./components/StatusStrip";
 import { TopBar } from "./components/TopBar";
+import { setRecordFavorite, setRecordProtected } from "./api";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
 import { useUiLayout } from "./hooks/useUiLayout";
 import type { ModRecord } from "./types";
-import { isDraftEnabled } from "./utils/format";
+import { isDraftEnabled, readError } from "./utils/format";
 import type { ActiveView } from "./viewTypes";
 
 export function App() {
@@ -56,6 +57,8 @@ export function App() {
   );
   const enabledCount = scan.maps.filter((map) => profileDraft.enabledMapDraft.has(map.id)).length;
   const enabledModCount = scan.otherMods.filter((modItem) => profileDraft.enabledModDraft.has(modItem.id)).length;
+  const protectedVisibleMaps = filters.filteredMaps.filter((record) => record.protected);
+  const protectedVisibleMods = filters.filteredMods.filter((record) => record.protected);
 
   function toggleMapLikeRecord(record: ModRecord) {
     if (record.kind === "mod") profileDraft.toggleMapMod(record.id);
@@ -63,25 +66,31 @@ export function App() {
   }
 
   function enableVisibleMaps() {
-    const mapIds = filters.filteredMaps.filter((record) => record.kind === "map").map((record) => record.id);
-    const modIds = filters.filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id);
+    const skipped = protectedVisibleMaps.length;
+    const mapIds = filters.filteredMaps.filter((record) => record.kind === "map" && !record.protected).map((record) => record.id);
+    const modIds = filters.filteredMaps.filter((record) => record.kind === "mod" && !record.protected).map((record) => record.id);
     profileDraft.setEnabledMapDraft((current) => new Set([...current, ...mapIds]));
     profileDraft.setEnabledMapModDraft((current) => new Set([...current, ...modIds]));
+    showProtectedSkip(skipped);
   }
 
   function disableVisibleMaps() {
-    const mapIds = new Set(filters.filteredMaps.filter((record) => record.kind === "map").map((record) => record.id));
-    const modIds = new Set(filters.filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id));
+    const skipped = protectedVisibleMaps.length;
+    const mapIds = new Set(filters.filteredMaps.filter((record) => record.kind === "map" && !record.protected).map((record) => record.id));
+    const modIds = new Set(filters.filteredMaps.filter((record) => record.kind === "mod" && !record.protected).map((record) => record.id));
     profileDraft.setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
     profileDraft.setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+    showProtectedSkip(skipped);
   }
 
   function enableAllInCurrentView() {
     if (activeView === "maps") {
       enableVisibleMaps();
     } else if (activeView === "mods") {
-      const modIds = filters.filteredMods.map((modItem) => modItem.id);
+      const skipped = protectedVisibleMods.length;
+      const modIds = filters.filteredMods.filter((modItem) => !modItem.protected).map((modItem) => modItem.id);
       profileDraft.setEnabledExplicitModDraft((current) => new Set([...current, ...modIds]));
+      showProtectedSkip(skipped);
     }
   }
 
@@ -89,8 +98,42 @@ export function App() {
     if (activeView === "maps") {
       disableVisibleMaps();
     } else if (activeView === "mods") {
-      const modIds = new Set(filters.filteredMods.map((modItem) => modItem.id));
+      const skipped = protectedVisibleMods.length;
+      const modIds = new Set(filters.filteredMods.filter((modItem) => !modItem.protected).map((modItem) => modItem.id));
       profileDraft.setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+      showProtectedSkip(skipped);
+    }
+  }
+
+  function showProtectedSkip(skipped: number) {
+    if (skipped > 0) setMessage(`已跳过 ${skipped} 个受保护项目。`);
+  }
+
+  async function updateRecordFavorite(record: ModRecord) {
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await setRecordFavorite(celestePath, record.id, !record.favorite);
+      setScan(result);
+      setMessage(record.favorite ? "已取消收藏。" : "已加入收藏。");
+    } catch (error) {
+      setMessage(readError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateRecordProtected(record: ModRecord) {
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await setRecordProtected(celestePath, record.id, !record.protected);
+      setScan(result);
+      setMessage(record.protected ? "已取消保护。" : "已设为保护。");
+    } catch (error) {
+      setMessage(readError(error));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -200,6 +243,8 @@ export function App() {
             onMapToggle={toggleMapLikeRecord}
             onModSelect={selectMod}
             onModToggle={profileDraft.toggleMod}
+            onFavoriteToggle={updateRecordFavorite}
+            onProtectedToggle={updateRecordProtected}
             isMapEnabled={(record) => isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)}
             isModEnabled={(id) => profileDraft.enabledModDraft.has(id)}
           />

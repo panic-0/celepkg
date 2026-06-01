@@ -1,4 +1,4 @@
-import { CircleDot, Clock, FolderOpen, Skull, ToggleLeft, ToggleRight } from "lucide-react";
+import { CircleDot, Clock, FolderOpen, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
 import type { ModRecord } from "../types";
 import { formatTime } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
@@ -19,6 +19,8 @@ type RecordListProps = {
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
   onModToggle: (id: string) => void;
+  onFavoriteToggle: (record: ModRecord) => void;
+  onProtectedToggle: (record: ModRecord) => void;
   isMapEnabled: (record: ModRecord) => boolean;
   isModEnabled: (id: string) => boolean;
 };
@@ -37,6 +39,8 @@ export function RecordList({
   onMapToggle,
   onModSelect,
   onModToggle,
+  onFavoriteToggle,
+  onProtectedToggle,
   isMapEnabled,
   isModEnabled
 }: RecordListProps) {
@@ -68,6 +72,8 @@ export function RecordList({
             selectedMap={selectedMap}
             onSelect={onMapSelect}
             onToggle={onMapToggle}
+            onFavoriteToggle={onFavoriteToggle}
+            onProtectedToggle={onProtectedToggle}
             isEnabled={isMapEnabled}
           />
         ) : (
@@ -76,6 +82,8 @@ export function RecordList({
             selectedMod={selectedMod}
             onSelect={onModSelect}
             onToggle={onModToggle}
+            onFavoriteToggle={onFavoriteToggle}
+            onProtectedToggle={onProtectedToggle}
             isEnabled={isModEnabled}
           />
         )}
@@ -95,12 +103,16 @@ function MapTable({
   selectedMap,
   onSelect,
   onToggle,
+  onFavoriteToggle,
+  onProtectedToggle,
   isEnabled
 }: {
   maps: ModRecord[];
   selectedMap?: ModRecord;
   onSelect: (id: string) => void;
   onToggle: (record: ModRecord) => void;
+  onFavoriteToggle: (record: ModRecord) => void;
+  onProtectedToggle: (record: ModRecord) => void;
   isEnabled: (record: ModRecord) => boolean;
 }) {
   return (
@@ -108,6 +120,7 @@ function MapTable({
       <thead>
         <tr>
           <th className="col-toggle">状态</th>
+          <th className="col-flags">标记</th>
           <th>名称</th>
           <th>作者</th>
           <th>版本</th>
@@ -126,6 +139,10 @@ function MapTable({
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <td className="col-toggle">
                 <ToggleButton enabled={enabled} label="地图" onClick={() => onToggle(map)} />
+              </td>
+              <td className="flag-cell">
+                <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
+                <FlagButton active={map.protected} icon={map.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(map)} />
               </td>
               <td className="name-cell">
                 <strong title={map.name}>{map.name}</strong>
@@ -156,12 +173,16 @@ function ModTable({
   selectedMod,
   onSelect,
   onToggle,
+  onFavoriteToggle,
+  onProtectedToggle,
   isEnabled
 }: {
   mods: ModRecord[];
   selectedMod?: ModRecord;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
+  onFavoriteToggle: (record: ModRecord) => void;
+  onProtectedToggle: (record: ModRecord) => void;
   isEnabled: (id: string) => boolean;
 }) {
   return (
@@ -169,6 +190,7 @@ function ModTable({
       <thead>
         <tr>
           <th className="col-toggle">状态</th>
+          <th className="col-flags">标记</th>
           <th>名称</th>
           <th>作者</th>
           <th>版本</th>
@@ -186,6 +208,10 @@ function ModTable({
               <td className="col-toggle">
                 <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem.id)} />
               </td>
+              <td className="flag-cell">
+                <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
+                <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
+              </td>
               <td className="name-cell">
                 <strong title={modItem.name}>{modItem.name}</strong>
                 <small title={modItem.fileName}>{modItem.fileName}</small>
@@ -201,6 +227,21 @@ function ModTable({
         })}
       </tbody>
     </table>
+  );
+}
+
+function FlagButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      className={active ? "flag-button active" : "flag-button"}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      title={active ? `取消 ${label}` : `设为 ${label}`}
+    >
+      {icon}
+    </button>
   );
 }
 

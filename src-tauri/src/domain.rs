@@ -52,6 +52,8 @@ pub struct ModRecord {
     pub is_archive: bool,
     pub kind: String,
     pub enabled: bool,
+    pub favorite: bool,
+    pub protected: bool,
     pub metadata: ModMetadata,
     pub map_ids: Vec<String>,
     pub sub_maps: Vec<SubMapInfo>,

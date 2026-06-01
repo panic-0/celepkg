@@ -519,6 +519,39 @@ h1 {
   text-align: center;
 }
 
+.record-table .col-flags {
+  width: 72px;
+  text-align: center;
+}
+
+.flag-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.flag-button {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #8a96a3;
+}
+
+.flag-button.active {
+  color: #0f77ad;
+  background: #eef8fc;
+  border-color: #abd4df;
+}
+
+.flag-button.active:first-child {
+  color: #ba7a13;
+  background: #fff8e5;
+  border-color: #efd18d;
+}
+
 .record-table .num,
 .sub-map-table .num {
   text-align: right;
@@ -528,38 +561,38 @@ h1 {
   text-align: right;
 }
 
-.record-table th:nth-child(2) {
+.record-table th:nth-child(3) {
   width: 30%;
 }
 
-.record-table th:nth-child(3) {
+.record-table th:nth-child(4) {
   width: 15%;
 }
 
-.record-table th:nth-child(4) {
+.record-table th:nth-child(5) {
   width: 100px;
 }
 
-.record-table th:nth-child(5),
 .record-table th:nth-child(6),
-.record-table th:nth-child(10) {
+.record-table th:nth-child(7),
+.record-table th:nth-child(11) {
   width: 74px;
 }
 
-.record-table th:nth-child(7),
 .record-table th:nth-child(8),
-.record-table th:nth-child(9) {
+.record-table th:nth-child(9),
+.record-table th:nth-child(10) {
   width: 86px;
 }
 
-.mod-table th:nth-child(2) {
+.mod-table th:nth-child(3) {
   width: 36%;
 }
 
-.mod-table th:nth-child(5),
 .mod-table th:nth-child(6),
 .mod-table th:nth-child(7),
-.mod-table th:nth-child(8) {
+.mod-table th:nth-child(8),
+.mod-table th:nth-child(9) {
   width: 86px;
 }
 

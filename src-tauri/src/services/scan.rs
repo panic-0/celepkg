@@ -45,17 +45,23 @@ struct Blacklist {
     entries: HashSet<String>,
 }
 
-pub fn full_scan_cached(celeste_path: &Path, profiles: ProfilesState) -> ScanResult {
+pub fn full_scan_cached(
+    celeste_path: &Path,
+    profiles: ProfilesState,
+    protected_record_ids: &[String],
+) -> ScanResult {
     let signature = build_scan_signature(celeste_path);
     let cache_path = scan_cache_path(celeste_path);
     if let Some(mut cached) = read_json::<CachedScan>(&cache_path) {
         if cached.signature == signature {
             cached.result.profiles = profiles;
+            apply_protected_flags(&mut cached.result, protected_record_ids);
             return cached.result;
         }
     }
 
-    let result = full_scan(celeste_path, profiles);
+    let mut result = full_scan(celeste_path, profiles);
+    apply_protected_flags(&mut result, protected_record_ids);
     let cache = CachedScan {
         signature,
         result: result.clone(),
@@ -68,6 +74,13 @@ pub fn full_scan(celeste_path: &Path, profiles: ProfilesState) -> ScanResult {
     let mut scan = scan_mods(celeste_path, &profiles);
     scan.maps = read_save_stats(celeste_path, scan.maps);
     scan
+}
+
+fn apply_protected_flags(scan: &mut ScanResult, protected_record_ids: &[String]) {
+    let protected: HashSet<&String> = protected_record_ids.iter().collect();
+    for record in scan.maps.iter_mut().chain(scan.other_mods.iter_mut()) {
+        record.protected = protected.contains(&record.id);
+    }
 }
 
 fn build_scan_signature(celeste_path: &Path) -> ScanSignature {
@@ -183,12 +196,15 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
     }
 
     let blacklist = read_blacklist(&mods_path);
+    let favorites = read_favorites(&mods_path);
     let mut records = vec![];
     if let Ok(entries) = fs::read_dir(&mods_path) {
         for entry in entries.flatten() {
             let path = entry.path();
             let file_name = entry.file_name().to_string_lossy().to_string();
-            if file_name.eq_ignore_ascii_case("blacklist.txt") {
+            if file_name.eq_ignore_ascii_case("blacklist.txt")
+                || file_name.eq_ignore_ascii_case("favorites.txt")
+            {
                 continue;
             }
             let parsed = if path.is_dir() {
@@ -200,6 +216,7 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
             };
             if let Some(mut record) = parsed {
                 record.enabled = !is_blacklisted(&record, &blacklist);
+                record.favorite = is_favorite(&record, &favorites);
                 records.push(record);
             }
         }
@@ -281,6 +298,13 @@ pub fn write_profile_blacklist(
         })
         .filter(|value| !value.is_empty())
         .collect();
+    let protected_keys: HashSet<String> = scan
+        .maps
+        .iter()
+        .chain(scan.other_mods.iter())
+        .filter(|record| record.protected)
+        .flat_map(record_match_keys)
+        .collect();
     let mut lines: Vec<String> = blacklist
         .lines
         .into_iter()
@@ -289,18 +313,19 @@ pub fn write_profile_blacklist(
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 return true;
             }
-            !managed_keys.contains(&normalize_slash(trimmed).to_lowercase())
+            let key = normalize_slash(trimmed).to_lowercase();
+            protected_keys.contains(&key) || !managed_keys.contains(&key)
         })
         .collect();
     let enabled_maps: HashSet<&String> = enabled_map_ids.iter().collect();
     for map in &scan.maps {
-        if !enabled_maps.contains(&map.id) {
+        if !map.protected && !enabled_maps.contains(&map.id) {
             lines.push(map.relative_path.clone());
         }
     }
     let enabled_mods: HashSet<&String> = enabled_mod_ids.iter().collect();
     for mod_item in &scan.other_mods {
-        if !enabled_mods.contains(&mod_item.id) {
+        if !mod_item.protected && !enabled_mods.contains(&mod_item.id) {
             lines.push(mod_item.relative_path.clone());
         }
     }
@@ -310,6 +335,40 @@ pub fn write_profile_blacklist(
     let content = format!("{}\n", lines.join("\n").trim());
     file.write_all(content.as_bytes())
         .map_err(|error| format!("写入 blacklist 失败：{error}"))
+}
+
+pub fn write_favorite_state(
+    celeste_path: &Path,
+    record_id: &str,
+    favorite: bool,
+    scan: &ScanResult,
+) -> Result<(), String> {
+    let record = scan
+        .maps
+        .iter()
+        .chain(scan.other_mods.iter())
+        .find(|record| record.id == record_id)
+        .ok_or_else(|| "Mod 不存在".to_string())?;
+    let mods_path = celeste_path.join("Mods");
+    fs::create_dir_all(&mods_path).map_err(|error| format!("创建 Mods 目录失败：{error}"))?;
+    let file = mods_path.join("favorites.txt");
+    let mut lines: Vec<String> = fs::read_to_string(&file)
+        .unwrap_or_default()
+        .lines()
+        .map(ToString::to_string)
+        .collect();
+    let keys: HashSet<String> = record_match_keys(record).into_iter().collect();
+    lines.retain(|line| {
+        let trimmed = line.trim();
+        trimmed.is_empty()
+            || trimmed.starts_with('#')
+            || !keys.contains(&normalize_slash(trimmed).to_lowercase())
+    });
+    if favorite {
+        lines.push(record.relative_path.clone());
+    }
+    let content = format!("{}\n", lines.join("\n").trim());
+    fs::write(file, content).map_err(|error| format!("写入 favorites.txt 失败：{error}"))
 }
 
 fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
@@ -438,6 +497,8 @@ fn create_mod_record(
         is_archive,
         kind: if is_map_mod { "map" } else { "mod" }.to_string(),
         enabled: true,
+        favorite: false,
+        protected: false,
         map_count: map_ids.len(),
         dependencies: metadata.dependencies.clone(),
         optional_dependencies: metadata.optional_dependencies.clone(),
@@ -517,6 +578,16 @@ fn read_blacklist(mods_path: &Path) -> Blacklist {
     }
 }
 
+fn read_favorites(mods_path: &Path) -> HashSet<String> {
+    fs::read_to_string(mods_path.join("favorites.txt"))
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| normalize_slash(line).to_lowercase())
+        .collect()
+}
+
 fn is_blacklisted(record: &ModRecord, blacklist: &Blacklist) -> bool {
     [
         record.file_name.as_str(),
@@ -529,6 +600,26 @@ fn is_blacklisted(record: &ModRecord, blacklist: &Blacklist) -> bool {
     .filter(|value| !value.is_empty())
     .map(|value| normalize_slash(value).to_lowercase())
     .any(|value| blacklist.entries.contains(&value))
+}
+
+fn is_favorite(record: &ModRecord, favorites: &HashSet<String>) -> bool {
+    record_match_keys(record)
+        .into_iter()
+        .any(|value| favorites.contains(&value))
+}
+
+fn record_match_keys(record: &ModRecord) -> Vec<String> {
+    [
+        record.file_name.as_str(),
+        record.relative_path.as_str(),
+        record.name.as_str(),
+        record.metadata.name.as_str(),
+        record.file_name.trim_end_matches(".zip"),
+    ]
+    .iter()
+    .filter(|value| !value.is_empty())
+    .map(|value| normalize_slash(value).to_lowercase())
+    .collect()
 }
 
 fn sub_map_display_name(sid: &str) -> String {
@@ -667,6 +758,83 @@ mod tests {
     }
 
     #[test]
+    fn blacklist_preserves_protected_records() {
+        let root = std::env::temp_dir().join(format!(
+            "celepkg-protected-blacklist-test-{}",
+            stable_id(&crate::utils::now_string())
+        ));
+        let mods_path = root.join("Mods");
+        fs::create_dir_all(&mods_path).expect("mods dir");
+        fs::write(mods_path.join("blacklist.txt"), "DisabledProtected.zip\n").expect("blacklist");
+        let mut enabled_protected = record("enabled-protected", "EnabledProtected.zip", "mod");
+        enabled_protected.protected = true;
+        let mut disabled_protected = record("disabled-protected", "DisabledProtected.zip", "mod");
+        disabled_protected.protected = true;
+        let scan = ScanResult {
+            celeste_path: root.to_string_lossy().to_string(),
+            mods_path: mods_path.to_string_lossy().to_string(),
+            blacklist_path: mods_path
+                .join("blacklist.txt")
+                .to_string_lossy()
+                .to_string(),
+            blacklist_entries: vec![],
+            game_executable: String::new(),
+            maps: vec![],
+            other_mods: vec![enabled_protected, disabled_protected],
+            profiles: empty_profiles(),
+            warnings: vec![],
+        };
+
+        write_profile_blacklist(&root, &[], &["disabled-protected".to_string()], &scan)
+            .expect("write blacklist");
+        let text = fs::read_to_string(mods_path.join("blacklist.txt")).expect("read blacklist");
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(text.contains("DisabledProtected.zip"));
+        assert!(!text.contains("EnabledProtected.zip"));
+    }
+
+    #[test]
+    fn favorites_file_round_trips_record_state() {
+        let root = temp_celeste_root("favorites");
+        write_dir_map(&root, "FavoriteMap", "maps/favorite/one");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+        let scan = full_scan_cached(&root, empty_profiles(), &[]);
+        let record_id = scan.maps[0].id.clone();
+
+        write_favorite_state(&root, &record_id, true, &scan).expect("write favorite");
+        let favorite_scan = full_scan_cached(&root, empty_profiles(), &[]);
+        assert!(favorite_scan.maps[0].favorite);
+
+        write_favorite_state(&root, &record_id, false, &favorite_scan).expect("remove favorite");
+        let plain_scan = full_scan_cached(&root, empty_profiles(), &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert!(!plain_scan.maps[0].favorite);
+    }
+
+    #[test]
+    fn cached_scan_overlays_protected_state() {
+        let root = temp_celeste_root("protected-cache");
+        write_dir_map(&root, "ProtectedMap", "maps/protected/one");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+        let first = full_scan_cached(&root, empty_profiles(), &[]);
+        let record_id = first.maps[0].id.clone();
+        assert!(!first.maps[0].protected);
+
+        let second = full_scan_cached(&root, empty_profiles(), &[record_id]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert!(second.maps[0].protected);
+    }
+
+    #[test]
     fn cached_scan_uses_latest_profiles_and_invalidates_on_blacklist() {
         let root = temp_celeste_root("cache-blacklist");
         write_dir_map(&root, "TestMap", "maps/cache/one");
@@ -680,6 +848,7 @@ mod tests {
                 active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
+            &[],
         );
         assert_eq!(first.profiles.active_map_profile_id, "one");
         assert_eq!(first.maps.len(), 1);
@@ -692,6 +861,7 @@ mod tests {
                 active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
+            &[],
         );
         assert_eq!(cached.profiles.active_map_profile_id, "two");
         assert!(cached.maps[0].enabled);
@@ -704,6 +874,7 @@ mod tests {
                 active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
+            &[],
         );
 
         let _ = fs::remove_file(cache_file);
@@ -723,7 +894,7 @@ mod tests {
         let cache_file = scan_cache_path(&root);
         let _ = fs::remove_file(&cache_file);
 
-        let first = full_scan_cached(&root, empty_profiles());
+        let first = full_scan_cached(&root, empty_profiles(), &[]);
         assert_eq!(
             first.maps[0].stats.as_ref().map(|stats| stats.deaths),
             Some(1)
@@ -734,7 +905,7 @@ mod tests {
             format!("{}\n<!-- changed -->", save_xml("maps/cache/save", 7)),
         )
         .expect("save file update");
-        let second = full_scan_cached(&root, empty_profiles());
+        let second = full_scan_cached(&root, empty_profiles(), &[]);
 
         let _ = fs::remove_file(cache_file);
         let _ = fs::remove_dir_all(root);
@@ -755,6 +926,8 @@ mod tests {
             is_archive: true,
             kind: kind.to_string(),
             enabled: true,
+            favorite: false,
+            protected: false,
             metadata: ModMetadata::default(),
             map_ids: vec![],
             sub_maps: vec![],

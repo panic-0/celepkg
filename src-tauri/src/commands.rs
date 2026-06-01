@@ -31,10 +31,78 @@ pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
         Ok(services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
+            &state.protected_record_ids,
         ))
     })
     .await
     .map_err(|error| format!("扫描任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn set_record_favorite(
+    celeste_path: String,
+    record_id: String,
+    favorite: bool,
+) -> Result<ScanResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state();
+        let path = resolve_input_path(&celeste_path);
+        let scan = services::scan::full_scan_cached(
+            &path,
+            state.profiles_state(),
+            &state.protected_record_ids,
+        );
+        services::scan::write_favorite_state(&path, &record_id, favorite, &scan)?;
+        Ok(services::scan::full_scan_cached(
+            &path,
+            state.profiles_state(),
+            &state.protected_record_ids,
+        ))
+    })
+    .await
+    .map_err(|error| format!("更新 Favorite 任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn set_record_protected(
+    celeste_path: String,
+    record_id: String,
+    protected: bool,
+) -> Result<ScanResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut state = load_state();
+        let path = resolve_input_path(&celeste_path);
+        let scan = services::scan::full_scan_cached(
+            &path,
+            state.profiles_state(),
+            &state.protected_record_ids,
+        );
+        if !scan
+            .maps
+            .iter()
+            .chain(scan.other_mods.iter())
+            .any(|record| record.id == record_id)
+        {
+            return Err("Mod 不存在".to_string());
+        }
+        if protected {
+            if !state.protected_record_ids.contains(&record_id) {
+                state.protected_record_ids.push(record_id);
+            }
+        } else {
+            state.protected_record_ids.retain(|id| id != &record_id);
+        }
+        state.protected_record_ids.sort();
+        state.protected_record_ids.dedup();
+        write_state(&state)?;
+        Ok(services::scan::full_scan_cached(
+            &path,
+            state.profiles_state(),
+            &state.protected_record_ids,
+        ))
+    })
+    .await
+    .map_err(|error| format!("更新 Protected 任务失败：{error}"))?
 }
 
 #[tauri::command]

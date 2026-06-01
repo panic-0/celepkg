@@ -10,6 +10,8 @@ pub struct AppState {
     pub celeste_path: String,
     pub active_map_profile_id: String,
     pub active_mod_profile_id: String,
+    #[serde(default)]
+    pub protected_record_ids: Vec<String>,
     pub profiles: Vec<Profile>,
 }
 
@@ -56,6 +58,7 @@ fn default_state() -> AppState {
         celeste_path: find_default_celeste_path(),
         active_map_profile_id: "default-maps".to_string(),
         active_mod_profile_id: "default-mods".to_string(),
+        protected_record_ids: vec![],
         profiles: vec![
             Profile {
                 id: "default-maps".to_string(),
@@ -139,6 +142,7 @@ mod tests {
 
         assert_eq!(state.active_map_profile_id, "default-maps");
         assert_eq!(state.active_mod_profile_id, "default-mods");
+        assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);
         assert_eq!(state.profiles[0].profile_type, "maps");
         assert_eq!(state.profiles[1].profile_type, "mods");

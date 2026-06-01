@@ -66,7 +66,12 @@ pub fn apply_profile(
     mod_profile_id: String,
 ) -> Result<ScanResult, String> {
     let applied = apply_profile_to_blacklist(celeste_path, map_profile_id, mod_profile_id)?;
-    Ok(full_scan_cached(&applied.path, applied.profiles))
+    let state = load_state();
+    Ok(full_scan_cached(
+        &applied.path,
+        applied.profiles,
+        &state.protected_record_ids,
+    ))
 }
 
 pub fn launch_profile(
@@ -120,7 +125,7 @@ fn apply_profile_to_blacklist(
         .find(|item| item.id == mod_profile_id && item.profile_type == PROFILE_TYPE_MODS)
         .cloned()
         .ok_or_else(|| "Mod Profile 不存在".to_string())?;
-    let scan = full_scan_cached(&path, profiles.clone());
+    let scan = full_scan_cached(&path, profiles.clone(), &state.protected_record_ids);
     let enabled_map_ids = map_profile.enabled_map_ids.clone().unwrap_or_else(|| {
         scan.maps
             .iter()
@@ -165,7 +170,11 @@ fn resolve_required_mod_ids(
     let mut enabled: HashSet<String> = base_mod_ids.iter().cloned().collect();
     let mut queue: VecDeque<String> = base_mod_ids.iter().cloned().collect();
 
-    for map in scan.maps.iter().filter(|map| enabled_map_ids.contains(&map.id)) {
+    for map in scan
+        .maps
+        .iter()
+        .filter(|map| enabled_map_ids.contains(&map.id))
+    {
         for dependency in &map.dependencies {
             if let Some(mod_id) = resolve_dependency_id(&dependency.name, &alias_to_mod_id) {
                 if enabled.insert(mod_id.clone()) {
@@ -214,7 +223,9 @@ fn mod_alias_map(scan: &ScanResult) -> HashMap<String, String> {
 }
 
 fn resolve_dependency_id(name: &str, alias_to_mod_id: &HashMap<String, String>) -> Option<String> {
-    alias_to_mod_id.get(&normalize_dependency_name(name)).cloned()
+    alias_to_mod_id
+        .get(&normalize_dependency_name(name))
+        .cloned()
 }
 
 fn normalize_dependency_name(value: &str) -> String {
@@ -264,7 +275,13 @@ mod tests {
                     &[dependency("CoreHelper")],
                 ),
                 record("core-helper", "CoreHelper.zip", "mod", "CoreHelper", &[]),
-                record("visual-pack", "VisualPack.zip", "mod", "VisualPack", &[dependency("CoreHelper")]),
+                record(
+                    "visual-pack",
+                    "VisualPack.zip",
+                    "mod",
+                    "VisualPack",
+                    &[dependency("CoreHelper")],
+                ),
             ],
             profiles: ProfilesState {
                 active_map_profile_id: "maps".to_string(),
@@ -274,11 +291,8 @@ mod tests {
             warnings: vec![],
         };
 
-        let resolved = resolve_required_mod_ids(
-            &scan,
-            &["map".to_string()],
-            &["visual-pack".to_string()],
-        );
+        let resolved =
+            resolve_required_mod_ids(&scan, &["map".to_string()], &["visual-pack".to_string()]);
 
         assert_eq!(
             resolved,
@@ -297,7 +311,13 @@ mod tests {
         }
     }
 
-    fn record(id: &str, relative_path: &str, kind: &str, name: &str, dependencies: &[Dependency]) -> ModRecord {
+    fn record(
+        id: &str,
+        relative_path: &str,
+        kind: &str,
+        name: &str,
+        dependencies: &[Dependency],
+    ) -> ModRecord {
         ModRecord {
             id: id.to_string(),
             name: name.to_string(),
@@ -312,6 +332,8 @@ mod tests {
                 ..ModMetadata::default()
             },
             enabled: true,
+            favorite: false,
+            protected: false,
             map_ids: vec![],
             sub_maps: vec![],
             map_count: 0,

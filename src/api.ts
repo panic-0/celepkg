@@ -28,3 +28,11 @@ export async function launchProfile(
 ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
   return invoke("launch_profile", { celestePath, mapProfileId, modProfileId });
 }
+
+export async function setRecordFavorite(celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {
+  return invoke("set_record_favorite", { celestePath, recordId, favorite });
+}
+
+export async function setRecordProtected(celestePath: string, recordId: string, protectedValue: boolean): Promise<ScanResult> {
+  return invoke("set_record_protected", { celestePath, recordId, protected: protectedValue });
+}

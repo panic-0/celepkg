@@ -40,6 +40,8 @@ export type ModRecord = {
   isArchive: boolean;
   kind: "map" | "mod";
   enabled: boolean;
+  favorite: boolean;
+  protected: boolean;
   metadata: ModMetadata;
   mapIds: string[];
   subMaps: SubMapInfo[];
