@@ -155,9 +155,11 @@ function MapTable({
           return (
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <td className="action-cell">
-                <ToggleButton enabled={enabled} label="地图" onClick={() => onToggle(map)} />
-                <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
-                <FlagButton active={map.protected} icon={map.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(map)} />
+                <div className="action-group">
+                  <ToggleButton enabled={enabled} label="地图" onClick={() => onToggle(map)} />
+                  <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
+                  <FlagButton active={map.protected} icon={map.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(map)} />
+                </div>
               </td>
               <td className="name-cell">
                 <div className="name-title-row">
@@ -229,9 +231,11 @@ function ModTable({
           return (
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
-                <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem.id)} />
-                <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
-                <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
+                <div className="action-group">
+                  <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem.id)} />
+                  <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
+                  <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
+                </div>
               </td>
               <td className="name-cell">
                 <div className="name-title-row">

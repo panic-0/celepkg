@@ -635,10 +635,6 @@ h1 {
 }
 
 .action-cell {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
   padding-right: 4px;
   padding-left: 4px;
   overflow: visible;
@@ -647,8 +643,18 @@ h1 {
   white-space: nowrap;
 }
 
-.action-cell .switch,
-.action-cell .flag-button {
+.action-group {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 92px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.action-group .switch,
+.action-group .flag-button {
   min-height: 28px;
 }
 
