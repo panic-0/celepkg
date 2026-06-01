@@ -618,11 +618,15 @@ h1 {
 
 .list-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
   gap: 8px;
   align-items: center;
   padding: 10px;
   border-bottom: 1px solid #e2e8ef;
+}
+
+.list-header button {
+  white-space: nowrap;
 }
 
 .list-header h2 {
