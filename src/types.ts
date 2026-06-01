@@ -36,6 +36,7 @@ export type CompletionStatus = "completed" | "unfinished" | "unknown" | "notAppl
 export type SubMapInfo = {
   id: string;
   sid: string;
+  modeIndex: number | null;
   displayName: string;
   chapter: string;
   filePath: string;
@@ -55,6 +56,7 @@ export type ModRecord = {
   enabled: boolean;
   favorite: boolean;
   protected: boolean;
+  readOnly: boolean;
   metadata: ModMetadata;
   mapIds: string[];
   subMaps: SubMapInfo[];

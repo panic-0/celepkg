@@ -343,6 +343,7 @@ mod tests {
             enabled: true,
             favorite: false,
             protected: false,
+            read_only: false,
             map_ids: vec![],
             sub_maps: vec![],
             map_count: 0,

@@ -46,6 +46,7 @@ pub struct SaveFileInfo {
 pub struct SubMapInfo {
     pub id: String,
     pub sid: String,
+    pub mode_index: Option<u8>,
     pub display_name: String,
     pub chapter: String,
     pub file_path: String,
@@ -67,6 +68,8 @@ pub struct ModRecord {
     pub enabled: bool,
     pub favorite: bool,
     pub protected: bool,
+    #[serde(default)]
+    pub read_only: bool,
     pub metadata: ModMetadata,
     pub map_ids: Vec<String>,
     pub sub_maps: Vec<SubMapInfo>,

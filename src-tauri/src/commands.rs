@@ -112,13 +112,16 @@ pub async fn set_record_protected(
             &state.protected_record_ids,
             &state.selected_save_files,
         );
-        if !scan
+        let Some(record) = scan
             .maps
             .iter()
             .chain(scan.other_mods.iter())
-            .any(|record| record.id == record_id)
-        {
+            .find(|record| record.id == record_id)
+        else {
             return Err("Mod 不存在".to_string());
+        };
+        if record.read_only {
+            return Err("内置项目不能修改保护状态".to_string());
         }
         if protected {
             if !state.protected_record_ids.contains(&record_id) {

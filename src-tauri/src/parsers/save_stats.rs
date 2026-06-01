@@ -116,7 +116,8 @@ pub fn read_save_stats(
                 .into_iter()
                 .map(|mut sub_map| {
                     let sub_needles = sub_map_needles(&sub_map);
-                    sub_map.stats = collect_stats_from_saves(&save_files, &sub_needles);
+                    sub_map.stats =
+                        collect_stats_from_saves(&save_files, &sub_needles, sub_map.mode_index);
                     sub_map.completion_status = sub_map_completion_status(&sub_map).to_string();
                     sub_map
                 })
@@ -148,6 +149,7 @@ pub fn read_save_stats(
 fn collect_stats_from_saves(
     save_files: &[SaveFileSnapshot],
     needles: &[String],
+    mode_index: Option<u8>,
 ) -> Option<MapStats> {
     let mut accumulator = SaveStatsAccumulator::new();
     for file in save_files {
@@ -160,7 +162,7 @@ fn collect_stats_from_saves(
         let before = accumulator.stats.clone();
         let berry_count = accumulator.berry_ids.len();
         let missing_berries = accumulator.missing_berry_ids;
-        accumulate_save_stats(&file.text, needles, &mut accumulator);
+        accumulate_save_stats(&file.text, needles, mode_index, &mut accumulator);
         if accumulator.stats.deaths != before.deaths
             || accumulator.berry_ids.len() != berry_count
             || accumulator.stats.time_played != before.time_played
@@ -253,18 +255,44 @@ fn is_non_completable_sub_map(sid: &str) -> bool {
 
 fn sub_map_needles(sub_map: &SubMapInfo) -> Vec<String> {
     let sid_with_underscores = sub_map.sid.replace('/', "_");
-    [
+    let official_area_sid = official_area_sid(sub_map);
+    let mut values = vec![
         sub_map.sid.clone(),
         sub_map.file_path.clone(),
         sid_with_underscores,
-    ]
-    .into_iter()
-    .filter(|value| !value.trim().is_empty())
-    .map(|value| value.to_lowercase())
-    .collect()
+    ];
+    if let Some(sid) = official_area_sid {
+        values.push(sid);
+    }
+    values
+        .into_iter()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| value.to_lowercase())
+        .collect()
 }
 
-fn accumulate_save_stats(xml: &str, needles: &[String], accumulator: &mut SaveStatsAccumulator) {
+fn official_area_sid(sub_map: &SubMapInfo) -> Option<String> {
+    let segments: Vec<&str> = sub_map
+        .sid
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect();
+    if sub_map.mode_index.is_some()
+        && segments.len() >= 3
+        && segments[0].eq_ignore_ascii_case("Celeste")
+    {
+        Some(format!("{}/{}", segments[0], segments[1]))
+    } else {
+        None
+    }
+}
+
+fn accumulate_save_stats(
+    xml: &str,
+    needles: &[String],
+    mode_index: Option<u8>,
+    accumulator: &mut SaveStatsAccumulator,
+) {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
@@ -274,6 +302,7 @@ fn accumulate_save_stats(xml: &str, needles: &[String], accumulator: &mut SaveSt
     let mut strawberry_depth: Option<usize> = None;
     let mut area_mode_total_strawberries = 0u64;
     let mut area_mode_berry_ids_seen = 0usize;
+    let mut next_area_mode_index = 0usize;
     let mut depth = 0usize;
     loop {
         match reader.read_event_into(&mut buf) {
@@ -282,10 +311,22 @@ fn accumulate_save_stats(xml: &str, needles: &[String], accumulator: &mut SaveSt
                 if is_area_stats_event(&event) && event_matches(&event, needles) {
                     area_depth = Some(depth);
                     area_sid = attr_value(&event, b"SID").unwrap_or_default();
+                    next_area_mode_index = 0;
+                    if mode_index.is_none() || mode_index == Some(0) {
+                        add_area_event_stats(&event, &mut accumulator.stats);
+                    }
                 } else if area_depth.is_some() && is_area_mode_stats_event(&event) {
-                    area_mode_depth = Some(depth);
-                    area_mode_total_strawberries = add_event_stats(&event, &mut accumulator.stats);
-                    area_mode_berry_ids_seen = 0;
+                    let current_mode_index = next_area_mode_index;
+                    next_area_mode_index += 1;
+                    if mode_index
+                        .map(|selected| selected as usize == current_mode_index)
+                        .unwrap_or(true)
+                    {
+                        area_mode_depth = Some(depth);
+                        area_mode_total_strawberries =
+                            add_event_stats(&event, &mut accumulator.stats);
+                        area_mode_berry_ids_seen = 0;
+                    }
                 } else if area_mode_depth.is_some()
                     && event.name().as_ref().eq_ignore_ascii_case(b"Strawberries")
                 {
@@ -300,9 +341,16 @@ fn accumulate_save_stats(xml: &str, needles: &[String], accumulator: &mut SaveSt
             }
             Ok(Event::Empty(event)) => {
                 if area_depth.is_some() && is_area_mode_stats_event(&event) {
-                    let total = add_event_stats(&event, &mut accumulator.stats);
-                    if total > 0 {
-                        accumulator.missing_berry_ids = true;
+                    let current_mode_index = next_area_mode_index;
+                    next_area_mode_index += 1;
+                    if mode_index
+                        .map(|selected| selected as usize == current_mode_index)
+                        .unwrap_or(true)
+                    {
+                        let total = add_event_stats(&event, &mut accumulator.stats);
+                        if total > 0 {
+                            accumulator.missing_berry_ids = true;
+                        }
                     }
                 } else if strawberry_depth.is_some()
                     && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
@@ -327,9 +375,11 @@ fn accumulate_save_stats(xml: &str, needles: &[String], accumulator: &mut SaveSt
                 if area_depth == Some(depth) {
                     area_depth = None;
                     area_sid.clear();
+                    next_area_mode_index = 0;
                 } else if event.name().as_ref().eq_ignore_ascii_case(b"AreaStats") {
                     area_depth = None;
                     area_sid.clear();
+                    next_area_mode_index = 0;
                 }
                 depth = depth.saturating_sub(1);
             }
@@ -362,6 +412,16 @@ fn event_matches(event: &BytesStart<'_>, needles: &[String]) -> bool {
         .any(|needle| !needle.is_empty() && haystack.contains(needle))
 }
 
+fn add_area_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) {
+    for attr in event.attributes().flatten() {
+        let key = String::from_utf8_lossy(attr.key.as_ref()).to_lowercase();
+        let value = String::from_utf8_lossy(attr.value.as_ref());
+        if key == "cassette" && value.eq_ignore_ascii_case("true") {
+            stats.cassettes = stats.cassettes.saturating_add(1);
+        }
+    }
+}
+
 fn add_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) -> u64 {
     let mut total_strawberries = 0u64;
     for attr in event.attributes().flatten() {
@@ -381,7 +441,13 @@ fn add_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) -> u64 {
                     stats.cassettes = stats.cassettes.saturating_add(number);
                 }
             }
-            "heartgems" | "hearts" | "heart" => stats.hearts = stats.hearts.saturating_add(number),
+            "heartgems" | "heartgem" | "hearts" | "heart" => {
+                if value.eq_ignore_ascii_case("true") {
+                    stats.hearts = stats.hearts.saturating_add(1);
+                } else {
+                    stats.hearts = stats.hearts.saturating_add(number);
+                }
+            }
             "completed" | "complete" => {
                 stats.completion_known = true;
                 stats.completed = stats.completed || value.eq_ignore_ascii_case("true");
@@ -523,6 +589,7 @@ mod tests {
         accumulate_save_stats(
             r#"<Save><OldStats SID="Map"><AreaModeStats Deaths="99" /></OldStats><AreaStats SID="Map"><AreaModeStats Deaths="3" TimePlayed="20" Completed="true" /></AreaStats></Save>"#,
             &["map".to_string()],
+            None,
             &mut accumulator,
         );
         let stats = accumulator.finish();
@@ -538,6 +605,7 @@ mod tests {
         accumulate_save_stats(
             r#"<Save><AreaStats SID="Map"><AreaModeStats Deaths="3" Completed="false" /></AreaStats></Save>"#,
             &["map".to_string()],
+            None,
             &mut accumulator,
         );
         let stats = accumulator.finish();
@@ -552,11 +620,13 @@ mod tests {
         accumulate_save_stats(
             r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="2"><Strawberries><EntityID Key="a:1" /><EntityID Key="a:2" /></Strawberries></AreaModeStats></AreaStats></Save>"#,
             &["map".to_string()],
+            None,
             &mut accumulator,
         );
         accumulate_save_stats(
             r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="2"><Strawberries><EntityID Key="a:2" /><EntityID Key="a:3" /></Strawberries></AreaModeStats></AreaStats></Save>"#,
             &["map".to_string()],
+            None,
             &mut accumulator,
         );
         let stats = accumulator.finish();
@@ -569,8 +639,8 @@ mod tests {
     fn duplicate_strawberries_across_saves_stay_known() {
         let mut accumulator = SaveStatsAccumulator::new();
         let save = r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="1"><Strawberries><EntityID Key="a:1" /></Strawberries></AreaModeStats></AreaStats></Save>"#;
-        accumulate_save_stats(save, &["map".to_string()], &mut accumulator);
-        accumulate_save_stats(save, &["map".to_string()], &mut accumulator);
+        accumulate_save_stats(save, &["map".to_string()], None, &mut accumulator);
+        accumulate_save_stats(save, &["map".to_string()], None, &mut accumulator);
         let stats = accumulator.finish();
 
         assert!(stats.strawberries_known);
@@ -583,12 +653,31 @@ mod tests {
         accumulate_save_stats(
             r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="2" /></AreaStats></Save>"#,
             &["map".to_string()],
+            None,
             &mut accumulator,
         );
         let stats = accumulator.finish();
 
         assert!(!stats.strawberries_known);
         assert_eq!(stats.strawberries, 0);
+    }
+
+    #[test]
+    fn mode_index_selects_official_side_stats() {
+        let mut accumulator = SaveStatsAccumulator::new();
+        accumulate_save_stats(
+            r#"<Save><AreaStats SID="Celeste/1-ForsakenCity" Cassette="true"><Modes><AreaModeStats Deaths="1" Completed="true" HeartGem="true" /><AreaModeStats Deaths="2" Completed="false" HeartGem="true" /><AreaModeStats Deaths="3" Completed="true" HeartGem="true" /></Modes></AreaStats></Save>"#,
+            &["celeste/1-forsakencity".to_string()],
+            Some(1),
+            &mut accumulator,
+        );
+        let stats = accumulator.finish();
+
+        assert_eq!(stats.deaths, 2);
+        assert_eq!(stats.hearts, 1);
+        assert_eq!(stats.cassettes, 0);
+        assert!(stats.completion_known);
+        assert!(!stats.completed);
     }
 
     #[test]
@@ -632,6 +721,7 @@ mod tests {
         SubMapInfo {
             id: sid.to_string(),
             sid: sid.to_string(),
+            mode_index: None,
             display_name: sid.to_string(),
             chapter: String::new(),
             file_path: format!("Maps/{sid}.bin"),

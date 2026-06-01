@@ -165,10 +165,11 @@ function MapTable({
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <td className="action-cell">
                 <div className="action-group">
-                  <ToggleButton enabled={enabled} label="地图" onClick={() => onToggle(map)} />
+                  <ToggleButton disabled={map.readOnly} enabled={enabled} label="地图" onClick={() => onToggle(map)} />
                   <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
                   <FlagButton
                     active={map.protected}
+                    disabled={map.readOnly}
                     icon={map.protected ? <Lock size={16} /> : <Shield size={16} />}
                     label="保护"
                     onClick={() => onProtectedToggle(map)}
@@ -188,6 +189,7 @@ function MapTable({
                   )}
                 </div>
                 <div className="inline-pills">
+                  {map.readOnly && <span>官图</span>}
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
                   {map.stats && <span>有存档</span>}
                 </div>
@@ -288,30 +290,46 @@ function ModTable({
   );
 }
 
-function FlagButton({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+function FlagButton({
+  active,
+  disabled,
+  icon,
+  label,
+  onClick
+}: {
+  active: boolean;
+  disabled?: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <button
       className={active ? "flag-button active" : "flag-button"}
+      disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
-      title={active ? `取消 ${label}` : `设为 ${label}`}
+      title={disabled ? `${label}不能修改` : active ? `取消 ${label}` : `设为 ${label}`}
     >
       {icon}
     </button>
   );
 }
 
-function ToggleButton({ enabled, label, onClick }: { enabled: boolean; label: string; onClick: () => void }) {
+function ToggleButton({ disabled, enabled, label, onClick }: { disabled?: boolean; enabled: boolean; label: string; onClick: () => void }) {
   return (
     <button
       className={enabled ? "switch on" : "switch"}
+      disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
-      title={enabled ? `禁用${label}` : `启用${label}`}
+      title={disabled ? `${label}不能修改启用状态` : enabled ? `禁用${label}` : `启用${label}`}
     >
       {enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
     </button>

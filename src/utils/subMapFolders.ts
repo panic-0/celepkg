@@ -17,7 +17,7 @@ export function collectSubMapFolderOptions(subMaps: SubMapInfo[], selectedPath: 
     if (segments.length <= prefix.length + 1) continue;
     const next = segments[prefix.length];
     const path = [...prefix, next].join("/");
-    const option = options.get(path) ?? { count: 0, label: next, path };
+    const option = options.get(path) ?? { count: 0, label: subMapFolderLabel(subMap, path, next), path };
     option.count += 1;
     options.set(path, option);
   }
@@ -61,4 +61,11 @@ export function normalizeFolderPath(path: string) {
 
 function isUnderFolder(segments: string[], prefix: string[]) {
   return prefix.every((part, index) => segments[index] === part);
+}
+
+function subMapFolderLabel(subMap: SubMapInfo, path: string, fallback: string) {
+  if (path.startsWith("Celeste/") && subMap.chapter.startsWith("Celeste/")) {
+    return subMap.chapter.split("/").filter(Boolean).at(-1) ?? fallback;
+  }
+  return fallback;
 }

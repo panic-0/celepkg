@@ -17,7 +17,7 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 4;
+const SCAN_CACHE_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -113,12 +113,18 @@ pub fn full_scan(
 fn apply_protected_flags(scan: &mut ScanResult, protected_record_ids: &[String]) {
     let protected: HashSet<&String> = protected_record_ids.iter().collect();
     for record in scan.maps.iter_mut().chain(scan.other_mods.iter_mut()) {
-        record.protected = protected.contains(&record.id);
+        record.protected = record.read_only || protected.contains(&record.id);
     }
 }
 
 fn build_scan_signature(celeste_path: &Path, selected_save_files: &[String]) -> ScanSignature {
     let mut files = vec![];
+    collect_tree_stamps(
+        celeste_path,
+        &celeste_path.join("Content").join("Maps"),
+        "Content/Maps",
+        &mut files,
+    );
     collect_tree_stamps(celeste_path, &celeste_path.join("Mods"), "Mods", &mut files);
     collect_save_stamps(celeste_path, &mut files);
     collect_file_stamp(&celeste_path.join("Celeste.exe"), "Celeste.exe", &mut files);
@@ -202,28 +208,9 @@ fn collect_file_stamp(path: &Path, relative: &str, files: &mut Vec<FileStamp>) {
 
 pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
     let mods_path = celeste_path.join("Mods");
-    if !mods_path.exists() {
-        return ScanResult {
-            celeste_path: celeste_path.to_string_lossy().to_string(),
-            mods_path: mods_path.to_string_lossy().to_string(),
-            blacklist_path: mods_path
-                .join("blacklist.txt")
-                .to_string_lossy()
-                .to_string(),
-            blacklist_entries: vec![],
-            game_executable: resolve_game_executable(celeste_path),
-            maps: vec![],
-            other_mods: vec![],
-            profiles: profiles.clone(),
-            available_save_files: vec![],
-            selected_save_files: vec![],
-            warnings: vec!["没有找到 Celeste/Mods 目录。".to_string()],
-        };
-    }
-
     let blacklist = read_blacklist(&mods_path);
     let favorites = read_favorites(&mods_path);
-    let mut records = vec![];
+    let mut records = scan_official_maps(celeste_path, &favorites);
     if let Ok(entries) = fs::read_dir(&mods_path) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -247,6 +234,11 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
             }
         }
     }
+    let warnings = if mods_path.exists() {
+        vec![]
+    } else {
+        vec!["没有找到 Celeste/Mods 目录。".to_string()]
+    };
 
     let available_names: HashSet<String> = records
         .iter()
@@ -300,8 +292,171 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         profiles: profiles.clone(),
         available_save_files: vec![],
         selected_save_files: vec![],
-        warnings: vec![],
+        warnings,
     }
+}
+
+struct OfficialMapFile {
+    area_name: String,
+    area_sort: u16,
+    side_sort: u8,
+    side_name: String,
+    sid: String,
+    mode_index: u8,
+    file_name: String,
+    path: PathBuf,
+}
+
+fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<ModRecord> {
+    let maps_path = celeste_path.join("Content").join("Maps");
+    let mut files = vec![];
+    if let Ok(entries) = fs::read_dir(&maps_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file()
+                || !path
+                    .extension()
+                    .map(|ext| ext.to_string_lossy().eq_ignore_ascii_case("bin"))
+                    .unwrap_or(false)
+            {
+                continue;
+            }
+            let Some(info) = official_map_file_info(&path) else {
+                continue;
+            };
+            files.push(info);
+        }
+    }
+    if files.is_empty() {
+        return vec![];
+    }
+    files.sort_by_key(|file| (file.area_sort, file.side_sort));
+    let sub_maps: Vec<SubMapInfo> = files
+        .iter()
+        .map(|file| {
+            let strawberry_count = fs::read(&file.path)
+                .ok()
+                .and_then(|bytes| count_strawberries(&bytes))
+                .unwrap_or(0);
+            let sid = format!("{}/{}", file.sid, file.side_name);
+            SubMapInfo {
+                id: stable_id(&format!("vanilla::{sid}")),
+                sid,
+                mode_index: Some(file.mode_index),
+                display_name: file.side_name.clone(),
+                chapter: format!("Celeste/{}", file.area_name),
+                file_path: format!("Content/Maps/{}", file.file_name),
+                strawberry_count,
+                completion_status: "unknown".to_string(),
+                stats: None,
+            }
+        })
+        .collect();
+    let strawberry_count = sub_maps
+        .iter()
+        .map(|sub_map| sub_map.strawberry_count)
+        .sum();
+    let mut map_ids: Vec<String> = files.iter().map(|file| file.sid.clone()).collect();
+    map_ids.sort();
+    map_ids.dedup();
+    let mut record = ModRecord {
+        id: stable_id("vanilla::celeste"),
+        name: "Celeste".to_string(),
+        file_name: "Celeste/".to_string(),
+        relative_path: "Celeste/".to_string(),
+        absolute_path: maps_path.to_string_lossy().to_string(),
+        is_archive: false,
+        kind: "map".to_string(),
+        enabled: true,
+        favorite: false,
+        protected: true,
+        read_only: true,
+        metadata: ModMetadata {
+            name: "Celeste 官方地图".to_string(),
+            author: "Extremely OK Games".to_string(),
+            description: "Celeste 自带关卡，只用于查看统计。".to_string(),
+            ..ModMetadata::default()
+        },
+        map_ids,
+        sub_maps,
+        map_count: files.len(),
+        strawberry_count,
+        completion_status: "unknown".to_string(),
+        dependencies: vec![],
+        optional_dependencies: vec![],
+        stats: None,
+        warnings: vec![],
+    };
+    record.favorite = is_favorite(&record, favorites);
+    vec![record]
+}
+
+fn official_map_file_info(path: &Path) -> Option<OfficialMapFile> {
+    let file_name = path.file_name()?.to_string_lossy().to_string();
+    let stem = path.file_stem()?.to_string_lossy().to_string();
+    if stem.eq_ignore_ascii_case("LostLevels") {
+        return Some(OfficialMapFile {
+            area_name: "Farewell".to_string(),
+            area_sort: 10,
+            side_sort: 0,
+            side_name: "Farewell".to_string(),
+            sid: "Celeste/LostLevels".to_string(),
+            mode_index: 0,
+            file_name,
+            path: path.to_path_buf(),
+        });
+    }
+    let (number_text, rest) = split_leading_digits(&stem)?;
+    let number = number_text.parse::<u16>().ok()?;
+    let (mode_index, side_sort, base_stem, side_name) = if let Some(name) = rest.strip_prefix("H-")
+    {
+        (1, 1, format!("{number}-{name}"), "B-Side".to_string())
+    } else if let Some(name) = rest.strip_prefix("X-") {
+        (2, 2, format!("{number}-{name}"), "C-Side".to_string())
+    } else if rest.starts_with('-') {
+        (0, 0, stem.clone(), "A-Side".to_string())
+    } else {
+        return None;
+    };
+    Some(OfficialMapFile {
+        area_name: official_area_name(number, &base_stem),
+        area_sort: number,
+        side_sort,
+        side_name,
+        sid: format!("Celeste/{base_stem}"),
+        mode_index,
+        file_name,
+        path: path.to_path_buf(),
+    })
+}
+
+fn split_leading_digits(value: &str) -> Option<(&str, &str)> {
+    let split_at = value
+        .char_indices()
+        .find(|(_, ch)| !ch.is_ascii_digit())
+        .map(|(index, _)| index)?;
+    if split_at == 0 {
+        None
+    } else {
+        Some(value.split_at(split_at))
+    }
+}
+
+fn official_area_name(number: u16, fallback: &str) -> String {
+    match number {
+        0 => "Prologue",
+        1 => "Forsaken City",
+        2 => "Old Site",
+        3 => "Celestial Resort",
+        4 => "Golden Ridge",
+        5 => "Mirror Temple",
+        6 => "Reflection",
+        7 => "The Summit",
+        8 => "Epilogue",
+        9 => "Core",
+        _ => fallback,
+    }
+    .to_string()
 }
 
 pub fn write_profile_blacklist(
@@ -524,6 +679,7 @@ fn create_mod_record(
         .map(|sid| SubMapInfo {
             id: stable_id(&format!("{}::{sid}", relative_path.to_lowercase())),
             sid: sid.clone(),
+            mode_index: None,
             display_name: dialog_title_for_sid(sid, &dialog_titles)
                 .unwrap_or_else(|| sub_map_display_name(sid)),
             chapter: sub_map_chapter(sid),
@@ -560,6 +716,7 @@ fn create_mod_record(
         enabled: true,
         favorite: false,
         protected: false,
+        read_only: false,
         map_count: map_ids.len(),
         dependencies: metadata.dependencies.clone(),
         optional_dependencies: metadata.optional_dependencies.clone(),
@@ -662,6 +819,7 @@ fn read_favorites(mods_path: &Path) -> HashSet<String> {
 
 fn is_blacklisted(record: &ModRecord, blacklist: &Blacklist) -> bool {
     [
+        record.id.as_str(),
         record.file_name.as_str(),
         record.relative_path.as_str(),
         record.name.as_str(),
@@ -1084,6 +1242,53 @@ mod tests {
         );
     }
 
+    #[test]
+    fn official_maps_are_scanned_as_read_only_maps() {
+        let root = temp_celeste_root("official-maps");
+        let content_maps = root.join("Content").join("Maps");
+        fs::create_dir_all(&content_maps).expect("content maps dir");
+        fs::create_dir_all(root.join("Mods")).expect("mods dir");
+        fs::write(content_maps.join("1-ForsakenCity.bin"), "").expect("a side");
+        fs::write(content_maps.join("1H-ForsakenCity.bin"), "").expect("b side");
+        fs::write(content_maps.join("1X-ForsakenCity.bin"), "").expect("c side");
+        let saves_path = root.join("Saves");
+        fs::create_dir_all(&saves_path).expect("saves dir");
+        fs::write(
+            saves_path.join("0.celeste"),
+            r#"<Save><AreaStats SID="Celeste/1-ForsakenCity" Cassette="true"><Modes><AreaModeStats Deaths="1" Completed="true" HeartGem="true" /><AreaModeStats Deaths="2" Completed="false" HeartGem="true" /><AreaModeStats Deaths="3" Completed="true" HeartGem="true" /></Modes></AreaStats></Save>"#,
+        )
+        .expect("save");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let scan = full_scan_cached(&root, empty_profiles(), &[], &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        let official = scan
+            .maps
+            .iter()
+            .find(|map| map.name == "Celeste")
+            .expect("official map");
+        assert_eq!(scan.maps.len(), 1);
+        assert!(official.read_only);
+        assert!(official.enabled);
+        assert!(official.protected);
+        assert_eq!(official.relative_path, "Celeste/");
+        assert_eq!(official.sub_maps.len(), 3);
+        assert_eq!(official.sub_maps[1].sid, "Celeste/1-ForsakenCity/B-Side");
+        assert_eq!(official.sub_maps[1].display_name, "B-Side");
+        assert_eq!(
+            official.sub_maps[1]
+                .stats
+                .as_ref()
+                .map(|stats| stats.deaths),
+            Some(2)
+        );
+        assert_eq!(official.sub_maps[1].completion_status, "unfinished");
+    }
+
     fn record(id: &str, relative_path: &str, kind: &str) -> ModRecord {
         ModRecord {
             id: id.to_string(),
@@ -1096,6 +1301,7 @@ mod tests {
             enabled: true,
             favorite: false,
             protected: false,
+            read_only: false,
             metadata: ModMetadata::default(),
             map_ids: vec![],
             sub_maps: vec![],

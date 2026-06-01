@@ -47,7 +47,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     (profile: Profile | undefined) => {
       setSelectedMapProfileId(profile?.id ?? "default-maps");
       setLaunchArgs(profile?.launchArgs ?? "");
-      setEnabledMapDraft(new Set(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)));
+      const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
+      setEnabledMapDraft(
+        new Set([...(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)), ...readOnlyMapIds])
+      );
       const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
       setEnabledMapModDraft(
         new Set(profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
