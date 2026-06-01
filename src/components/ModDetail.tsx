@@ -56,13 +56,21 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
       </div>
 
       {activeTab === "overview" && (
-        <div className="detail-tab-panel" ref={detailPanelRef}>
-          <section className="detail-section flush">
+        <div className="detail-tab-panel compact" ref={detailPanelRef}>
+          <section className="detail-section flush compact-card">
             <h3>Mod 信息</h3>
-            <Info label="作者" value={modItem.metadata.author || "未知"} />
-            <Info label="版本" value={modItem.metadata.version || "未知"} />
-            <Info label="类型" value={modItem.isArchive ? "zip Mod" : "文件夹 Mod"} />
-            <Info label="测试图" value={modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "无"} />
+            <div className="overview-metrics">
+              <Metric label="类型" value={modItem.isArchive ? "zip" : "文件夹"} />
+              <Metric label="依赖" value={modItem.dependencies.length} />
+              <Metric label="可选依赖" value={modItem.optionalDependencies.length} />
+              <Metric label="警告" value={modItem.warnings.length} tone={modItem.warnings.length ? "warn" : undefined} />
+              <Metric label="测试图" value={modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "无"} />
+            </div>
+            <div className="overview-info-grid">
+              <Info label="作者" value={modItem.metadata.author || "未知"} />
+              <Info label="版本" value={modItem.metadata.version || "未知"} />
+              <Info label="文件" value={modItem.fileName} />
+            </div>
           </section>
         </div>
       )}
@@ -123,6 +131,15 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
         </div>
       )}
     </section>
+  );
+}
+
+function Metric({ label, tone, value }: { label: string; tone?: "warn"; value: React.ReactNode }) {
+  return (
+    <span className={tone ? `overview-metric ${tone}` : "overview-metric"}>
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </span>
   );
 }
 
