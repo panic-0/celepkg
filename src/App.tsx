@@ -7,21 +7,14 @@ import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
 import { AppToolbar } from "./components/AppToolbar";
 import { WorkspaceNav } from "./components/WorkspaceNav";
-import {
-  createBackup,
-  listBackups,
-  openBackupFolder,
-  openBackupLocation,
-  restoreBackup,
-  setRecordFavorite,
-  setRecordProtected
-} from "./api";
+import { setRecordFavorite, setRecordProtected } from "./api";
+import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
-import type { BackupInfo, ModRecord, RestoreScope } from "./types";
+import type { ModRecord } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
 import { isDraftEnabled, readError } from "./utils/format";
 import type { ActiveView } from "./viewTypes";
@@ -46,10 +39,15 @@ export function App() {
   const [mainMode, setMainMode] = useState<"list" | "detail">("list");
   const [selectedMapId, setSelectedMapId] = useState("");
   const [selectedModId, setSelectedModId] = useState("");
-  const [backups, setBackups] = useState<BackupInfo[]>([]);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
+  const backups = useBackups({
+    celestePath,
+    refresh,
+    setLoading,
+    setMessage
+  });
 
   const profileDraft = useProfileDraft({
     celestePath,
@@ -204,75 +202,10 @@ export function App() {
     }
   }
 
-  async function refreshBackups() {
-    setLoading(true);
-    setMessage("");
-    try {
-      setBackups(await listBackups());
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function createManualBackup() {
-    setLoading(true);
-    setMessage("");
-    try {
-      const backup = await createBackup(celestePath, "manual");
-      setBackups(await listBackups());
-      setMessage(`已创建备份：${backup.id}`);
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function restoreSelectedBackup(backupId: string, scope: RestoreScope) {
-    setLoading(true);
-    setMessage("");
-    try {
-      await restoreBackup(backupId, scope);
-      setBackups(await listBackups());
-      await refresh(celestePath);
-      setMessage("已还原游戏文件。");
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function openCurrentBackupFolder() {
-    setLoading(true);
-    setMessage("");
-    try {
-      await openBackupFolder(celestePath);
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function openSelectedBackupLocation(backupPath: string) {
-    setLoading(true);
-    setMessage("");
-    try {
-      await openBackupLocation(backupPath);
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function changeActiveView(view: ActiveView) {
     setActiveView(view);
     setMainMode("list");
-    if (view === "backups") void refreshBackups();
+    if (view === "backups") void backups.refreshBackups();
   }
 
   function selectMap(id: string) {
@@ -362,15 +295,15 @@ export function App() {
         ) : activeView === "backups" ? (
           <BackupManager
             autoBackupEnabled={autoBackupEnabled}
-            backups={backups}
+            backups={backups.backups}
             celestePath={celestePath}
             loading={loading}
             onAutoBackupEnabledChange={updateAutoBackupEnabled}
-            onBackupCreate={createManualBackup}
-            onBackupFolderOpen={openCurrentBackupFolder}
-            onBackupLocationOpen={openSelectedBackupLocation}
-            onBackupRestore={restoreSelectedBackup}
-            onBackupsRefresh={refreshBackups}
+            onBackupCreate={backups.createManualBackup}
+            onBackupFolderOpen={backups.openCurrentBackupFolder}
+            onBackupLocationOpen={backups.openSelectedBackupLocation}
+            onBackupRestore={backups.restoreSelectedBackup}
+            onBackupsRefresh={backups.refreshBackups}
           />
         ) : mainMode === "detail" && activeView === "maps" ? (
           <MapDetail
