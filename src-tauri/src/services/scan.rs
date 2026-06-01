@@ -1,4 +1,7 @@
-use crate::domain::{ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult, SubMapInfo};
+use crate::domain::{
+    CompletionStatus, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult,
+    SubMapInfo,
+};
 use crate::parsers::dialog::{dialog_title_for_sid, is_dialog_file, read_dialog_titles};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
 use crate::parsers::map_bin::count_strawberries;
@@ -256,7 +259,7 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
     let mut maps = vec![];
     let mut other_mods = vec![];
     for mut record in records {
-        if record.kind == "map" {
+        if record.kind == ModKind::Map {
             for dep in &record.dependencies {
                 if !dep.name.is_empty()
                     && !is_builtin_dependency(&dep.name)
@@ -347,7 +350,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
                 chapter: format!("Celeste/{}", file.area_name),
                 file_path: format!("Content/Maps/{}", file.file_name),
                 strawberry_count,
-                completion_status: "unknown".to_string(),
+                completion_status: CompletionStatus::Unknown,
                 stats: None,
             }
         })
@@ -366,7 +369,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
         relative_path: "Celeste/".to_string(),
         absolute_path: maps_path.to_string_lossy().to_string(),
         is_archive: false,
-        kind: "map".to_string(),
+        kind: ModKind::Map,
         enabled: true,
         favorite: false,
         protected: true,
@@ -381,7 +384,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
         sub_maps,
         map_count: files.len(),
         strawberry_count,
-        completion_status: "unknown".to_string(),
+        completion_status: CompletionStatus::Unknown,
         dependencies: vec![],
         optional_dependencies: vec![],
         stats: None,
@@ -683,7 +686,7 @@ fn create_mod_record(
             chapter: sub_map_chapter(sid),
             file_path: format!("Maps/{sid}.bin"),
             strawberry_count: strawberry_counts.get(sid).copied().unwrap_or(0),
-            completion_status: "unknown".to_string(),
+            completion_status: CompletionStatus::Unknown,
             stats: None,
         })
         .collect();
@@ -710,7 +713,11 @@ fn create_mod_record(
         relative_path: relative_path.clone(),
         absolute_path: absolute_path.to_string_lossy().to_string(),
         is_archive,
-        kind: if is_map_mod { "map" } else { "mod" }.to_string(),
+        kind: if is_map_mod {
+            ModKind::Map
+        } else {
+            ModKind::Mod
+        },
         enabled: true,
         favorite: false,
         protected: false,
@@ -722,7 +729,7 @@ fn create_mod_record(
         map_ids,
         sub_maps,
         stats: None,
-        completion_status: "unknown".to_string(),
+        completion_status: CompletionStatus::Unknown,
         strawberry_count,
         warnings: vec![],
     }
@@ -992,8 +999,8 @@ mod tests {
                 .to_string(),
             blacklist_entries: vec![],
             game_executable: String::new(),
-            maps: vec![record("map-id", "Map.zip", "map")],
-            other_mods: vec![record("mod-id", "Helper.zip", "mod")],
+            maps: vec![record("map-id", "Map.zip", ModKind::Map)],
+            other_mods: vec![record("mod-id", "Helper.zip", ModKind::Mod)],
             profiles: ProfilesState {
                 active_map_profile_id: "default-maps".to_string(),
                 active_mod_profile_id: "default-mods".to_string(),
@@ -1023,9 +1030,11 @@ mod tests {
         let mods_path = root.join("Mods");
         fs::create_dir_all(&mods_path).expect("mods dir");
         fs::write(mods_path.join("blacklist.txt"), "DisabledProtected.zip\n").expect("blacklist");
-        let mut enabled_protected = record("enabled-protected", "EnabledProtected.zip", "mod");
+        let mut enabled_protected =
+            record("enabled-protected", "EnabledProtected.zip", ModKind::Mod);
         enabled_protected.protected = true;
-        let mut disabled_protected = record("disabled-protected", "DisabledProtected.zip", "mod");
+        let mut disabled_protected =
+            record("disabled-protected", "DisabledProtected.zip", ModKind::Mod);
         disabled_protected.protected = true;
         let scan = ScanResult {
             celeste_path: root.to_string_lossy().to_string(),
@@ -1284,10 +1293,13 @@ mod tests {
                 .map(|stats| stats.deaths),
             Some(2)
         );
-        assert_eq!(official.sub_maps[1].completion_status, "unfinished");
+        assert_eq!(
+            official.sub_maps[1].completion_status,
+            CompletionStatus::Unfinished
+        );
     }
 
-    fn record(id: &str, relative_path: &str, kind: &str) -> ModRecord {
+    fn record(id: &str, relative_path: &str, kind: ModKind) -> ModRecord {
         ModRecord {
             id: id.to_string(),
             name: relative_path.to_string(),
@@ -1295,7 +1307,7 @@ mod tests {
             relative_path: relative_path.to_string(),
             absolute_path: relative_path.to_string(),
             is_archive: true,
-            kind: kind.to_string(),
+            kind,
             enabled: true,
             favorite: false,
             protected: false,
@@ -1305,7 +1317,7 @@ mod tests {
             sub_maps: vec![],
             map_count: 0,
             strawberry_count: 0,
-            completion_status: "unknown".to_string(),
+            completion_status: CompletionStatus::Unknown,
             dependencies: Vec::<Dependency>::new(),
             optional_dependencies: vec![],
             stats: None,

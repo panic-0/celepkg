@@ -1,4 +1,4 @@
-use crate::domain::{LaunchResult, Profile, ProfileInput, ProfilesState, ScanResult};
+use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult};
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
 use crate::storage::{load_state, resolve_input_path, write_state};
@@ -7,22 +7,19 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::process::Command;
 
-const PROFILE_TYPE_MAPS: &str = "maps";
-const PROFILE_TYPE_MODS: &str = "mods";
-
 pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
     let mut state = load_state();
     let mut data = state.profiles_state();
     let now = now_string();
-    let profile_type = normalize_profile_type(&profile.profile_type)?;
+    let profile_type = profile.profile_type;
     let id = profile
         .id
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| stable_id(&format!("{}-{profile_type}-{now}", profile.name)));
+        .unwrap_or_else(|| stable_id(&format!("{}-{}-{now}", profile.name, profile_type.as_str())));
     let normalized = Profile {
         id: id.clone(),
         name: if profile.name.trim().is_empty() {
-            if profile_type == PROFILE_TYPE_MAPS {
+            if profile_type == ProfileType::Maps {
                 "未命名地图 Profile".to_string()
             } else {
                 "未命名 Mod Profile".to_string()
@@ -30,14 +27,14 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
         } else {
             profile.name.trim().to_string()
         },
-        profile_type: profile_type.to_string(),
-        enabled_map_ids: if profile_type == PROFILE_TYPE_MAPS {
+        profile_type,
+        enabled_map_ids: if profile_type == ProfileType::Maps {
             profile.enabled_map_ids
         } else {
             None
         },
         enabled_mod_ids: profile.enabled_mod_ids,
-        launch_args: if profile_type == PROFILE_TYPE_MAPS {
+        launch_args: if profile_type == ProfileType::Maps {
             profile.launch_args.unwrap_or_default()
         } else {
             String::new()
@@ -50,7 +47,7 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
     } else {
         data.profiles.push(normalized);
     }
-    if profile_type == PROFILE_TYPE_MAPS {
+    if profile_type == ProfileType::Maps {
         data.active_map_profile_id = id;
     } else {
         data.active_mod_profile_id = id;
@@ -75,19 +72,19 @@ pub fn delete_profile(profile_id: String) -> Result<ProfilesState, String> {
         return Err("Profile 不存在".to_string());
     };
     data.profiles.retain(|item| item.id != profile_id);
-    if profile.profile_type == PROFILE_TYPE_MAPS && data.active_map_profile_id == profile_id {
+    if profile.profile_type == ProfileType::Maps && data.active_map_profile_id == profile_id {
         data.active_map_profile_id = data
             .profiles
             .iter()
-            .find(|item| item.profile_type == PROFILE_TYPE_MAPS)
+            .find(|item| item.profile_type == ProfileType::Maps)
             .map(|item| item.id.clone())
             .unwrap_or_else(|| "default-maps".to_string());
-    } else if profile.profile_type == PROFILE_TYPE_MODS && data.active_mod_profile_id == profile_id
+    } else if profile.profile_type == ProfileType::Mods && data.active_mod_profile_id == profile_id
     {
         data.active_mod_profile_id = data
             .profiles
             .iter()
-            .find(|item| item.profile_type == PROFILE_TYPE_MODS)
+            .find(|item| item.profile_type == ProfileType::Mods)
             .map(|item| item.id.clone())
             .unwrap_or_else(|| "default-mods".to_string());
     }
@@ -153,13 +150,13 @@ fn apply_profile_to_blacklist(
     let map_profile = profiles
         .profiles
         .iter()
-        .find(|item| item.id == map_profile_id && item.profile_type == PROFILE_TYPE_MAPS)
+        .find(|item| item.id == map_profile_id && item.profile_type == ProfileType::Maps)
         .cloned()
         .ok_or_else(|| "地图 Profile 不存在".to_string())?;
     let mod_profile = profiles
         .profiles
         .iter()
-        .find(|item| item.id == mod_profile_id && item.profile_type == PROFILE_TYPE_MODS)
+        .find(|item| item.id == mod_profile_id && item.profile_type == ProfileType::Mods)
         .cloned()
         .ok_or_else(|| "Mod Profile 不存在".to_string())?;
     let scan = full_scan_cached(
@@ -281,18 +278,19 @@ fn normalize_dependency_name(value: &str) -> String {
         .to_lowercase()
 }
 
-fn normalize_profile_type(value: &str) -> Result<&'static str, String> {
-    match value {
-        PROFILE_TYPE_MAPS => Ok(PROFILE_TYPE_MAPS),
-        PROFILE_TYPE_MODS => Ok(PROFILE_TYPE_MODS),
-        _ => Err("Profile 类型无效".to_string()),
+impl ProfileType {
+    fn as_str(self) -> &'static str {
+        match self {
+            ProfileType::Maps => "maps",
+            ProfileType::Mods => "mods",
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Dependency, ModMetadata, ModRecord};
+    use crate::domain::{CompletionStatus, Dependency, ModKind, ModMetadata, ModRecord};
 
     #[test]
     fn resolves_required_mods_from_maps_and_mods_recursively() {
@@ -305,7 +303,7 @@ mod tests {
             maps: vec![record(
                 "map",
                 "Adventure.zip",
-                "map",
+                ModKind::Map,
                 "Adventure",
                 &[dependency("Helper One")],
             )],
@@ -313,15 +311,21 @@ mod tests {
                 record(
                     "helper-one",
                     "Helper_One.zip",
-                    "mod",
+                    ModKind::Mod,
                     "Helper One",
                     &[dependency("CoreHelper")],
                 ),
-                record("core-helper", "CoreHelper.zip", "mod", "CoreHelper", &[]),
+                record(
+                    "core-helper",
+                    "CoreHelper.zip",
+                    ModKind::Mod,
+                    "CoreHelper",
+                    &[],
+                ),
                 record(
                     "visual-pack",
                     "VisualPack.zip",
-                    "mod",
+                    ModKind::Mod,
                     "VisualPack",
                     &[dependency("CoreHelper")],
                 ),
@@ -359,7 +363,7 @@ mod tests {
     fn record(
         id: &str,
         relative_path: &str,
-        kind: &str,
+        kind: ModKind,
         name: &str,
         dependencies: &[Dependency],
     ) -> ModRecord {
@@ -370,7 +374,7 @@ mod tests {
             relative_path: relative_path.to_string(),
             absolute_path: relative_path.to_string(),
             is_archive: true,
-            kind: kind.to_string(),
+            kind,
             metadata: ModMetadata {
                 name: name.to_string(),
                 dependencies: dependencies.to_vec(),
@@ -384,7 +388,7 @@ mod tests {
             sub_maps: vec![],
             map_count: 0,
             strawberry_count: 0,
-            completion_status: "unknown".to_string(),
+            completion_status: CompletionStatus::Unknown,
             dependencies: dependencies.to_vec(),
             optional_dependencies: vec![],
             stats: None,

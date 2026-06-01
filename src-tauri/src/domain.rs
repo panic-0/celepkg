@@ -1,5 +1,28 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CompletionStatus {
+    Completed,
+    Unfinished,
+    Unknown,
+    NotApplicable,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ModKind {
+    Map,
+    Mod,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProfileType {
+    Maps,
+    Mods,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Dependency {
@@ -51,7 +74,7 @@ pub struct SubMapInfo {
     pub chapter: String,
     pub file_path: String,
     pub strawberry_count: u64,
-    pub completion_status: String,
+    pub completion_status: CompletionStatus,
     pub stats: Option<MapStats>,
 }
 
@@ -64,7 +87,7 @@ pub struct ModRecord {
     pub relative_path: String,
     pub absolute_path: String,
     pub is_archive: bool,
-    pub kind: String,
+    pub kind: ModKind,
     pub enabled: bool,
     pub favorite: bool,
     pub protected: bool,
@@ -75,7 +98,7 @@ pub struct ModRecord {
     pub sub_maps: Vec<SubMapInfo>,
     pub map_count: usize,
     pub strawberry_count: u64,
-    pub completion_status: String,
+    pub completion_status: CompletionStatus,
     pub dependencies: Vec<Dependency>,
     pub optional_dependencies: Vec<Dependency>,
     pub stats: Option<MapStats>,
@@ -87,7 +110,7 @@ pub struct ModRecord {
 pub struct Profile {
     pub id: String,
     pub name: String,
-    pub profile_type: String,
+    pub profile_type: ProfileType,
     pub enabled_map_ids: Option<Vec<String>>,
     pub enabled_mod_ids: Option<Vec<String>>,
     pub launch_args: String,
@@ -139,7 +162,7 @@ pub struct ScanResult {
 pub struct ProfileInput {
     pub id: Option<String>,
     pub name: String,
-    pub profile_type: String,
+    pub profile_type: ProfileType,
     pub enabled_map_ids: Option<Vec<String>>,
     pub enabled_mod_ids: Option<Vec<String>>,
     pub launch_args: Option<String>,

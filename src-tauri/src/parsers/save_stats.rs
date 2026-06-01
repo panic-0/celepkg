@@ -1,4 +1,4 @@
-use crate::domain::{MapStats, ModRecord, SaveFileInfo, SubMapInfo};
+use crate::domain::{CompletionStatus, MapStats, ModRecord, SaveFileInfo, SubMapInfo};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use std::collections::HashSet;
@@ -118,7 +118,7 @@ pub fn read_save_stats(
                     let sub_needles = sub_map_needles(&sub_map);
                     sub_map.stats =
                         collect_stats_from_saves(&save_files, &sub_needles, sub_map.mode_index);
-                    sub_map.completion_status = sub_map_completion_status(&sub_map).to_string();
+                    sub_map.completion_status = sub_map_completion_status(&sub_map);
                     sub_map
                 })
                 .collect();
@@ -132,9 +132,11 @@ pub fn read_save_stats(
                 }
             }
             let completion_status = map_completion_status(&map.sub_maps);
-            aggregate.completed = completion_status == "completed";
-            aggregate.completion_known =
-                matches!(completion_status.as_str(), "completed" | "unfinished");
+            aggregate.completed = completion_status == CompletionStatus::Completed;
+            aggregate.completion_known = matches!(
+                completion_status,
+                CompletionStatus::Completed | CompletionStatus::Unfinished
+            );
             map.stats = if aggregate.save_files.is_empty() {
                 None
             } else {
@@ -209,37 +211,37 @@ fn merge_stats(target: &mut MapStats, source: &MapStats) {
     target.save_files.dedup();
 }
 
-fn sub_map_completion_status(sub_map: &SubMapInfo) -> &'static str {
+fn sub_map_completion_status(sub_map: &SubMapInfo) -> CompletionStatus {
     match &sub_map.stats {
-        Some(stats) if stats.completion_known && stats.completed => "completed",
-        Some(stats) if stats.completion_known => "unfinished",
-        _ if is_non_completable_sub_map(&sub_map.sid) => "notApplicable",
-        Some(_) => "unknown",
-        None => "unfinished",
+        Some(stats) if stats.completion_known && stats.completed => CompletionStatus::Completed,
+        Some(stats) if stats.completion_known => CompletionStatus::Unfinished,
+        _ if is_non_completable_sub_map(&sub_map.sid) => CompletionStatus::NotApplicable,
+        Some(_) => CompletionStatus::Unknown,
+        None => CompletionStatus::Unfinished,
     }
 }
 
-fn map_completion_status(sub_maps: &[SubMapInfo]) -> String {
+fn map_completion_status(sub_maps: &[SubMapInfo]) -> CompletionStatus {
     let finishable: Vec<&SubMapInfo> = sub_maps
         .iter()
-        .filter(|sub_map| sub_map.completion_status != "notApplicable")
+        .filter(|sub_map| sub_map.completion_status != CompletionStatus::NotApplicable)
         .collect();
     if finishable.is_empty() {
-        return "notApplicable".to_string();
+        return CompletionStatus::NotApplicable;
     }
     if finishable
         .iter()
-        .all(|sub_map| sub_map.completion_status == "completed")
+        .all(|sub_map| sub_map.completion_status == CompletionStatus::Completed)
     {
-        return "completed".to_string();
+        return CompletionStatus::Completed;
     }
     if finishable
         .iter()
-        .any(|sub_map| sub_map.completion_status == "unfinished")
+        .any(|sub_map| sub_map.completion_status == CompletionStatus::Unfinished)
     {
-        return "unfinished".to_string();
+        return CompletionStatus::Unfinished;
     }
-    "unknown".to_string()
+    CompletionStatus::Unknown
 }
 
 fn is_non_completable_sub_map(sid: &str) -> bool {
@@ -683,41 +685,53 @@ mod tests {
     #[test]
     fn map_completion_requires_all_finishable_sub_maps() {
         let sub_maps = vec![
-            sub_map("Pack/MapA", "completed"),
-            sub_map("Pack/MapB", "unfinished"),
-            sub_map("Pack/Gym", "notApplicable"),
+            sub_map("Pack/MapA", CompletionStatus::Completed),
+            sub_map("Pack/MapB", CompletionStatus::Unfinished),
+            sub_map("Pack/Gym", CompletionStatus::NotApplicable),
         ];
 
-        assert_eq!(map_completion_status(&sub_maps), "unfinished");
+        assert_eq!(
+            map_completion_status(&sub_maps),
+            CompletionStatus::Unfinished
+        );
     }
 
     #[test]
     fn gyms_do_not_count_against_pack_completion() {
         let sub_maps = vec![
-            sub_map("Pack/MapA", "completed"),
-            sub_map("Pack/Gym", "notApplicable"),
+            sub_map("Pack/MapA", CompletionStatus::Completed),
+            sub_map("Pack/Gym", CompletionStatus::NotApplicable),
         ];
 
-        assert_eq!(map_completion_status(&sub_maps), "completed");
         assert_eq!(
-            sub_map_completion_status(&sub_map("StrawberryJam2021/5-Grandmaster/Gym", "unknown")),
-            "notApplicable"
+            map_completion_status(&sub_maps),
+            CompletionStatus::Completed
+        );
+        assert_eq!(
+            sub_map_completion_status(&sub_map(
+                "StrawberryJam2021/5-Grandmaster/Gym",
+                CompletionStatus::Unknown
+            )),
+            CompletionStatus::NotApplicable
         );
     }
 
     #[test]
     fn explicit_completion_beats_gym_heuristic() {
-        let mut sub_map = sub_map("Pack/Gym", "unknown");
+        let mut sub_map = sub_map("Pack/Gym", CompletionStatus::Unknown);
         sub_map.stats = Some(MapStats {
             completion_known: true,
             completed: true,
             ..MapStats::default()
         });
 
-        assert_eq!(sub_map_completion_status(&sub_map), "completed");
+        assert_eq!(
+            sub_map_completion_status(&sub_map),
+            CompletionStatus::Completed
+        );
     }
 
-    fn sub_map(sid: &str, completion_status: &str) -> SubMapInfo {
+    fn sub_map(sid: &str, completion_status: CompletionStatus) -> SubMapInfo {
         SubMapInfo {
             id: sid.to_string(),
             sid: sid.to_string(),
@@ -726,7 +740,7 @@ mod tests {
             chapter: String::new(),
             file_path: format!("Maps/{sid}.bin"),
             strawberry_count: 0,
-            completion_status: completion_status.to_string(),
+            completion_status,
             stats: None,
         }
     }

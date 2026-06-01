@@ -1,4 +1,4 @@
-use crate::domain::{Profile, ProfilesState};
+use crate::domain::{Profile, ProfileType, ProfilesState};
 use crate::utils::{now_string, stable_id};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -70,7 +70,7 @@ fn default_state() -> AppState {
             Profile {
                 id: "default-maps".to_string(),
                 name: "当前地图启用状态".to_string(),
-                profile_type: "maps".to_string(),
+                profile_type: ProfileType::Maps,
                 enabled_map_ids: None,
                 enabled_mod_ids: None,
                 launch_args: String::new(),
@@ -80,7 +80,7 @@ fn default_state() -> AppState {
             Profile {
                 id: "default-mods".to_string(),
                 name: "当前 Mod 启用状态".to_string(),
-                profile_type: "mods".to_string(),
+                profile_type: ProfileType::Mods,
                 enabled_map_ids: None,
                 enabled_mod_ids: None,
                 launch_args: String::new(),
@@ -174,8 +174,8 @@ mod tests {
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);
-        assert_eq!(state.profiles[0].profile_type, "maps");
-        assert_eq!(state.profiles[1].profile_type, "mods");
+        assert_eq!(state.profiles[0].profile_type, ProfileType::Maps);
+        assert_eq!(state.profiles[1].profile_type, ProfileType::Mods);
     }
 
     #[test]
@@ -188,7 +188,7 @@ mod tests {
                 Profile {
                     id: "next-map".to_string(),
                     name: "Next Map".to_string(),
-                    profile_type: "maps".to_string(),
+                    profile_type: ProfileType::Maps,
                     enabled_map_ids: Some(vec!["map".to_string()]),
                     enabled_mod_ids: Some(vec!["helper".to_string()]),
                     launch_args: "-debug".to_string(),
@@ -198,7 +198,7 @@ mod tests {
                 Profile {
                     id: "next-mod".to_string(),
                     name: "Next Mod".to_string(),
-                    profile_type: "mods".to_string(),
+                    profile_type: ProfileType::Mods,
                     enabled_map_ids: None,
                     enabled_mod_ids: Some(vec!["mod".to_string()]),
                     launch_args: String::new(),
