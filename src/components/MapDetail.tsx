@@ -3,7 +3,14 @@ import { Fragment, useEffect, useMemo, useState, type MutableRefObject } from "r
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
-import { ALL_SUB_MAP_FOLDER, collectSubMapFolderOptions, getSubMapRootPath, normalizeFolderPath, subMapIsDirectChildOfFolder, subMapMatchesFolder } from "../utils/subMapFolders";
+import {
+  ALL_SUB_MAP_FOLDER,
+  collectSubMapFolderOptions,
+  getSubMapRootPath,
+  normalizeFolderPath,
+  subMapIsDirectChildOfFolder,
+  subMapMatchesFolder
+} from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
 
@@ -32,8 +39,14 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
   const subMapTableRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:submaps:table`, scrollMemory);
   const subMapRootPath = useMemo(() => (map ? getSubMapRootPath(map.subMaps) : ALL_SUB_MAP_FOLDER), [map]);
   const effectiveSubMapPath = subMapPath === ALL_SUB_MAP_FOLDER ? subMapRootPath : subMapPath;
-  const subMapBreadcrumbs = useMemo(() => buildSubMapBreadcrumbs(effectiveSubMapPath, subMapRootPath), [effectiveSubMapPath, subMapRootPath]);
-  const subMapFolderOptions = useMemo(() => (map ? collectSubMapFolderOptions(map.subMaps, effectiveSubMapPath) : []), [effectiveSubMapPath, map]);
+  const subMapBreadcrumbs = useMemo(
+    () => buildSubMapBreadcrumbs(effectiveSubMapPath, subMapRootPath),
+    [effectiveSubMapPath, subMapRootPath]
+  );
+  const subMapFolderOptions = useMemo(
+    () => (map ? collectSubMapFolderOptions(map.subMaps, effectiveSubMapPath) : []),
+    [effectiveSubMapPath, map]
+  );
   const filteredSubMaps = useMemo(() => {
     if (!map) return [];
     const needle = subMapQuery.trim().toLowerCase();
@@ -116,10 +129,18 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
       </div>
 
       <div className="detail-tabs" role="tablist">
-        <TabButton active={activeTab === "overview"} onClick={() => onTabChange("overview")}>概览</TabButton>
-        <TabButton active={activeTab === "submaps"} onClick={() => onTabChange("submaps")}>小图</TabButton>
-        <TabButton active={activeTab === "dependencies"} onClick={() => onTabChange("dependencies")}>依赖/文件</TabButton>
-        <TabButton active={activeTab === "saves"} onClick={() => onTabChange("saves")}>存档来源</TabButton>
+        <TabButton active={activeTab === "overview"} onClick={() => onTabChange("overview")}>
+          概览
+        </TabButton>
+        <TabButton active={activeTab === "submaps"} onClick={() => onTabChange("submaps")}>
+          小图
+        </TabButton>
+        <TabButton active={activeTab === "dependencies"} onClick={() => onTabChange("dependencies")}>
+          依赖/文件
+        </TabButton>
+        <TabButton active={activeTab === "saves"} onClick={() => onTabChange("saves")}>
+          存档来源
+        </TabButton>
       </div>
 
       {activeTab === "overview" && (
@@ -127,7 +148,11 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
           <div className="stat-grid">
             <DetailStat icon={<Skull size={18} />} label="死亡" value={map.stats?.deaths ?? "-"} />
             <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
-            <DetailStat icon={<CircleDot size={18} />} label="草莓" value={formatStrawberries(map.stats?.strawberries, map.strawberryCount)} />
+            <DetailStat
+              icon={<CircleDot size={18} />}
+              label="草莓"
+              value={formatStrawberries(map.stats?.strawberries, map.strawberryCount)}
+            />
             <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
           </div>
           <section className="detail-section">
@@ -210,10 +235,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                     })}
                     {filteredSubMaps.map((subMap) => (
                       <Fragment key={subMap.id}>
-                        <tr
-                          className={selectedSubMap?.id === subMap.id ? "active" : ""}
-                          onClick={() => selectSubMap(subMap.id)}
-                        >
+                        <tr className={selectedSubMap?.id === subMap.id ? "active" : ""} onClick={() => selectSubMap(subMap.id)}>
                           <td title={subMap.sid}>
                             <span className="sub-map-name-cell">
                               <strong>{subMap.displayName || "未知"}</strong>
@@ -265,7 +287,10 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
             {map.dependencies.length ? (
               <div className="dependency-list">
                 {map.dependencies.map((dependency) => (
-                  <span key={`${dependency.name}-${dependency.version}`} title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}>
+                  <span
+                    key={`${dependency.name}-${dependency.version}`}
+                    title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
+                  >
                     {dependency.name}
                     {dependency.version && <small>{dependency.version}</small>}
                   </span>
@@ -275,7 +300,9 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
               <p className="muted">没有声明必需依赖。</p>
             )}
             {map.warnings.map((warning) => (
-              <p className="warning-text" key={warning}>{warning}</p>
+              <p className="warning-text" key={warning}>
+                {warning}
+              </p>
             ))}
           </section>
         </div>
@@ -361,7 +388,9 @@ function LongList({ label, values, emptyText }: { label?: string; values: string
       {values.length ? (
         <div className="long-list">
           {values.map((value, index) => (
-            <code key={`${value}-${index}`} title={value}>{value}</code>
+            <code key={`${value}-${index}`} title={value}>
+              {value}
+            </code>
           ))}
         </div>
       ) : (

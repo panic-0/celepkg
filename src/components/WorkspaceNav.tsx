@@ -1,14 +1,4 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  Gamepad2,
-  Layers,
-  Search,
-  SlidersHorizontal,
-  ToggleLeft,
-  ToggleRight,
-  UserRound
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Gamepad2, Layers, Search, SlidersHorizontal, ToggleLeft, ToggleRight, UserRound } from "lucide-react";
 import { useState } from "react";
 import type { ActiveView, EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { Select } from "./common";
@@ -117,11 +107,7 @@ export function WorkspaceNav({
             筛选
             {filterCount > 0 && <small>{filterCount}</small>}
           </button>
-          {!filtersExpanded && (
-            <p className="filter-summary">
-              {filterCount > 0 ? "筛选条件已生效，展开可调整。" : "筛选已折叠。"}
-            </p>
-          )}
+          {!filtersExpanded && <p className="filter-summary">{filterCount > 0 ? "筛选条件已生效，展开可调整。" : "筛选已折叠。"}</p>}
           {filtersExpanded && (
             <div className="filter-content">
               <label className="search-box">

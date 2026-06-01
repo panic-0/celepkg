@@ -17,17 +17,7 @@ import { isDraftEnabled, readError } from "./utils/format";
 import type { ActiveView } from "./viewTypes";
 
 export function App() {
-  const {
-    celestePath,
-    loading,
-    message,
-    savePathAndRefresh,
-    scan,
-    setLoading,
-    setMessage,
-    setPathInput,
-    setScan
-  } = useCelePkgData();
+  const { celestePath, loading, message, savePathAndRefresh, scan, setLoading, setMessage, setPathInput, setScan } = useCelePkgData();
   const [activeView, setActiveView] = useState<ActiveView>("maps");
   const [mainMode, setMainMode] = useState<"list" | "detail">("list");
   const [selectedMapId, setSelectedMapId] = useState("");

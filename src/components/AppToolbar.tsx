@@ -63,17 +63,7 @@ export function AppToolbar({
   );
 }
 
-function MetricPill({
-  icon,
-  label,
-  tone,
-  value
-}: {
-  icon: React.ReactNode;
-  label: string;
-  tone?: "ok" | "warn";
-  value: React.ReactNode;
-}) {
+function MetricPill({ icon, label, tone, value }: { icon: React.ReactNode; label: string; tone?: "ok" | "warn"; value: React.ReactNode }) {
   return (
     <span className={tone ? `toolbar-pill ${tone}` : "toolbar-pill"}>
       {icon}

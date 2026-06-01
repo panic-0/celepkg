@@ -50,9 +50,15 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
       </div>
 
       <div className="detail-tabs" role="tablist">
-        <TabButton active={activeTab === "overview"} onClick={() => onTabChange("overview")}>概览</TabButton>
-        <TabButton active={activeTab === "dependencies"} onClick={() => onTabChange("dependencies")}>依赖</TabButton>
-        <TabButton active={activeTab === "files"} onClick={() => onTabChange("files")}>文件/警告</TabButton>
+        <TabButton active={activeTab === "overview"} onClick={() => onTabChange("overview")}>
+          概览
+        </TabButton>
+        <TabButton active={activeTab === "dependencies"} onClick={() => onTabChange("dependencies")}>
+          依赖
+        </TabButton>
+        <TabButton active={activeTab === "files"} onClick={() => onTabChange("files")}>
+          文件/警告
+        </TabButton>
       </div>
 
       {activeTab === "overview" && (
@@ -83,7 +89,10 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
             {modItem.dependencies.length ? (
               <div className="dependency-list">
                 {modItem.dependencies.map((dependency) => (
-                  <span key={`${dependency.name}-${dependency.version}`} title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}>
+                  <span
+                    key={`${dependency.name}-${dependency.version}`}
+                    title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
+                  >
                     {dependency.name}
                     {dependency.version && <small>{dependency.version}</small>}
                   </span>
@@ -99,7 +108,10 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
             {modItem.optionalDependencies.length ? (
               <div className="dependency-list">
                 {modItem.optionalDependencies.map((dependency) => (
-                  <span key={`${dependency.name}-${dependency.version}`} title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}>
+                  <span
+                    key={`${dependency.name}-${dependency.version}`}
+                    title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
+                  >
                     {dependency.name}
                     {dependency.version && <small>{dependency.version}</small>}
                   </span>
@@ -124,7 +136,9 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
               <h3>警告</h3>
               <div className="warning-list">
                 {modItem.warnings.map((warning) => (
-                  <p className="warning-text" key={warning} title={warning}>{warning}</p>
+                  <p className="warning-text" key={warning} title={warning}>
+                    {warning}
+                  </p>
                 ))}
               </div>
             </section>

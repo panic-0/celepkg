@@ -53,20 +53,33 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       hydrateModDraft(activeMod);
     }
     initializedRef.current = true;
-  }, [mapDirty, mapProfiles, modDirty, modProfiles, scan.maps, scan.otherMods, scan.profiles.activeMapProfileId, scan.profiles.activeModProfileId]);
+  }, [
+    mapDirty,
+    mapProfiles,
+    modDirty,
+    modProfiles,
+    scan.maps,
+    scan.otherMods,
+    scan.profiles.activeMapProfileId,
+    scan.profiles.activeModProfileId
+  ]);
 
   function hydrateMapDraft(profile: Profile | undefined) {
     setSelectedMapProfileId(profile?.id ?? "default-maps");
     setLaunchArgs(profile?.launchArgs ?? "");
     setEnabledMapDraft(new Set(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)));
     const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
-    setEnabledMapModDraft(new Set(profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id)));
+    setEnabledMapModDraft(
+      new Set(profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
+    );
     setMapDirty(false);
   }
 
   function hydrateModDraft(profile: Profile | undefined) {
     setSelectedModProfileId(profile?.id ?? "default-mods");
-    setEnabledExplicitModDraft(new Set(profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id)));
+    setEnabledExplicitModDraft(
+      new Set(profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id))
+    );
     setModDirty(false);
   }
 
@@ -273,7 +286,14 @@ function toggleSetValue(current: Set<string>, id: string) {
 function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {
   const aliasToModId = new Map<string, string>();
   for (const modItem of scan.otherMods) {
-    for (const alias of [modItem.id, modItem.name, modItem.metadata.name, modItem.fileName, modItem.fileName.replace(/\.zip$/i, ""), modItem.relativePath]) {
+    for (const alias of [
+      modItem.id,
+      modItem.name,
+      modItem.metadata.name,
+      modItem.fileName,
+      modItem.fileName.replace(/\.zip$/i, ""),
+      modItem.relativePath
+    ]) {
       const normalized = normalizeDependencyName(alias);
       if (normalized) aliasToModId.set(normalized, modItem.id);
     }

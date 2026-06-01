@@ -143,9 +143,18 @@ function MapTable({
           <th>名称</th>
           <th className="num">小图</th>
           <th>完成</th>
-          <th className="num"><Skull size={14} />死亡</th>
-          <th className="num"><Clock size={14} />用时</th>
-          <th className="num"><CircleDot size={14} />草莓</th>
+          <th className="num">
+            <Skull size={14} />
+            死亡
+          </th>
+          <th className="num">
+            <Clock size={14} />
+            用时
+          </th>
+          <th className="num">
+            <CircleDot size={14} />
+            草莓
+          </th>
           {showWarningColumn && <th>警告</th>}
         </tr>
       </thead>
@@ -158,14 +167,25 @@ function MapTable({
                 <div className="action-group">
                   <ToggleButton enabled={enabled} label="地图" onClick={() => onToggle(map)} />
                   <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
-                  <FlagButton active={map.protected} icon={map.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(map)} />
+                  <FlagButton
+                    active={map.protected}
+                    icon={map.protected ? <Lock size={16} /> : <Shield size={16} />}
+                    label="保护"
+                    onClick={() => onProtectedToggle(map)}
+                  />
                 </div>
               </td>
               <td className="name-cell">
                 <div className="name-title-row">
                   <strong title={map.name}>{map.name}</strong>
-                  <span className="file-name-text" title={map.fileName}>{map.fileName}</span>
-                  {map.metadata.version && <span className="version-text" title={map.metadata.version}>{map.metadata.version}</span>}
+                  <span className="file-name-text" title={map.fileName}>
+                    {map.fileName}
+                  </span>
+                  {map.metadata.version && (
+                    <span className="version-text" title={map.metadata.version}>
+                      {map.metadata.version}
+                    </span>
+                  )}
                 </div>
                 <div className="inline-pills">
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
@@ -234,19 +254,30 @@ function ModTable({
                 <div className="action-group">
                   <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem)} />
                   <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
-                  <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
+                  <FlagButton
+                    active={modItem.protected}
+                    icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />}
+                    label="保护"
+                    onClick={() => onProtectedToggle(modItem)}
+                  />
                 </div>
               </td>
               <td className="name-cell">
                 <div className="name-title-row">
                   <strong title={modItem.name}>{modItem.name}</strong>
-                  {modItem.metadata.version && <span className="version-text" title={modItem.metadata.version}>{modItem.metadata.version}</span>}
+                  {modItem.metadata.version && (
+                    <span className="version-text" title={modItem.metadata.version}>
+                      {modItem.metadata.version}
+                    </span>
+                  )}
                 </div>
               </td>
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
               <td>{modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "-"}</td>
-              {showWarningColumn && <td>{modItem.warnings.length ? <span className="warning-pill">{modItem.warnings.length}</span> : "-"}</td>}
+              {showWarningColumn && (
+                <td>{modItem.warnings.length ? <span className="warning-pill">{modItem.warnings.length}</span> : "-"}</td>
+              )}
             </tr>
           );
         })}
