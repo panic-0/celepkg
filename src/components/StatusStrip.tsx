@@ -8,7 +8,7 @@ type StatusStripProps = {
 };
 
 export function StatusStrip({ enabledCount, enabledModCount, scan }: StatusStripProps) {
-  const completedCount = scan.maps.filter((map) => map.stats?.completed).length;
+  const completedCount = scan.maps.filter((map) => map.completionStatus === "completed").length;
   const warningCount = [...scan.maps, ...scan.otherMods].filter((record) => record.warnings.length).length;
 
   return (

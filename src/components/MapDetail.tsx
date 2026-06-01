@@ -1,7 +1,7 @@
 import { ArrowLeft, Clock, CircleDot, FolderOpen, Heart, Search, Skull } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ModRecord } from "../types";
-import { formatHeartCassette, formatTime } from "../utils/format";
+import { formatCompletionStatus, formatHeartCassette, formatTime } from "../utils/format";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
 
@@ -77,6 +77,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
             <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
             <DetailStat icon={<CircleDot size={18} />} label="草莓" value={map.stats?.strawberries ?? "-"} />
             <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
+            <DetailStat icon={<CircleDot size={18} />} label="完成" value={formatCompletionStatus(map.completionStatus)} />
           </div>
           <section className="detail-section">
             <h3>地图信息</h3>
@@ -107,6 +108,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
                       <th>名称</th>
                       <th>章节</th>
                       <th>SID</th>
+                      <th>完成</th>
                       <th className="num">死亡</th>
                       <th className="num">用时</th>
                       <th className="num">草莓</th>
@@ -123,6 +125,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
                         <td title={subMap.displayName}>{subMap.displayName || "未知"}</td>
                         <td title={subMap.chapter}>{subMap.chapter || "未知"}</td>
                         <td title={subMap.sid}>{subMap.sid}</td>
+                        <td>{formatCompletionStatus(subMap.completionStatus)}</td>
                         <td className="num">{subMap.stats?.deaths ?? "-"}</td>
                         <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
                         <td className="num">{subMap.stats?.strawberries ?? "-"}</td>
@@ -137,6 +140,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }:
                   <h3>当前小图</h3>
                   <Info label="名称" value={selectedSubMap.displayName || "未知"} />
                   <Info label="章节" value={selectedSubMap.chapter || "未知"} />
+                  <Info label="完成" value={formatCompletionStatus(selectedSubMap.completionStatus)} />
                   <Info label="SID" value={selectedSubMap.sid} />
                   <Info label="文件" value={selectedSubMap.filePath} />
                   <p className="muted">{selectedSubMap.stats?.saveFiles.join(", ") || "未在存档中匹配到这张小图。"}</p>

@@ -1,4 +1,4 @@
-import type { MapStats, ModRecord, Profile } from "../types";
+import type { CompletionStatus, MapStats, ModRecord, Profile } from "../types";
 
 export function readError(error: unknown) {
   if (typeof error === "string") return error;
@@ -31,4 +31,17 @@ export function formatTime(value?: number) {
 
 export function formatHeartCassette(stats?: MapStats | null) {
   return stats ? `${stats.hearts}/${stats.cassettes}` : "-";
+}
+
+export function formatCompletionStatus(status?: CompletionStatus | null) {
+  switch (status) {
+    case "completed":
+      return "已完成";
+    case "unfinished":
+      return "未完成";
+    case "notApplicable":
+      return "不适用";
+    default:
+      return "未知";
+  }
 }

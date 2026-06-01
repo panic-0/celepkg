@@ -30,8 +30,8 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
       const draftEnabled = isDraftEnabled(map, enabledMapDraft, enabledModDraft);
       if (enabledFilter === "enabled" && !draftEnabled) return false;
       if (enabledFilter === "disabled" && draftEnabled) return false;
-      if (progressFilter === "completed" && !map.stats?.completed) return false;
-      if (progressFilter === "unfinished" && map.stats?.completed) return false;
+      if (progressFilter === "completed" && map.completionStatus !== "completed") return false;
+      if (progressFilter === "unfinished" && map.completionStatus !== "unfinished") return false;
       if (progressFilter === "withStats" && !map.stats) return false;
       if (progressFilter === "warnings" && !map.warnings.length) return false;
       if (!normalizedQuery) return true;

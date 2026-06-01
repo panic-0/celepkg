@@ -14,7 +14,7 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 1;
+const SCAN_CACHE_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -473,6 +473,7 @@ fn create_mod_record(
                 .unwrap_or_else(|| sub_map_display_name(sid)),
             chapter: sub_map_chapter(sid),
             file_path: format!("Maps/{sid}.bin"),
+            completion_status: "unknown".to_string(),
             stats: None,
         })
         .collect();
@@ -506,6 +507,7 @@ fn create_mod_record(
         map_ids,
         sub_maps,
         stats: None,
+        completion_status: "unknown".to_string(),
         warnings: vec![],
     }
 }
@@ -932,6 +934,7 @@ mod tests {
             map_ids: vec![],
             sub_maps: vec![],
             map_count: 0,
+            completion_status: "unknown".to_string(),
             dependencies: Vec::<Dependency>::new(),
             optional_dependencies: vec![],
             stats: None,

@@ -1,6 +1,6 @@
 import { CircleDot, Clock, FolderOpen, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
 import type { ModRecord } from "../types";
-import { formatTime } from "../utils/format";
+import { formatCompletionStatus, formatTime } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
 
 type RecordView = Exclude<ActiveView, "profiles">;
@@ -155,7 +155,7 @@ function MapTable({
               <td title={map.metadata.author || "未知"}>{map.metadata.author || "未知"}</td>
               <td title={map.metadata.version || "无版本号"}>{map.metadata.version || "无版本号"}</td>
               <td className="num">{map.mapCount || 1}</td>
-              <td>{map.stats?.completed ? "已完成" : "未完成"}</td>
+              <td>{formatCompletionStatus(map.completionStatus)}</td>
               <td className="num">{map.stats?.deaths ?? "-"}</td>
               <td className="num">{formatTime(map.stats?.timePlayed)}</td>
               <td className="num">{map.stats?.strawberries ?? "-"}</td>

@@ -17,10 +17,13 @@ export type MapStats = {
   strawberries: number;
   timePlayed: number;
   completed: boolean;
+  completionKnown: boolean;
   cassettes: number;
   hearts: number;
   saveFiles: string[];
 };
+
+export type CompletionStatus = "completed" | "unfinished" | "unknown" | "notApplicable";
 
 export type SubMapInfo = {
   id: string;
@@ -28,6 +31,7 @@ export type SubMapInfo = {
   displayName: string;
   chapter: string;
   filePath: string;
+  completionStatus: CompletionStatus;
   stats: MapStats | null;
 };
 
@@ -46,6 +50,7 @@ export type ModRecord = {
   mapIds: string[];
   subMaps: SubMapInfo[];
   mapCount: number;
+  completionStatus: CompletionStatus;
   dependencies: Dependency[];
   optionalDependencies: Dependency[];
   stats: MapStats | null;

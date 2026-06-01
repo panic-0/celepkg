@@ -12,9 +12,6 @@ struct SaveFileSnapshot {
 
 pub fn read_save_stats(celeste_path: &Path, maps: Vec<ModRecord>) -> Vec<ModRecord> {
     let saves_path = celeste_path.join("Saves");
-    if !saves_path.exists() {
-        return maps;
-    }
     let save_files: Vec<SaveFileSnapshot> = fs::read_dir(saves_path)
         .map(|entries| {
             entries
@@ -50,6 +47,7 @@ pub fn read_save_stats(celeste_path: &Path, maps: Vec<ModRecord>) -> Vec<ModReco
                 .map(|mut sub_map| {
                     let sub_needles = sub_map_needles(&sub_map);
                     sub_map.stats = collect_stats_from_saves(&save_files, &sub_needles);
+                    sub_map.completion_status = sub_map_completion_status(&sub_map).to_string();
                     sub_map
                 })
                 .collect();
@@ -59,20 +57,31 @@ pub fn read_save_stats(celeste_path: &Path, maps: Vec<ModRecord>) -> Vec<ModReco
                     merge_stats(&mut aggregate, stats);
                 }
             }
+            let completion_status = map_completion_status(&map.sub_maps);
+            aggregate.completed = completion_status == "completed";
+            aggregate.completion_known =
+                matches!(completion_status.as_str(), "completed" | "unfinished");
             map.stats = if aggregate.save_files.is_empty() {
                 None
             } else {
                 Some(aggregate)
             };
+            map.completion_status = completion_status;
             map
         })
         .collect()
 }
 
-fn collect_stats_from_saves(save_files: &[SaveFileSnapshot], needles: &[String]) -> Option<MapStats> {
+fn collect_stats_from_saves(
+    save_files: &[SaveFileSnapshot],
+    needles: &[String],
+) -> Option<MapStats> {
     let mut stats = MapStats::default();
     for file in save_files {
-        if !needles.iter().any(|needle| !needle.is_empty() && file.lower_text.contains(needle)) {
+        if !needles
+            .iter()
+            .any(|needle| !needle.is_empty() && file.lower_text.contains(needle))
+        {
             continue;
         }
         let before = stats.clone();
@@ -81,6 +90,7 @@ fn collect_stats_from_saves(save_files: &[SaveFileSnapshot], needles: &[String])
             || stats.strawberries != before.strawberries
             || stats.time_played != before.time_played
             || stats.completed != before.completed
+            || stats.completion_known != before.completion_known
             || stats.cassettes != before.cassettes
             || stats.hearts != before.hearts
         {
@@ -112,11 +122,56 @@ fn merge_stats(target: &mut MapStats, source: &MapStats) {
     target.strawberries = target.strawberries.saturating_add(source.strawberries);
     target.time_played = target.time_played.saturating_add(source.time_played);
     target.completed = target.completed || source.completed;
+    target.completion_known = target.completion_known || source.completion_known;
     target.cassettes = target.cassettes.saturating_add(source.cassettes);
     target.hearts = target.hearts.saturating_add(source.hearts);
     target.save_files.extend(source.save_files.iter().cloned());
     target.save_files.sort();
     target.save_files.dedup();
+}
+
+fn sub_map_completion_status(sub_map: &SubMapInfo) -> &'static str {
+    match &sub_map.stats {
+        Some(stats) if stats.completion_known && stats.completed => "completed",
+        Some(stats) if stats.completion_known => "unfinished",
+        _ if is_non_completable_sub_map(&sub_map.sid) => "notApplicable",
+        Some(_) => "unknown",
+        None => "unfinished",
+    }
+}
+
+fn map_completion_status(sub_maps: &[SubMapInfo]) -> String {
+    let finishable: Vec<&SubMapInfo> = sub_maps
+        .iter()
+        .filter(|sub_map| sub_map.completion_status != "notApplicable")
+        .collect();
+    if finishable.is_empty() {
+        return "notApplicable".to_string();
+    }
+    if finishable
+        .iter()
+        .all(|sub_map| sub_map.completion_status == "completed")
+    {
+        return "completed".to_string();
+    }
+    if finishable
+        .iter()
+        .any(|sub_map| sub_map.completion_status == "unfinished")
+    {
+        return "unfinished".to_string();
+    }
+    "unknown".to_string()
+}
+
+fn is_non_completable_sub_map(sid: &str) -> bool {
+    sid.split('/').any(|part| {
+        let lower = part.to_lowercase();
+        lower == "gym"
+            || lower == "gyms"
+            || lower.ends_with("-gym")
+            || lower.ends_with("_gym")
+            || lower.contains("training")
+    })
 }
 
 fn sub_map_needles(sub_map: &SubMapInfo) -> Vec<String> {
@@ -183,7 +238,9 @@ fn event_matches(event: &BytesStart<'_>, needles: &[String]) -> bool {
         haystack.push('=');
         haystack.push_str(&String::from_utf8_lossy(attr.value.as_ref()).to_lowercase());
     }
-    needles.iter().any(|needle| !needle.is_empty() && haystack.contains(needle))
+    needles
+        .iter()
+        .any(|needle| !needle.is_empty() && haystack.contains(needle))
 }
 
 fn add_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) {
@@ -205,7 +262,10 @@ fn add_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) {
                 }
             }
             "heartgems" | "hearts" | "heart" => stats.hearts = stats.hearts.saturating_add(number),
-            "completed" | "complete" => stats.completed = stats.completed || value.eq_ignore_ascii_case("true"),
+            "completed" | "complete" => {
+                stats.completion_known = true;
+                stats.completed = stats.completed || value.eq_ignore_ascii_case("true");
+            }
             _ => {}
         }
     }
@@ -235,5 +295,67 @@ mod tests {
         assert_eq!(stats.deaths, 3);
         assert_eq!(stats.time_played, 20);
         assert!(stats.completed);
+    }
+
+    #[test]
+    fn records_explicit_incomplete_state() {
+        let mut stats = MapStats::default();
+        accumulate_save_stats(
+            r#"<Save><AreaStats SID="Map"><AreaModeStats Deaths="3" Completed="false" /></AreaStats></Save>"#,
+            &["map".to_string()],
+            &mut stats,
+        );
+
+        assert!(stats.completion_known);
+        assert!(!stats.completed);
+    }
+
+    #[test]
+    fn map_completion_requires_all_finishable_sub_maps() {
+        let sub_maps = vec![
+            sub_map("Pack/MapA", "completed"),
+            sub_map("Pack/MapB", "unfinished"),
+            sub_map("Pack/Gym", "notApplicable"),
+        ];
+
+        assert_eq!(map_completion_status(&sub_maps), "unfinished");
+    }
+
+    #[test]
+    fn gyms_do_not_count_against_pack_completion() {
+        let sub_maps = vec![
+            sub_map("Pack/MapA", "completed"),
+            sub_map("Pack/Gym", "notApplicable"),
+        ];
+
+        assert_eq!(map_completion_status(&sub_maps), "completed");
+        assert_eq!(
+            sub_map_completion_status(&sub_map("StrawberryJam2021/5-Grandmaster/Gym", "unknown")),
+            "notApplicable"
+        );
+    }
+
+    #[test]
+    fn explicit_completion_beats_gym_heuristic() {
+        let mut sub_map = sub_map("Pack/Gym", "unknown");
+        sub_map.stats = Some(MapStats {
+            completion_known: true,
+            completed: true,
+            ..MapStats::default()
+        });
+
+        assert_eq!(sub_map_completion_status(&sub_map), "completed");
+    }
+
+    fn sub_map(sid: &str, completion_status: &str) -> SubMapInfo {
+        SubMapInfo {
+            id: sid.to_string(),
+            sid: sid.to_string(),
+            display_name: sid.to_string(),
+            chapter: String::new(),
+            file_path: format!("Maps/{sid}.bin"),
+            completion_status: completion_status.to_string(),
+            stats: None,
+        }
     }
 }

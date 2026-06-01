@@ -25,6 +25,7 @@ pub struct MapStats {
     pub strawberries: u64,
     pub time_played: u64,
     pub completed: bool,
+    pub completion_known: bool,
     pub cassettes: u64,
     pub hearts: u64,
     pub save_files: Vec<String>,
@@ -38,6 +39,7 @@ pub struct SubMapInfo {
     pub display_name: String,
     pub chapter: String,
     pub file_path: String,
+    pub completion_status: String,
     pub stats: Option<MapStats>,
 }
 
@@ -58,6 +60,7 @@ pub struct ModRecord {
     pub map_ids: Vec<String>,
     pub sub_maps: Vec<SubMapInfo>,
     pub map_count: usize,
+    pub completion_status: String,
     pub dependencies: Vec<Dependency>,
     pub optional_dependencies: Vec<Dependency>,
     pub stats: Option<MapStats>,
