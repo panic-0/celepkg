@@ -83,7 +83,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
       if (enabledFilter === "enabled" && !draftEnabled) return false;
       if (enabledFilter === "disabled" && draftEnabled) return false;
       if (progressFilter === "warnings" && !modItem.warnings.length) return false;
-      if (showOnlyUnreferencedMods && referencedModIds.has(modItem.id)) return false;
+      if (showOnlyUnreferencedMods && referencedModIds.has(modItem.id) && !modItem.favorite) return false;
       if (!normalizedQuery) return true;
       return [
         modItem.name,
