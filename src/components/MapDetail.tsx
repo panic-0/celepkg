@@ -143,7 +143,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
       )}
 
       {activeTab === "submaps" && (
-        <div className="detail-tab-panel" ref={detailPanelRef}>
+        <div className="detail-tab-panel sub-map-tab-panel" ref={detailPanelRef}>
           {map.subMaps.length ? (
             <>
               <label className="sub-map-search">
