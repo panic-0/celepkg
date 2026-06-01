@@ -334,7 +334,7 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string) {
   const completed = known.filter((subMap) => subMap.completionStatus === "completed").length;
 
   return {
-    completion: completable.length === 0 ? "不适用" : known.length ? `${completed}/${known.length} 完成` : "未知",
+    completion: completable.length === 0 ? "不适用" : known.length ? `${completed}/${known.length}` : "未知",
     deaths: statsMembers.length ? deaths : "-",
     heartCassette: statsMembers.length ? `${hearts}/${cassettes}` : "-",
     strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries),
