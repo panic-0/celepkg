@@ -115,7 +115,7 @@ export function WorkspaceNav({
           </button>
           {!filtersExpanded && (
             <p className="filter-summary">
-              {filterCount > 0 ? "筛选条件已生效，展开可调整。" : "默认收起，展开后搜索和排序。"}
+              {filterCount > 0 ? "筛选条件已生效，展开可调整。" : "筛选已折叠。"}
             </p>
           )}
           {filtersExpanded && (
