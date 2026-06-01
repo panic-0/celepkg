@@ -1,4 +1,4 @@
-import { AlertTriangle, PanelRightOpen } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { MapDetail } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
@@ -28,6 +28,7 @@ export function App() {
     setScan
   } = useCelePkgData();
   const [activeView, setActiveView] = useState<ActiveView>("maps");
+  const [mainMode, setMainMode] = useState<"list" | "detail">("list");
   const [selectedMapId, setSelectedMapId] = useState("");
   const [selectedModId, setSelectedModId] = useState("");
   const uiLayout = useUiLayout();
@@ -93,6 +94,21 @@ export function App() {
     }
   }
 
+  function changeActiveView(view: ActiveView) {
+    setActiveView(view);
+    setMainMode("list");
+  }
+
+  function selectMap(id: string) {
+    setSelectedMapId(id);
+    setMainMode("detail");
+  }
+
+  function selectMod(id: string) {
+    setSelectedModId(id);
+    setMainMode("detail");
+  }
+
   return (
     <main className={`app-shell density-${uiLayout.tableDensity}`}>
       <TopBar
@@ -106,7 +122,7 @@ export function App() {
 
       <StatusStrip enabledCount={enabledCount} enabledModCount={enabledModCount} scan={scan} />
 
-      <section className={`${uiLayout.detailCollapsed ? "workspace detail-collapsed" : "workspace"} ${activeView === "profiles" ? "profile-view" : ""}`}>
+      <section className={`workspace ${activeView === "profiles" ? "profile-view" : ""}`}>
         <Sidebar
           activeView={activeView}
           enabledFilter={filters.enabledFilter}
@@ -115,7 +131,7 @@ export function App() {
           query={filters.query}
           showHelperMaps={filters.showHelperMaps}
           sortKey={filters.sortKey}
-          onActiveViewChange={setActiveView}
+          onActiveViewChange={changeActiveView}
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
@@ -142,6 +158,22 @@ export function App() {
             onSaveAsProfile={profileDraft.saveAsProfile}
             onSaveProfile={profileDraft.saveCurrentProfile}
           />
+        ) : mainMode === "detail" && activeView === "maps" ? (
+          <MapDetail
+            activeTab={uiLayout.mapDetailTab}
+            map={selectedMap}
+            draftEnabled={selectedMap ? isDraftEnabled(selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft) : false}
+            onBack={() => setMainMode("list")}
+            onTabChange={uiLayout.setMapDetailTab}
+          />
+        ) : mainMode === "detail" && activeView === "mods" ? (
+          <ModDetail
+            activeTab={uiLayout.modDetailTab}
+            modItem={selectedMod}
+            draftEnabled={selectedMod ? profileDraft.enabledModDraft.has(selectedMod.id) : false}
+            onBack={() => setMainMode("list")}
+            onTabChange={uiLayout.setModDetailTab}
+          />
         ) : (
           <RecordList
             activeView={activeView}
@@ -153,37 +185,12 @@ export function App() {
             modCount={scan.otherMods.length}
             onDisableAll={disableAllInCurrentView}
             onEnableAll={enableAllInCurrentView}
-            onMapSelect={setSelectedMapId}
+            onMapSelect={selectMap}
             onMapToggle={toggleMapLikeRecord}
-            onModSelect={setSelectedModId}
+            onModSelect={selectMod}
             onModToggle={profileDraft.toggleMod}
             isMapEnabled={(record) => isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)}
             isModEnabled={(id) => profileDraft.enabledModDraft.has(id)}
-          />
-        )}
-
-        {activeView === "profiles" ? null : uiLayout.detailCollapsed ? (
-          <aside className="detail-rail">
-            <button onClick={() => uiLayout.setDetailCollapsed(false)} title="展开详情">
-              <PanelRightOpen size={18} />
-              详情
-            </button>
-          </aside>
-        ) : activeView === "maps" ? (
-          <MapDetail
-            activeTab={uiLayout.mapDetailTab}
-            map={selectedMap}
-            draftEnabled={selectedMap ? isDraftEnabled(selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft) : false}
-            onCollapse={() => uiLayout.setDetailCollapsed(true)}
-            onTabChange={uiLayout.setMapDetailTab}
-          />
-        ) : (
-          <ModDetail
-            activeTab={uiLayout.modDetailTab}
-            modItem={selectedMod}
-            draftEnabled={selectedMod ? profileDraft.enabledModDraft.has(selectedMod.id) : false}
-            onCollapse={() => uiLayout.setDetailCollapsed(true)}
-            onTabChange={uiLayout.setModDetailTab}
           />
         )}
       </section>

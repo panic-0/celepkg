@@ -1,4 +1,4 @@
-import { FolderOpen, PanelRightClose } from "lucide-react";
+import { ArrowLeft, FolderOpen } from "lucide-react";
 import type { ModRecord } from "../types";
 import type { ModDetailTab } from "../hooks/useUiLayout";
 import { Info } from "./common";
@@ -7,33 +7,35 @@ type ModDetailProps = {
   activeTab: ModDetailTab;
   draftEnabled: boolean;
   modItem?: ModRecord;
-  onCollapse: () => void;
+  onBack: () => void;
   onTabChange: (tab: ModDetailTab) => void;
 };
 
-export function ModDetail({ activeTab, draftEnabled, modItem, onCollapse, onTabChange }: ModDetailProps) {
+export function ModDetail({ activeTab, draftEnabled, modItem, onBack, onTabChange }: ModDetailProps) {
   if (!modItem) {
     return (
-      <aside className="detail-pane">
-        <button className="detail-collapse" onClick={onCollapse} title="收起详情">
-          <PanelRightClose size={17} />
+      <section className="detail-pane">
+        <button className="back-button" onClick={onBack}>
+          <ArrowLeft size={17} />
+          返回列表
         </button>
         <div className="empty-state compact">
           <FolderOpen size={24} />
           <p>选择一个 Mod 查看详情。</p>
         </div>
-      </aside>
+      </section>
     );
   }
 
   return (
-    <aside className="detail-pane">
+    <section className="detail-pane">
       <div className="detail-heading">
         <div className="detail-topline">
-          <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
-          <button className="detail-collapse" onClick={onCollapse} title="收起详情">
-            <PanelRightClose size={17} />
+          <button className="back-button" onClick={onBack}>
+            <ArrowLeft size={17} />
+            返回列表
           </button>
+          <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
         </div>
         <h2 title={modItem.name}>{modItem.name}</h2>
         <p title={modItem.metadata.description || modItem.fileName}>{modItem.metadata.description || modItem.fileName}</p>
@@ -112,7 +114,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, onCollapse, onTabC
           )}
         </div>
       )}
-    </aside>
+    </section>
   );
 }
 

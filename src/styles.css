@@ -176,18 +176,9 @@ h1 {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: 260px minmax(560px, 1fr) minmax(330px, 380px);
+  grid-template-columns: 260px minmax(560px, 1fr);
   gap: 10px;
   padding: 10px;
-}
-
-.workspace.detail-collapsed {
-  grid-template-columns: 260px minmax(560px, 1fr) 48px;
-}
-
-.workspace.profile-view,
-.workspace.profile-view.detail-collapsed {
-  grid-template-columns: 260px minmax(560px, 1fr);
 }
 
 .sidebar,
@@ -202,7 +193,7 @@ h1 {
 .panel,
 .record-panel,
 .detail-pane,
-.detail-rail {
+.profile-manager {
   border: 1px solid #d7e0e9;
   background: #ffffff;
   border-radius: 8px;
@@ -634,19 +625,6 @@ h1 {
   padding: 12px;
 }
 
-.detail-rail {
-  min-height: 0;
-  display: grid;
-  place-items: start center;
-  padding: 10px 6px;
-}
-
-.detail-rail button {
-  writing-mode: vertical-rl;
-  min-width: 34px;
-  padding: 8px 5px;
-}
-
 .detail-heading {
   display: grid;
   gap: 7px;
@@ -661,9 +639,9 @@ h1 {
   gap: 8px;
 }
 
-.detail-collapse {
-  width: 34px;
-  padding: 0;
+.back-button {
+  width: fit-content;
+  min-width: 0;
 }
 
 .detail-heading h2 {
@@ -720,7 +698,7 @@ h1 {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
   gap: 8px;
 }
 
@@ -868,7 +846,7 @@ h1 {
 }
 
 .sub-map-table-wrap {
-  max-height: 360px;
+  max-height: min(560px, 52vh);
   overflow: auto;
   border: 1px solid #dce4ec;
   border-radius: 8px;
@@ -943,10 +921,7 @@ h1 {
 }
 
 @media (max-width: 1180px) {
-  .workspace,
-  .workspace.detail-collapsed,
-  .workspace.profile-view,
-  .workspace.profile-view.detail-collapsed {
+  .workspace {
     grid-template-columns: 230px minmax(520px, 1fr);
   }
 
@@ -955,16 +930,8 @@ h1 {
     overflow: auto;
   }
 
-  .detail-pane {
-    position: fixed;
-    inset: 86px 10px 10px auto;
-    width: min(420px, calc(100vw - 20px));
-    z-index: 20;
-    box-shadow: 0 18px 50px rgba(23, 32, 42, 0.18);
-  }
-
-  .detail-rail {
-    display: none;
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
   }
 }
 
@@ -978,10 +945,7 @@ h1 {
     overflow-x: auto;
   }
 
-  .workspace,
-  .workspace.detail-collapsed,
-  .workspace.profile-view,
-  .workspace.profile-view.detail-collapsed {
+  .workspace {
     grid-template-columns: minmax(220px, 1fr);
     overflow: auto;
   }
@@ -998,7 +962,10 @@ h1 {
   }
 
   .detail-pane {
-    inset: 72px 8px 8px 8px;
-    width: auto;
+    min-height: 520px;
+  }
+
+  .stat-grid {
+    grid-template-columns: 1fr;
   }
 }

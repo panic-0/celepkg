@@ -5,7 +5,6 @@ export type MapDetailTab = "overview" | "submaps" | "dependencies" | "saves";
 export type ModDetailTab = "overview" | "dependencies" | "files";
 
 type UiLayoutState = {
-  detailCollapsed: boolean;
   mapDetailTab: MapDetailTab;
   modDetailTab: ModDetailTab;
   tableDensity: TableDensity;
@@ -13,7 +12,6 @@ type UiLayoutState = {
 
 const STORAGE_KEY = "celepkg.ui.layout";
 const defaultLayout: UiLayoutState = {
-  detailCollapsed: false,
   mapDetailTab: "overview",
   modDetailTab: "overview",
   tableDensity: "compact"
@@ -28,7 +26,6 @@ export function useUiLayout() {
 
   return {
     ...layout,
-    setDetailCollapsed: (detailCollapsed: boolean) => setLayout((current) => ({ ...current, detailCollapsed })),
     setMapDetailTab: (mapDetailTab: MapDetailTab) => setLayout((current) => ({ ...current, mapDetailTab })),
     setModDetailTab: (modDetailTab: ModDetailTab) => setLayout((current) => ({ ...current, modDetailTab })),
     setTableDensity: (tableDensity: TableDensity) => setLayout((current) => ({ ...current, tableDensity }))
@@ -41,7 +38,6 @@ function readLayout(): UiLayoutState {
     if (!text) return defaultLayout;
     const value = JSON.parse(text) as Partial<UiLayoutState>;
     return {
-      detailCollapsed: Boolean(value.detailCollapsed),
       mapDetailTab: isMapTab(value.mapDetailTab) ? value.mapDetailTab : defaultLayout.mapDetailTab,
       modDetailTab: isModTab(value.modDetailTab) ? value.modDetailTab : defaultLayout.modDetailTab,
       tableDensity: value.tableDensity === "comfortable" ? "comfortable" : "compact"

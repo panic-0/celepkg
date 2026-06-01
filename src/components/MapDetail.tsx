@@ -1,4 +1,4 @@
-import { Clock, CircleDot, FolderOpen, Heart, PanelRightClose, Search, Skull } from "lucide-react";
+import { ArrowLeft, Clock, CircleDot, FolderOpen, Heart, Search, Skull } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ModRecord } from "../types";
 import { formatHeartCassette, formatTime } from "../utils/format";
@@ -9,11 +9,11 @@ type MapDetailProps = {
   activeTab: MapDetailTab;
   draftEnabled: boolean;
   map?: ModRecord;
-  onCollapse: () => void;
+  onBack: () => void;
   onTabChange: (tab: MapDetailTab) => void;
 };
 
-export function MapDetail({ activeTab, draftEnabled, map, onCollapse, onTabChange }: MapDetailProps) {
+export function MapDetail({ activeTab, draftEnabled, map, onBack, onTabChange }: MapDetailProps) {
   const [selectedSubMapId, setSelectedSubMapId] = useState("");
   const [subMapQuery, setSubMapQuery] = useState("");
   const selectedSubMap = useMemo(() => {
@@ -36,26 +36,28 @@ export function MapDetail({ activeTab, draftEnabled, map, onCollapse, onTabChang
 
   if (!map) {
     return (
-      <aside className="detail-pane">
-        <button className="detail-collapse" onClick={onCollapse} title="收起详情">
-          <PanelRightClose size={17} />
+      <section className="detail-pane">
+        <button className="back-button" onClick={onBack}>
+          <ArrowLeft size={17} />
+          返回列表
         </button>
         <div className="empty-state compact">
           <FolderOpen size={24} />
           <p>选择一个地图查看详情。</p>
         </div>
-      </aside>
+      </section>
     );
   }
 
   return (
-    <aside className="detail-pane">
+    <section className="detail-pane">
       <div className="detail-heading">
         <div className="detail-topline">
-          <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
-          <button className="detail-collapse" onClick={onCollapse} title="收起详情">
-            <PanelRightClose size={17} />
+          <button className="back-button" onClick={onBack}>
+            <ArrowLeft size={17} />
+            返回列表
           </button>
+          <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
         </div>
         <h2 title={map.name}>{map.name}</h2>
         <p title={map.metadata.description || map.fileName}>{map.metadata.description || map.fileName}</p>
@@ -183,7 +185,7 @@ export function MapDetail({ activeTab, draftEnabled, map, onCollapse, onTabChang
           </section>
         </div>
       )}
-    </aside>
+    </section>
   );
 }
 
