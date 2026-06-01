@@ -4,9 +4,8 @@ import { MapDetail } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
 import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
-import { Sidebar } from "./components/Sidebar";
-import { StatusStrip } from "./components/StatusStrip";
-import { TopBar } from "./components/TopBar";
+import { AppToolbar } from "./components/AppToolbar";
+import { WorkspaceNav } from "./components/WorkspaceNav";
 import { setRecordFavorite, setRecordProtected } from "./api";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useModFilters } from "./hooks/useModFilters";
@@ -154,28 +153,36 @@ export function App() {
 
   return (
     <main className={`app-shell density-${uiLayout.tableDensity}`}>
-      <TopBar
+      <AppToolbar
         celestePath={celestePath}
         loading={loading}
         canLaunch={Boolean(scan.gameExecutable)}
+        enabledMapCount={enabledCount}
+        enabledModCount={enabledModCount}
+        scan={scan}
         onLaunch={profileDraft.launchSelectedProfiles}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
       />
 
-      <StatusStrip enabledCount={enabledCount} enabledModCount={enabledModCount} scan={scan} />
-
       <section className={`workspace ${activeView === "profiles" ? "profile-view" : ""}`}>
-        <Sidebar
+        <WorkspaceNav
           activeView={activeView}
+          dependencyModCount={profileDraft.dependencyModDraft.size}
           enabledFilter={filters.enabledFilter}
+          enabledMapCount={enabledCount}
+          enabledModCount={enabledModCount}
           helperMapCount={filters.helperMapMods.length}
+          mapProfileName={profileDraft.mapProfiles.find((profile) => profile.id === profileDraft.selectedMapProfileId)?.name ?? ""}
+          modProfileName={profileDraft.modProfiles.find((profile) => profile.id === profileDraft.selectedModProfileId)?.name ?? ""}
           progressFilter={filters.progressFilter}
           query={filters.query}
           referencedModCount={filters.referencedModIds.size}
           showHelperMaps={filters.showHelperMaps}
           showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
           sortKey={filters.sortKey}
+          totalMapCount={scan.maps.length}
+          totalModCount={scan.otherMods.length}
           onActiveViewChange={changeActiveView}
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
