@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+dist/
+
+# Rust/Tauri build output
+src-tauri/target/
+target/
+src-tauri/gen/schemas/
+
+# Local app/runtime files
+*.log
+*.tmp
+*.bak
+.env
+.env.*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Codex/local assistant files
+AGENTS.md
+.Codex/
+.codex/
