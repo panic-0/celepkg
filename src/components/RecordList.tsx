@@ -21,7 +21,7 @@ type RecordListProps = {
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
-  onModToggle: (id: string) => void;
+  onModToggle: (record: ModRecord) => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
   isMapEnabled: (record: ModRecord) => boolean;
@@ -199,7 +199,7 @@ function ModTable({
   mods: ModRecord[];
   selectedMod?: ModRecord;
   onSelect: (id: string) => void;
-  onToggle: (id: string) => void;
+  onToggle: (record: ModRecord) => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
   showWarningColumn: boolean;
@@ -232,7 +232,7 @@ function ModTable({
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
                 <div className="action-group">
-                  <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem.id)} />
+                  <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem)} />
                   <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
                   <FlagButton active={modItem.protected} icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />} label="保护" onClick={() => onProtectedToggle(modItem)} />
                 </div>

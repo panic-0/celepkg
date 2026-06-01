@@ -63,8 +63,47 @@ export function App() {
   const protectedVisibleMods = filters.filteredMods.filter((record) => record.protected);
 
   function toggleMapLikeRecord(record: ModRecord) {
+    if (!canToggleProfileRecord(record)) return;
     if (record.kind === "mod") profileDraft.toggleMapMod(record.id);
     else profileDraft.toggleMap(record.id);
+  }
+
+  function toggleModRecord(record: ModRecord) {
+    if (!canToggleProfileRecord(record)) return;
+    profileDraft.toggleMod(record.id);
+  }
+
+  function canToggleProfileRecord(record: ModRecord) {
+    const enabled = isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft);
+    if (record.protected) {
+      setMessage(`${record.name} 已设为 Protected，不能通过 Profile 启用或禁用。`);
+      return false;
+    }
+    if (record.kind === "mod" && enabled && profileDraft.dependencyModDraft.has(record.id)) {
+      setMessage(`${record.name} 被以下已启用项目依赖，不能直接禁用：${dependentSummary(record)}。`);
+      return false;
+    }
+    return true;
+  }
+
+  function dependentSummary(record: ModRecord) {
+    const names = findEnabledDependents(record).map((item) => item.name);
+    if (!names.length) return "未知项目";
+    const visible = names.slice(0, 6).join("、");
+    return names.length > 6 ? `${visible} 等 ${names.length} 个项目` : visible;
+  }
+
+  function findEnabledDependents(target: ModRecord) {
+    const targetAliases = new Set(
+      [target.id, target.name, target.metadata.name, target.fileName, target.fileName.replace(/\.zip$/i, ""), target.relativePath]
+        .map(normalizeDependencyName)
+        .filter(Boolean)
+    );
+    const enabledMaps = scan.maps.filter((map) => profileDraft.enabledMapDraft.has(map.id));
+    const enabledMods = scan.otherMods.filter((modItem) => modItem.id !== target.id && profileDraft.enabledModDraft.has(modItem.id));
+    return [...enabledMaps, ...enabledMods].filter((item) =>
+      item.dependencies.some((dependency) => targetAliases.has(normalizeDependencyName(dependency.name)))
+    );
   }
 
   function enableVisibleMaps() {
@@ -271,7 +310,7 @@ export function App() {
             onMapSelect={selectMap}
             onMapToggle={toggleMapLikeRecord}
             onModSelect={selectMod}
-            onModToggle={profileDraft.toggleMod}
+            onModToggle={toggleModRecord}
             onFavoriteToggle={updateRecordFavorite}
             onProtectedToggle={updateRecordProtected}
             isMapEnabled={(record) => isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)}
@@ -288,4 +327,15 @@ export function App() {
       )}
     </main>
   );
+}
+
+function normalizeDependencyName(value: string) {
+  return value
+    .replace(/\\/g, "/")
+    .replace(/\.zip$/i, "")
+    .replace(/[_-]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .join(" ")
+    .toLowerCase();
 }
