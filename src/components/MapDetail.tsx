@@ -137,6 +137,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
             <Info label="版本" value={map.metadata.version || "未知"} />
             <Info label="类型" value={map.isArchive ? "zip 地图包" : "文件夹地图包"} />
             <Info label="小图" value={`${map.subMaps.length} 张`} />
+            <Info label="描述" value={map.metadata.description || "无"} />
           </section>
         </div>
       )}

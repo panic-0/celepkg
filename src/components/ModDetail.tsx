@@ -71,6 +71,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
               <Info label="版本" value={modItem.metadata.version || "未知"} />
               <Info label="文件" value={modItem.fileName} />
             </div>
+            <Info label="描述" value={modItem.metadata.description || "无"} />
           </section>
         </div>
       )}
