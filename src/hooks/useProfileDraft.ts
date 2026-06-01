@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, launchProfile, saveProfile } from "../api";
-import type { ModRecord, Profile, ScanResult } from "../types";
+import type { Profile, ScanResult } from "../types";
 import { readError } from "../utils/format";
 
 type ProfileDraftOptions = {
