@@ -183,6 +183,7 @@ export function App() {
           referencedModCount={filters.referencedModIds.size}
           showHelperMaps={filters.showHelperMaps}
           showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
+          showWarningColumn={uiLayout.showWarningColumn}
           sortKey={filters.sortKey}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
@@ -192,6 +193,7 @@ export function App() {
           onQueryChange={filters.setQuery}
           onShowHelperMapsChange={filters.setShowHelperMaps}
           onShowOnlyUnreferencedModsChange={filters.setShowOnlyUnreferencedMods}
+          onShowWarningColumnChange={uiLayout.setShowWarningColumn}
           onSortKeyChange={filters.setSortKey}
         />
 
@@ -249,6 +251,7 @@ export function App() {
             filteredMods={filters.filteredMods}
             selectedMap={selectedMap}
             selectedMod={selectedMod}
+            showWarningColumn={uiLayout.showWarningColumn}
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
             scrollMemory={scrollMemory}

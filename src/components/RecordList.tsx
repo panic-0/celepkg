@@ -12,6 +12,7 @@ type RecordListProps = {
   filteredMods: ModRecord[];
   selectedMap?: ModRecord;
   selectedMod?: ModRecord;
+  showWarningColumn: boolean;
   scrollMemory: ScrollMemory;
   visibleMapCount: number;
   modCount: number;
@@ -33,6 +34,7 @@ export function RecordList({
   filteredMods,
   selectedMap,
   selectedMod,
+  showWarningColumn,
   scrollMemory,
   visibleMapCount,
   modCount,
@@ -78,6 +80,7 @@ export function RecordList({
             onToggle={onMapToggle}
             onFavoriteToggle={onFavoriteToggle}
             onProtectedToggle={onProtectedToggle}
+            showWarningColumn={showWarningColumn}
             isEnabled={isMapEnabled}
           />
         ) : (
@@ -88,6 +91,7 @@ export function RecordList({
             onToggle={onModToggle}
             onFavoriteToggle={onFavoriteToggle}
             onProtectedToggle={onProtectedToggle}
+            showWarningColumn={showWarningColumn}
             isEnabled={isModEnabled}
           />
         )}
@@ -109,6 +113,7 @@ function MapTable({
   onToggle,
   onFavoriteToggle,
   onProtectedToggle,
+  showWarningColumn,
   isEnabled
 }: {
   maps: ModRecord[];
@@ -117,10 +122,11 @@ function MapTable({
   onToggle: (record: ModRecord) => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
+  showWarningColumn: boolean;
   isEnabled: (record: ModRecord) => boolean;
 }) {
   return (
-    <table className="record-table map-table">
+    <table className={showWarningColumn ? "record-table map-table show-warning" : "record-table map-table"}>
       <colgroup>
         <col className="w-toggle" />
         <col className="w-flags" />
@@ -130,7 +136,7 @@ function MapTable({
         <col className="w-number" />
         <col className="w-time" />
         <col className="w-number" />
-        <col className="w-warning" />
+        {showWarningColumn && <col className="w-warning" />}
       </colgroup>
       <thead>
         <tr>
@@ -142,7 +148,7 @@ function MapTable({
           <th className="num"><Skull size={14} />死亡</th>
           <th className="num"><Clock size={14} />用时</th>
           <th className="num"><CircleDot size={14} />草莓</th>
-          <th>警告</th>
+          {showWarningColumn && <th>警告</th>}
         </tr>
       </thead>
       <tbody>
@@ -173,7 +179,7 @@ function MapTable({
               <td className="num">{map.stats?.deaths ?? "-"}</td>
               <td className="num">{formatTime(map.stats?.timePlayed)}</td>
               <td className="num">{formatStrawberries(map.stats?.strawberries, map.strawberryCount)}</td>
-              <td>{map.warnings.length ? <span className="warning-pill">{map.warnings.length}</span> : "-"}</td>
+              {showWarningColumn && <td>{map.warnings.length ? <span className="warning-pill">{map.warnings.length}</span> : "-"}</td>}
             </tr>
           );
         })}
@@ -189,6 +195,7 @@ function ModTable({
   onToggle,
   onFavoriteToggle,
   onProtectedToggle,
+  showWarningColumn,
   isEnabled
 }: {
   mods: ModRecord[];
@@ -197,10 +204,11 @@ function ModTable({
   onToggle: (id: string) => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
+  showWarningColumn: boolean;
   isEnabled: (id: string) => boolean;
 }) {
   return (
-    <table className="record-table mod-table">
+    <table className={showWarningColumn ? "record-table mod-table show-warning" : "record-table mod-table"}>
       <colgroup>
         <col className="w-toggle" />
         <col className="w-flags" />
@@ -208,7 +216,7 @@ function ModTable({
         <col className="w-kind" />
         <col className="w-number" />
         <col className="w-progress" />
-        <col className="w-warning" />
+        {showWarningColumn && <col className="w-warning" />}
       </colgroup>
       <thead>
         <tr>
@@ -218,7 +226,7 @@ function ModTable({
           <th>类型</th>
           <th className="num">依赖</th>
           <th>测试图</th>
-          <th>警告</th>
+          {showWarningColumn && <th>警告</th>}
         </tr>
       </thead>
       <tbody>
@@ -243,7 +251,7 @@ function ModTable({
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
               <td>{modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "-"}</td>
-              <td>{modItem.warnings.length ? <span className="warning-pill">{modItem.warnings.length}</span> : "-"}</td>
+              {showWarningColumn && <td>{modItem.warnings.length ? <span className="warning-pill">{modItem.warnings.length}</span> : "-"}</td>}
             </tr>
           );
         })}

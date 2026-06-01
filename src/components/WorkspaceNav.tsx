@@ -27,6 +27,7 @@ type WorkspaceNavProps = {
   referencedModCount: number;
   showHelperMaps: boolean;
   showOnlyUnreferencedMods: boolean;
+  showWarningColumn: boolean;
   sortKey: SortKey;
   totalMapCount: number;
   totalModCount: number;
@@ -36,6 +37,7 @@ type WorkspaceNavProps = {
   onQueryChange: (value: string) => void;
   onShowHelperMapsChange: (value: boolean) => void;
   onShowOnlyUnreferencedModsChange: (value: boolean) => void;
+  onShowWarningColumnChange: (value: boolean) => void;
   onSortKeyChange: (value: SortKey) => void;
 };
 
@@ -53,6 +55,7 @@ export function WorkspaceNav({
   referencedModCount,
   showHelperMaps,
   showOnlyUnreferencedMods,
+  showWarningColumn,
   sortKey,
   totalMapCount,
   totalModCount,
@@ -62,6 +65,7 @@ export function WorkspaceNav({
   onQueryChange,
   onShowHelperMapsChange,
   onShowOnlyUnreferencedModsChange,
+  onShowWarningColumnChange,
   onSortKeyChange
 }: WorkspaceNavProps) {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -133,6 +137,14 @@ export function WorkspaceNav({
                 <option value="enabled">仅启用</option>
                 <option value="disabled">仅禁用</option>
               </Select>
+              <button
+                className={showWarningColumn ? "inline-toggle active" : "inline-toggle"}
+                onClick={() => onShowWarningColumnChange(!showWarningColumn)}
+                title="在列表中显示警告数量列"
+              >
+                {showWarningColumn ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                警告栏
+              </button>
               {activeView === "maps" ? (
                 <>
                   <Select label="进度" value={progressFilter} onChange={(value) => onProgressFilterChange(value as ProgressFilter)}>

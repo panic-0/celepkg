@@ -570,10 +570,18 @@ h1 {
 }
 
 .map-table {
+  min-width: 884px;
+}
+
+.map-table.show-warning {
   min-width: 960px;
 }
 
 .mod-table {
+  min-width: 704px;
+}
+
+.mod-table.show-warning {
   min-width: 780px;
 }
 
