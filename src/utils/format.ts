@@ -10,7 +10,10 @@ export function profileSummary(profile: Profile) {
   if (!profile.enabledMapIds && !profile.enabledModIds) {
     return "跟随当前状态";
   }
-  return `${profile.enabledMapIds?.length ?? 0} 图 / ${profile.enabledModIds?.length ?? 0} Mod`;
+  if (profile.profileType === "maps") {
+    return `${profile.enabledMapIds?.length ?? 0} 图 / ${profile.enabledModIds?.length ?? 0} 测试图 Mod`;
+  }
+  return `${profile.enabledModIds?.length ?? 0} Mod`;
 }
 
 export function isDraftEnabled(record: ModRecord, enabledMapDraft: Set<string>, enabledModDraft: Set<string>) {

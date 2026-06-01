@@ -43,9 +43,13 @@ pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
 }
 
 #[tauri::command]
-pub async fn apply_profile(celeste_path: String, profile_id: String) -> Result<ScanResult, String> {
+pub async fn apply_profile(
+    celeste_path: String,
+    map_profile_id: String,
+    mod_profile_id: String,
+) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        services::profile::apply_profile(celeste_path, profile_id)
+        services::profile::apply_profile(celeste_path, map_profile_id, mod_profile_id)
     })
     .await
     .map_err(|error| format!("应用 Profile 任务失败：{error}"))?
@@ -54,10 +58,11 @@ pub async fn apply_profile(celeste_path: String, profile_id: String) -> Result<S
 #[tauri::command]
 pub async fn launch_profile(
     celeste_path: String,
-    profile_id: String,
+    map_profile_id: String,
+    mod_profile_id: String,
 ) -> Result<LaunchResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        services::profile::launch_profile(celeste_path, profile_id)
+        services::profile::launch_profile(celeste_path, map_profile_id, mod_profile_id)
     })
     .await
     .map_err(|error| format!("启动任务失败：{error}"))?

@@ -1,148 +1,209 @@
-import { Check, Gamepad2, Play, Save, Sparkles, ToggleRight } from "lucide-react";
+import { Check, Gamepad2, Layers, Play, Save, Sparkles, ToggleRight } from "lucide-react";
 import type { Profile } from "../types";
 import { profileSummary } from "../utils/format";
 
 type ProfileManagerProps = {
+  dependencyModCount: number;
   enabledMapCount: number;
   enabledModCount: number;
   launchArgs: string;
   loading: boolean;
-  profileName: string;
-  profiles: Profile[];
-  selectedProfileId: string;
+  mapProfileName: string;
+  mapProfiles: Profile[];
+  modProfileName: string;
+  modProfiles: Profile[];
+  selectedMapProfileId: string;
+  selectedModProfileId: string;
   totalMapCount: number;
   totalModCount: number;
   onApplyProfile: () => void;
   onLaunch: () => void;
   onLaunchArgsChange: (value: string) => void;
-  onProfileNameChange: (value: string) => void;
-  onProfileSelect: (profile: Profile) => void;
-  onSaveAsProfile: () => void;
-  onSaveProfile: (applyAfterSave: boolean) => void;
+  onMapProfileNameChange: (value: string) => void;
+  onMapProfileSelect: (profile: Profile) => void;
+  onModProfileNameChange: (value: string) => void;
+  onModProfileSelect: (profile: Profile) => void;
+  onSaveAsMapProfile: () => void;
+  onSaveAsModProfile: () => void;
+  onSaveMapProfile: (applyAfterSave: boolean) => void;
+  onSaveModProfile: (applyAfterSave: boolean) => void;
 };
 
 export function ProfileManager({
+  dependencyModCount,
   enabledMapCount,
   enabledModCount,
   launchArgs,
   loading,
-  profileName,
-  profiles,
-  selectedProfileId,
+  mapProfileName,
+  mapProfiles,
+  modProfileName,
+  modProfiles,
+  selectedMapProfileId,
+  selectedModProfileId,
   totalMapCount,
   totalModCount,
   onApplyProfile,
   onLaunch,
   onLaunchArgsChange,
-  onProfileNameChange,
-  onProfileSelect,
-  onSaveAsProfile,
-  onSaveProfile
+  onMapProfileNameChange,
+  onMapProfileSelect,
+  onModProfileNameChange,
+  onModProfileSelect,
+  onSaveAsMapProfile,
+  onSaveAsModProfile,
+  onSaveMapProfile,
+  onSaveModProfile
 }: ProfileManagerProps) {
-  const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
+  const selectedMapProfile = mapProfiles.find((profile) => profile.id === selectedMapProfileId);
+  const selectedModProfile = modProfiles.find((profile) => profile.id === selectedModProfileId);
 
   return (
     <section className="profile-manager">
       <div className="list-header">
         <div>
           <h2>Profile</h2>
-          <p>{`${profiles.length} 个配置，当前草稿启用 ${enabledMapCount}/${totalMapCount} 图，${enabledModCount}/${totalModCount} Mod`}</p>
+          <p>{`启用 ${enabledMapCount}/${totalMapCount} 图，${enabledModCount}/${totalModCount} Mod，其中 ${dependencyModCount} 个由依赖推导`}</p>
         </div>
-        <button onClick={onLaunch} disabled={loading}>
+        <button onClick={onLaunch} disabled={loading || !selectedMapProfile || !selectedModProfile}>
           <Play size={16} />
           启动
         </button>
-        <button onClick={onApplyProfile} disabled={loading || !selectedProfile}>
+        <button onClick={onApplyProfile} disabled={loading || !selectedMapProfile || !selectedModProfile}>
           <ToggleRight size={16} />
           应用
         </button>
       </div>
 
-      <div className="profile-layout">
-        <div className="profile-table-card">
-          <div className="profile-table-scroll">
-            <table className="record-table profile-table">
-              <thead>
-                <tr>
-                  <th>名称</th>
-                  <th>范围</th>
-                  <th>启动参数</th>
-                  <th>更新时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {profiles.map((profile) => (
-                  <tr
-                    className={profile.id === selectedProfileId ? "active" : ""}
-                    key={profile.id}
-                    onClick={() => onProfileSelect(profile)}
-                  >
-                    <td className="name-cell">
-                      <strong title={profile.name}>{profile.name}</strong>
-                      <small title={profile.id}>{profile.id}</small>
-                    </td>
-                    <td title={profileSummary(profile)}>{profileSummary(profile)}</td>
-                    <td title={profile.launchArgs || "无"}>{profile.launchArgs || "-"}</td>
-                    <td title={profile.updatedAt}>{formatDate(profile.updatedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <aside className="profile-editor">
-          <div className="panel-title">
-            <Gamepad2 size={17} />
-            当前 Profile
-          </div>
-          <div className="profile-current">
-            <strong title={selectedProfile?.name || "未选择"}>{selectedProfile?.name || "未选择"}</strong>
-            <span>{selectedProfile ? profileSummary(selectedProfile) : "请选择一个 Profile"}</span>
-          </div>
+      <div className="profile-layout split">
+        <ProfileColumn
+          icon={<Gamepad2 size={17} />}
+          title="地图 Profile"
+          profiles={mapProfiles}
+          selectedProfileId={selectedMapProfileId}
+          nameDraft={mapProfileName}
+          nameLabel="另存为地图 Profile"
+          summary={selectedMapProfile ? profileSummary(selectedMapProfile) : "请选择地图 Profile"}
+          onNameChange={onMapProfileNameChange}
+          onProfileSelect={onMapProfileSelect}
+          onSave={() => onSaveMapProfile(false)}
+          onSaveAndApply={() => onSaveMapProfile(true)}
+          onSaveAs={onSaveAsMapProfile}
+          loading={loading}
+        >
           <label className="field">
             <span>启动参数</span>
             <input value={launchArgs} onChange={(event) => onLaunchArgsChange(event.target.value)} placeholder="-debug" />
           </label>
-          <label className="field">
-            <span>另存为</span>
-            <input value={profileName} onChange={(event) => onProfileNameChange(event.target.value)} />
-          </label>
           <div className="profile-stats">
             <span>草稿地图</span>
             <strong>{`${enabledMapCount}/${totalMapCount}`}</strong>
-            <span>草稿 Mod</span>
+            <span>依赖推导 Mod</span>
+            <strong>{dependencyModCount}</strong>
+          </div>
+        </ProfileColumn>
+
+        <ProfileColumn
+          icon={<Layers size={17} />}
+          title="其他 Mod Profile"
+          profiles={modProfiles}
+          selectedProfileId={selectedModProfileId}
+          nameDraft={modProfileName}
+          nameLabel="另存为 Mod Profile"
+          summary={selectedModProfile ? profileSummary(selectedModProfile) : "请选择 Mod Profile"}
+          onNameChange={onModProfileNameChange}
+          onProfileSelect={onModProfileSelect}
+          onSave={() => onSaveModProfile(false)}
+          onSaveAndApply={() => onSaveModProfile(true)}
+          onSaveAs={onSaveAsModProfile}
+          loading={loading}
+        >
+          <div className="profile-stats">
+            <span>有效 Mod</span>
             <strong>{`${enabledModCount}/${totalModCount}`}</strong>
+            <span>依赖推导</span>
+            <strong>{dependencyModCount}</strong>
           </div>
-          <div className="button-row">
-            <button onClick={() => onSaveProfile(false)} disabled={loading || !selectedProfile}>
-              <Save size={16} />
-              保存
-            </button>
-            <button onClick={() => onSaveProfile(true)} disabled={loading || !selectedProfile}>
-              <Check size={16} />
-              保存并应用
-            </button>
-          </div>
-          <div className="button-row">
-            <button onClick={onSaveAsProfile} disabled={loading}>
-              <Sparkles size={16} />
-              新建 Profile
-            </button>
-            <button onClick={onApplyProfile} disabled={loading || !selectedProfile}>
-              <ToggleRight size={16} />
-              应用
-            </button>
-          </div>
-        </aside>
+        </ProfileColumn>
       </div>
     </section>
   );
 }
 
-function formatDate(value: string) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
+function ProfileColumn({
+  children,
+  icon,
+  loading,
+  nameDraft,
+  nameLabel,
+  profiles,
+  selectedProfileId,
+  summary,
+  title,
+  onNameChange,
+  onProfileSelect,
+  onSave,
+  onSaveAndApply,
+  onSaveAs
+}: {
+  children?: React.ReactNode;
+  icon: React.ReactNode;
+  loading: boolean;
+  nameDraft: string;
+  nameLabel: string;
+  profiles: Profile[];
+  selectedProfileId: string;
+  summary: string;
+  title: string;
+  onNameChange: (value: string) => void;
+  onProfileSelect: (profile: Profile) => void;
+  onSave: () => void;
+  onSaveAndApply: () => void;
+  onSaveAs: () => void;
+}) {
+  const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
+
+  return (
+    <aside className="profile-editor">
+      <div className="panel-title">
+        {icon}
+        {title}
+      </div>
+      <div className="profile-current">
+        <strong title={selectedProfile?.name || "未选择"}>{selectedProfile?.name || "未选择"}</strong>
+        <span>{summary}</span>
+      </div>
+      <div className="profile-list table-like">
+        {profiles.map((profile) => (
+          <button
+            className={profile.id === selectedProfileId ? "profile active" : "profile"}
+            key={profile.id}
+            onClick={() => onProfileSelect(profile)}
+          >
+            <span>{profile.name}</span>
+            <small>{profileSummary(profile)}</small>
+          </button>
+        ))}
+      </div>
+      {children}
+      <label className="field">
+        <span>{nameLabel}</span>
+        <input value={nameDraft} onChange={(event) => onNameChange(event.target.value)} />
+      </label>
+      <div className="button-row">
+        <button onClick={onSave} disabled={loading || !selectedProfile}>
+          <Save size={16} />
+          保存
+        </button>
+        <button onClick={onSaveAndApply} disabled={loading || !selectedProfile}>
+          <Check size={16} />
+          保存并应用
+        </button>
+      </div>
+      <button className="wide-button" onClick={onSaveAs} disabled={loading}>
+        <Sparkles size={16} />
+        新建 Profile
+      </button>
+    </aside>
+  );
 }

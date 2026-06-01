@@ -649,7 +649,8 @@ mod tests {
             maps: vec![record("map-id", "Map.zip", "map")],
             other_mods: vec![record("mod-id", "Helper.zip", "mod")],
             profiles: ProfilesState {
-                active_profile_id: "default".to_string(),
+                active_map_profile_id: "default-maps".to_string(),
+                active_mod_profile_id: "default-mods".to_string(),
                 profiles: vec![],
             },
             warnings: vec![],
@@ -675,29 +676,32 @@ mod tests {
         let first = full_scan_cached(
             &root,
             ProfilesState {
-                active_profile_id: "one".to_string(),
+                active_map_profile_id: "one".to_string(),
+                active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
         );
-        assert_eq!(first.profiles.active_profile_id, "one");
+        assert_eq!(first.profiles.active_map_profile_id, "one");
         assert_eq!(first.maps.len(), 1);
         assert!(first.maps[0].enabled);
 
         let cached = full_scan_cached(
             &root,
             ProfilesState {
-                active_profile_id: "two".to_string(),
+                active_map_profile_id: "two".to_string(),
+                active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
         );
-        assert_eq!(cached.profiles.active_profile_id, "two");
+        assert_eq!(cached.profiles.active_map_profile_id, "two");
         assert!(cached.maps[0].enabled);
 
         fs::write(root.join("Mods").join("blacklist.txt"), "TestMap\n").expect("blacklist");
         let invalidated = full_scan_cached(
             &root,
             ProfilesState {
-                active_profile_id: "three".to_string(),
+                active_map_profile_id: "three".to_string(),
+                active_mod_profile_id: "mods".to_string(),
                 profiles: vec![],
             },
         );
@@ -705,7 +709,7 @@ mod tests {
         let _ = fs::remove_file(cache_file);
         let _ = fs::remove_dir_all(root);
 
-        assert_eq!(invalidated.profiles.active_profile_id, "three");
+        assert_eq!(invalidated.profiles.active_map_profile_id, "three");
         assert!(!invalidated.maps[0].enabled);
     }
 
@@ -764,7 +768,8 @@ mod tests {
 
     fn empty_profiles() -> ProfilesState {
         ProfilesState {
-            active_profile_id: "default".to_string(),
+            active_map_profile_id: "default-maps".to_string(),
+            active_mod_profile_id: "default-mods".to_string(),
             profiles: vec![],
         }
     }

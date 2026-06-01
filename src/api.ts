@@ -17,13 +17,14 @@ export async function saveProfile(profile: Partial<Profile> & { name: string }):
   return invoke("save_profile", { profile });
 }
 
-export async function applyProfile(celestePath: string, profileId: string): Promise<ScanResult> {
-  return invoke("apply_profile", { celestePath, profileId });
+export async function applyProfile(celestePath: string, mapProfileId: string, modProfileId: string): Promise<ScanResult> {
+  return invoke("apply_profile", { celestePath, mapProfileId, modProfileId });
 }
 
 export async function launchProfile(
   celestePath: string,
-  profileId: string
-): Promise<{ launched: boolean; executable: string; profileId: string }> {
-  return invoke("launch_profile", { celestePath, profileId });
+  mapProfileId: string,
+  modProfileId: string
+): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+  return invoke("launch_profile", { celestePath, mapProfileId, modProfileId });
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, launchProfile, saveProfile } from "../api";
-import type { Profile, ScanResult } from "../types";
+import type { ModRecord, Profile, ScanResult } from "../types";
 import { readError } from "../utils/format";
 
 type ProfileDraftOptions = {
@@ -13,155 +13,201 @@ type ProfileDraftOptions = {
 
 export function useProfileDraft({ celestePath, scan, setLoading, setMessage, setScan }: ProfileDraftOptions) {
   const [enabledMapDraft, setEnabledMapDraft] = useState<Set<string>>(new Set());
-  const [enabledModDraft, setEnabledModDraft] = useState<Set<string>>(new Set());
-  const [selectedProfileId, setSelectedProfileId] = useState("default");
-  const [profileName, setProfileName] = useState("新地图组");
+  const [enabledMapModDraft, setEnabledMapModDraft] = useState<Set<string>>(new Set());
+  const [enabledExplicitModDraft, setEnabledExplicitModDraft] = useState<Set<string>>(new Set());
+  const [selectedMapProfileId, setSelectedMapProfileId] = useState("default-maps");
+  const [selectedModProfileId, setSelectedModProfileId] = useState("default-mods");
+  const [mapProfileName, setMapProfileName] = useState("新地图 Profile");
+  const [modProfileName, setModProfileName] = useState("新 Mod Profile");
   const [launchArgs, setLaunchArgs] = useState("");
-  const [draftDirty, setDraftDirty] = useState(false);
+  const [mapDirty, setMapDirty] = useState(false);
+  const [modDirty, setModDirty] = useState(false);
   const initializedRef = useRef(false);
-  const lastHydratedProfileIdRef = useRef("");
 
-  const selectedProfile = useMemo(
-    () => scan.profiles.profiles.find((profile) => profile.id === selectedProfileId),
-    [scan.profiles.profiles, selectedProfileId]
+  const mapProfiles = useMemo(() => scan.profiles.profiles.filter((profile) => profile.profileType === "maps"), [scan.profiles.profiles]);
+  const modProfiles = useMemo(() => scan.profiles.profiles.filter((profile) => profile.profileType === "mods"), [scan.profiles.profiles]);
+  const selectedMapProfile = useMemo(
+    () => mapProfiles.find((profile) => profile.id === selectedMapProfileId),
+    [mapProfiles, selectedMapProfileId]
+  );
+  const selectedModProfile = useMemo(
+    () => modProfiles.find((profile) => profile.id === selectedModProfileId),
+    [modProfiles, selectedModProfileId]
+  );
+  const inferredDependencyModDraft = useMemo(
+    () => inferDependencyMods(scan, enabledMapDraft, new Set([...enabledMapModDraft, ...enabledExplicitModDraft])),
+    [enabledExplicitModDraft, enabledMapDraft, enabledMapModDraft, scan]
+  );
+  const enabledModDraft = useMemo(
+    () => new Set([...enabledMapModDraft, ...enabledExplicitModDraft, ...inferredDependencyModDraft]),
+    [enabledExplicitModDraft, enabledMapModDraft, inferredDependencyModDraft]
   );
 
   useEffect(() => {
-    const activeId = scan.profiles.activeProfileId;
-    const active = scan.profiles.profiles.find((profile) => profile.id === activeId);
-    if (!initializedRef.current || !draftDirty) {
-      hydrateDraftFromProfile(active, activeId);
+    const activeMap = mapProfiles.find((profile) => profile.id === scan.profiles.activeMapProfileId) ?? mapProfiles[0];
+    const activeMod = modProfiles.find((profile) => profile.id === scan.profiles.activeModProfileId) ?? modProfiles[0];
+    if (!initializedRef.current || !mapDirty) {
+      hydrateMapDraft(activeMap);
     }
-  }, [draftDirty, scan.maps, scan.otherMods, scan.profiles]);
-
-  function hydrateDraftFromProfile(profile: Profile | undefined, profileId = profile?.id ?? "default") {
-    setSelectedProfileId(profileId);
-    setLaunchArgs(profile?.launchArgs ?? "");
-    applyDraftFromProfile(profile);
+    if (!initializedRef.current || !modDirty) {
+      hydrateModDraft(activeMod);
+    }
     initializedRef.current = true;
-    lastHydratedProfileIdRef.current = profileId;
-    setDraftDirty(false);
+  }, [mapDirty, mapProfiles, modDirty, modProfiles, scan.maps, scan.otherMods, scan.profiles.activeMapProfileId, scan.profiles.activeModProfileId]);
+
+  function hydrateMapDraft(profile: Profile | undefined) {
+    setSelectedMapProfileId(profile?.id ?? "default-maps");
+    setLaunchArgs(profile?.launchArgs ?? "");
+    setEnabledMapDraft(new Set(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)));
+    const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
+    setEnabledMapModDraft(new Set(profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id)));
+    setMapDirty(false);
   }
 
-  function applyDraftFromProfile(profile: Profile | undefined) {
-    if (profile?.enabledMapIds) {
-      setEnabledMapDraft(new Set(profile.enabledMapIds));
-    } else {
-      setEnabledMapDraft(new Set(scan.maps.filter((map) => map.enabled).map((map) => map.id)));
-    }
-    if (profile?.enabledModIds) {
-      setEnabledModDraft(new Set(profile.enabledModIds));
-    } else {
-      setEnabledModDraft(new Set(scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id)));
-    }
+  function hydrateModDraft(profile: Profile | undefined) {
+    setSelectedModProfileId(profile?.id ?? "default-mods");
+    setEnabledExplicitModDraft(new Set(profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id)));
+    setModDirty(false);
   }
 
-  function setProfileDraft(profile: Profile | undefined) {
+  function setMapProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
-    hydrateDraftFromProfile(profile, profile.id);
-    setDraftDirty(true);
+    hydrateMapDraft(profile);
+  }
+
+  function setModProfileDraft(profile: Profile | undefined) {
+    if (!profile) return;
+    hydrateModDraft(profile);
   }
 
   const updateEnabledMapDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
-    setDraftDirty(true);
+    setMapDirty(true);
     setEnabledMapDraft(action);
   };
 
-  const updateEnabledModDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
-    setDraftDirty(true);
-    setEnabledModDraft(action);
+  const updateEnabledMapModDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
+    setMapDirty(true);
+    setEnabledMapModDraft(action);
+  };
+
+  const updateEnabledExplicitModDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
+    setModDirty(true);
+    setEnabledExplicitModDraft(action);
   };
 
   function updateLaunchArgs(value: string) {
-    setDraftDirty(true);
+    setMapDirty(true);
     setLaunchArgs(value);
   }
 
-  async function persistCurrentProfile() {
-    const current = selectedProfile;
+  async function persistMapProfile() {
+    const current = selectedMapProfile;
     const profiles = await saveProfile({
       id: current?.id,
-      name: current?.name || profileName,
+      name: current?.name || mapProfileName,
+      profileType: "maps",
       enabledMapIds: [...enabledMapDraft],
-      enabledModIds: [...enabledModDraft],
+      enabledModIds: [...enabledMapModDraft],
       launchArgs,
       createdAt: current?.createdAt
     });
-    const nextId = current?.id || profiles.activeProfileId;
-    setDraftDirty(false);
-    setSelectedProfileId(nextId);
-    lastHydratedProfileIdRef.current = nextId;
+    const nextId = current?.id || profiles.activeMapProfileId;
+    setMapDirty(false);
+    setSelectedMapProfileId(nextId);
     setScan((value) => ({ ...value, profiles }));
     return nextId;
   }
 
-  async function saveCurrentProfile(applyAfterSave: boolean) {
-    setLoading(true);
-    setMessage("");
-    try {
-      const nextId = await persistCurrentProfile();
-      if (applyAfterSave) {
-        const result = await applyProfile(celestePath, nextId);
-        setDraftDirty(false);
-        setScan(result);
-        setMessage("Profile 已保存并应用到 blacklist.txt。");
-      } else {
-        setMessage("Profile 已保存。");
-      }
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
+  async function persistModProfile() {
+    const current = selectedModProfile;
+    const profiles = await saveProfile({
+      id: current?.id,
+      name: current?.name || modProfileName,
+      profileType: "mods",
+      enabledModIds: [...enabledExplicitModDraft],
+      createdAt: current?.createdAt
+    });
+    const nextId = current?.id || profiles.activeModProfileId;
+    setModDirty(false);
+    setSelectedModProfileId(nextId);
+    setScan((value) => ({ ...value, profiles }));
+    return nextId;
   }
 
-  async function saveAsProfile() {
-    setLoading(true);
-    setMessage("");
-    try {
+  async function saveMapProfile(applyAfterSave: boolean) {
+    await runProfileTask(async () => {
+      const mapId = await persistMapProfile();
+      if (applyAfterSave) await applyProfiles(mapId, selectedModProfileId, "地图 Profile 已保存并应用。");
+      else setMessage("地图 Profile 已保存。");
+    });
+  }
+
+  async function saveModProfile(applyAfterSave: boolean) {
+    await runProfileTask(async () => {
+      const modId = await persistModProfile();
+      if (applyAfterSave) await applyProfiles(selectedMapProfileId, modId, "Mod Profile 已保存并应用。");
+      else setMessage("Mod Profile 已保存。");
+    });
+  }
+
+  async function saveAsMapProfile() {
+    await runProfileTask(async () => {
       const profiles = await saveProfile({
-        name: profileName,
+        name: mapProfileName,
+        profileType: "maps",
         enabledMapIds: [...enabledMapDraft],
-        enabledModIds: [...enabledModDraft],
+        enabledModIds: [...enabledMapModDraft],
         launchArgs
       });
-      setDraftDirty(false);
+      setMapDirty(false);
       setScan((value) => ({ ...value, profiles }));
-      setSelectedProfileId(profiles.activeProfileId);
-      lastHydratedProfileIdRef.current = profiles.activeProfileId;
+      setSelectedMapProfileId(profiles.activeMapProfileId);
       setMessage("新的地图 Profile 已保存。");
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
-  async function applySelectedProfile() {
-    setLoading(true);
-    setMessage("");
-    try {
-      const result = await applyProfile(celestePath, selectedProfileId);
-      setDraftDirty(false);
-      setScan(result);
-      setMessage("已应用 Profile。");
-    } catch (error) {
-      setMessage(readError(error));
-    } finally {
-      setLoading(false);
-    }
+  async function saveAsModProfile() {
+    await runProfileTask(async () => {
+      const profiles = await saveProfile({
+        name: modProfileName,
+        profileType: "mods",
+        enabledModIds: [...enabledExplicitModDraft]
+      });
+      setModDirty(false);
+      setScan((value) => ({ ...value, profiles }));
+      setSelectedModProfileId(profiles.activeModProfileId);
+      setMessage("新的 Mod Profile 已保存。");
+    });
   }
 
-  async function launchSelectedProfile() {
-    setLoading(true);
-    setMessage("");
-    try {
-      const nextId = await persistCurrentProfile();
-      const applied = await applyProfile(celestePath, nextId);
-      setDraftDirty(false);
+  async function applySelectedProfiles() {
+    await runProfileTask(async () => applyProfiles(selectedMapProfileId, selectedModProfileId, "已应用地图和 Mod Profile。"));
+  }
+
+  async function launchSelectedProfiles() {
+    await runProfileTask(async () => {
+      const mapId = mapDirty ? await persistMapProfile() : selectedMapProfileId;
+      const modId = modDirty ? await persistModProfile() : selectedModProfileId;
+      const applied = await applyProfile(celestePath, mapId, modId);
       setScan(applied);
-      const result = await launchProfile(celestePath, nextId);
+      const result = await launchProfile(celestePath, mapId, modId);
       setMessage(`已启动：${result.executable}`);
+    });
+  }
+
+  async function applyProfiles(mapProfileId: string, modProfileId: string, successMessage: string) {
+    const result = await applyProfile(celestePath, mapProfileId, modProfileId);
+    setMapDirty(false);
+    setModDirty(false);
+    setScan(result);
+    setMessage(successMessage);
+  }
+
+  async function runProfileTask(task: () => Promise<void>) {
+    setLoading(true);
+    setMessage("");
+    try {
+      await task();
     } catch (error) {
       setMessage(readError(error));
     } finally {
@@ -170,41 +216,97 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   }
 
   function toggleMap(id: string) {
-    setDraftDirty(true);
-    setEnabledMapDraft((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setMapDirty(true);
+    setEnabledMapDraft((current) => toggleSetValue(current, id));
+  }
+
+  function toggleMapMod(id: string) {
+    setMapDirty(true);
+    setEnabledMapModDraft((current) => toggleSetValue(current, id));
   }
 
   function toggleMod(id: string) {
-    setDraftDirty(true);
-    setEnabledModDraft((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setModDirty(true);
+    setEnabledExplicitModDraft((current) => toggleSetValue(current, id));
   }
 
   return {
-    applySelectedProfile,
+    applySelectedProfiles,
+    dependencyModDraft: inferredDependencyModDraft,
+    enabledExplicitModDraft,
     enabledMapDraft,
+    enabledMapModDraft,
     enabledModDraft,
     launchArgs,
-    launchSelectedProfile,
-    profileName,
-    saveAsProfile,
-    saveCurrentProfile,
-    selectedProfileId,
+    launchSelectedProfiles,
+    mapProfileName,
+    mapProfiles,
+    modProfileName,
+    modProfiles,
+    saveAsMapProfile,
+    saveAsModProfile,
+    saveMapProfile,
+    saveModProfile,
+    selectedMapProfileId,
+    selectedModProfileId,
+    setEnabledExplicitModDraft: updateEnabledExplicitModDraft,
     setEnabledMapDraft: updateEnabledMapDraft,
-    setEnabledModDraft: updateEnabledModDraft,
+    setEnabledMapModDraft: updateEnabledMapModDraft,
     setLaunchArgs: updateLaunchArgs,
-    setProfileDraft,
-    setProfileName,
+    setMapProfileDraft,
+    setMapProfileName,
+    setModProfileDraft,
+    setModProfileName,
     toggleMap,
+    toggleMapMod,
     toggleMod
   };
+}
+
+function toggleSetValue(current: Set<string>, id: string) {
+  const next = new Set(current);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {
+  const aliasToModId = new Map<string, string>();
+  for (const modItem of scan.otherMods) {
+    for (const alias of [modItem.id, modItem.name, modItem.metadata.name, modItem.fileName, modItem.fileName.replace(/\.zip$/i, ""), modItem.relativePath]) {
+      const normalized = normalizeDependencyName(alias);
+      if (normalized) aliasToModId.set(normalized, modItem.id);
+    }
+  }
+  const modById = new Map(scan.otherMods.map((modItem) => [modItem.id, modItem]));
+  const inferred = new Set<string>();
+  const queue: string[] = [];
+  const addDependency = (name: string) => {
+    const id = aliasToModId.get(normalizeDependencyName(name));
+    if (id && !baseModIds.has(id) && !inferred.has(id)) {
+      inferred.add(id);
+      queue.push(id);
+    }
+  };
+
+  for (const map of scan.maps) {
+    if (enabledMapIds.has(map.id)) map.dependencies.forEach((dependency) => addDependency(dependency.name));
+  }
+  for (const id of baseModIds) queue.push(id);
+  while (queue.length) {
+    const modItem = modById.get(queue.shift() ?? "");
+    modItem?.dependencies.forEach((dependency) => addDependency(dependency.name));
+  }
+  return inferred;
+}
+
+function normalizeDependencyName(value: string) {
+  return value
+    .replace(/\\/g, "/")
+    .replace(/\.zip$/i, "")
+    .replace(/[_-]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .join(" ")
+    .toLowerCase();
 }

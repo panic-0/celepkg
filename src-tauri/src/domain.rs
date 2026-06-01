@@ -67,6 +67,7 @@ pub struct ModRecord {
 pub struct Profile {
     pub id: String,
     pub name: String,
+    pub profile_type: String,
     pub enabled_map_ids: Option<Vec<String>>,
     pub enabled_mod_ids: Option<Vec<String>>,
     pub launch_args: String,
@@ -77,7 +78,8 @@ pub struct Profile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfilesState {
-    pub active_profile_id: String,
+    pub active_map_profile_id: String,
+    pub active_mod_profile_id: String,
     pub profiles: Vec<Profile>,
 }
 
@@ -113,6 +115,7 @@ pub struct ScanResult {
 pub struct ProfileInput {
     pub id: Option<String>,
     pub name: String,
+    pub profile_type: String,
     pub enabled_map_ids: Option<Vec<String>>,
     pub enabled_mod_ids: Option<Vec<String>>,
     pub launch_args: Option<String>,
@@ -124,5 +127,6 @@ pub struct ProfileInput {
 pub struct LaunchResult {
     pub launched: bool,
     pub executable: String,
-    pub profile_id: String,
+    pub map_profile_id: String,
+    pub mod_profile_id: String,
 }

@@ -58,7 +58,7 @@ export function App() {
   const enabledModCount = scan.otherMods.filter((modItem) => profileDraft.enabledModDraft.has(modItem.id)).length;
 
   function toggleMapLikeRecord(record: ModRecord) {
-    if (record.kind === "mod") profileDraft.toggleMod(record.id);
+    if (record.kind === "mod") profileDraft.toggleMapMod(record.id);
     else profileDraft.toggleMap(record.id);
   }
 
@@ -66,14 +66,14 @@ export function App() {
     const mapIds = filters.filteredMaps.filter((record) => record.kind === "map").map((record) => record.id);
     const modIds = filters.filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id);
     profileDraft.setEnabledMapDraft((current) => new Set([...current, ...mapIds]));
-    profileDraft.setEnabledModDraft((current) => new Set([...current, ...modIds]));
+    profileDraft.setEnabledMapModDraft((current) => new Set([...current, ...modIds]));
   }
 
   function disableVisibleMaps() {
     const mapIds = new Set(filters.filteredMaps.filter((record) => record.kind === "map").map((record) => record.id));
     const modIds = new Set(filters.filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id));
     profileDraft.setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
-    profileDraft.setEnabledModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+    profileDraft.setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
   }
 
   function enableAllInCurrentView() {
@@ -81,7 +81,7 @@ export function App() {
       enableVisibleMaps();
     } else if (activeView === "mods") {
       const modIds = filters.filteredMods.map((modItem) => modItem.id);
-      profileDraft.setEnabledModDraft((current) => new Set([...current, ...modIds]));
+      profileDraft.setEnabledExplicitModDraft((current) => new Set([...current, ...modIds]));
     }
   }
 
@@ -90,7 +90,7 @@ export function App() {
       disableVisibleMaps();
     } else if (activeView === "mods") {
       const modIds = new Set(filters.filteredMods.map((modItem) => modItem.id));
-      profileDraft.setEnabledModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+      profileDraft.setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
     }
   }
 
@@ -115,7 +115,7 @@ export function App() {
         celestePath={celestePath}
         loading={loading}
         canLaunch={Boolean(scan.gameExecutable)}
-        onLaunch={profileDraft.launchSelectedProfile}
+        onLaunch={profileDraft.launchSelectedProfiles}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
       />
@@ -143,20 +143,28 @@ export function App() {
           <ProfileManager
             enabledMapCount={enabledCount}
             enabledModCount={enabledModCount}
+            dependencyModCount={profileDraft.dependencyModDraft.size}
             launchArgs={profileDraft.launchArgs}
             loading={loading}
-            profileName={profileDraft.profileName}
-            profiles={scan.profiles.profiles}
-            selectedProfileId={profileDraft.selectedProfileId}
+            mapProfileName={profileDraft.mapProfileName}
+            mapProfiles={profileDraft.mapProfiles}
+            modProfileName={profileDraft.modProfileName}
+            modProfiles={profileDraft.modProfiles}
+            selectedMapProfileId={profileDraft.selectedMapProfileId}
+            selectedModProfileId={profileDraft.selectedModProfileId}
             totalMapCount={scan.maps.length}
             totalModCount={scan.otherMods.length}
-            onApplyProfile={profileDraft.applySelectedProfile}
-            onLaunch={profileDraft.launchSelectedProfile}
+            onApplyProfile={profileDraft.applySelectedProfiles}
+            onLaunch={profileDraft.launchSelectedProfiles}
             onLaunchArgsChange={profileDraft.setLaunchArgs}
-            onProfileNameChange={profileDraft.setProfileName}
-            onProfileSelect={profileDraft.setProfileDraft}
-            onSaveAsProfile={profileDraft.saveAsProfile}
-            onSaveProfile={profileDraft.saveCurrentProfile}
+            onMapProfileNameChange={profileDraft.setMapProfileName}
+            onMapProfileSelect={profileDraft.setMapProfileDraft}
+            onModProfileNameChange={profileDraft.setModProfileName}
+            onModProfileSelect={profileDraft.setModProfileDraft}
+            onSaveAsMapProfile={profileDraft.saveAsMapProfile}
+            onSaveAsModProfile={profileDraft.saveAsModProfile}
+            onSaveMapProfile={profileDraft.saveMapProfile}
+            onSaveModProfile={profileDraft.saveModProfile}
           />
         ) : mainMode === "detail" && activeView === "maps" ? (
           <MapDetail

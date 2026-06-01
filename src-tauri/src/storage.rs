@@ -8,20 +8,23 @@ use std::path::{Path, PathBuf};
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
     pub celeste_path: String,
-    pub active_profile_id: String,
+    pub active_map_profile_id: String,
+    pub active_mod_profile_id: String,
     pub profiles: Vec<Profile>,
 }
 
 impl AppState {
     pub fn profiles_state(&self) -> ProfilesState {
         ProfilesState {
-            active_profile_id: self.active_profile_id.clone(),
+            active_map_profile_id: self.active_map_profile_id.clone(),
+            active_mod_profile_id: self.active_mod_profile_id.clone(),
             profiles: self.profiles.clone(),
         }
     }
 
     pub fn set_profiles_state(&mut self, profiles: ProfilesState) {
-        self.active_profile_id = profiles.active_profile_id;
+        self.active_map_profile_id = profiles.active_map_profile_id;
+        self.active_mod_profile_id = profiles.active_mod_profile_id;
         self.profiles = profiles.profiles;
     }
 }
@@ -51,16 +54,30 @@ fn default_state() -> AppState {
     let now = now_string();
     AppState {
         celeste_path: find_default_celeste_path(),
-        active_profile_id: "default".to_string(),
-        profiles: vec![Profile {
-            id: "default".to_string(),
-            name: "当前启用状态".to_string(),
-            enabled_map_ids: None,
-            enabled_mod_ids: None,
-            launch_args: String::new(),
-            created_at: now.clone(),
-            updated_at: now,
-        }],
+        active_map_profile_id: "default-maps".to_string(),
+        active_mod_profile_id: "default-mods".to_string(),
+        profiles: vec![
+            Profile {
+                id: "default-maps".to_string(),
+                name: "当前地图启用状态".to_string(),
+                profile_type: "maps".to_string(),
+                enabled_map_ids: None,
+                enabled_mod_ids: None,
+                launch_args: String::new(),
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            },
+            Profile {
+                id: "default-mods".to_string(),
+                name: "当前 Mod 启用状态".to_string(),
+                profile_type: "mods".to_string(),
+                enabled_map_ids: None,
+                enabled_mod_ids: None,
+                launch_args: String::new(),
+                created_at: now.clone(),
+                updated_at: now,
+            },
+        ],
     }
 }
 
@@ -120,29 +137,46 @@ mod tests {
     fn default_state_contains_a_default_profile() {
         let state = default_state();
 
-        assert_eq!(state.active_profile_id, "default");
-        assert_eq!(state.profiles.len(), 1);
-        assert_eq!(state.profiles[0].id, "default");
+        assert_eq!(state.active_map_profile_id, "default-maps");
+        assert_eq!(state.active_mod_profile_id, "default-mods");
+        assert_eq!(state.profiles.len(), 2);
+        assert_eq!(state.profiles[0].profile_type, "maps");
+        assert_eq!(state.profiles[1].profile_type, "mods");
     }
 
     #[test]
     fn profiles_state_round_trips_through_app_state() {
         let mut state = default_state();
         state.set_profiles_state(ProfilesState {
-            active_profile_id: "next".to_string(),
-            profiles: vec![Profile {
-                id: "next".to_string(),
-                name: "Next".to_string(),
-                enabled_map_ids: Some(vec!["map".to_string()]),
-                enabled_mod_ids: Some(vec!["mod".to_string()]),
-                launch_args: "-debug".to_string(),
-                created_at: "1".to_string(),
-                updated_at: "2".to_string(),
-            }],
+            active_map_profile_id: "next-map".to_string(),
+            active_mod_profile_id: "next-mod".to_string(),
+            profiles: vec![
+                Profile {
+                    id: "next-map".to_string(),
+                    name: "Next Map".to_string(),
+                    profile_type: "maps".to_string(),
+                    enabled_map_ids: Some(vec!["map".to_string()]),
+                    enabled_mod_ids: Some(vec!["helper".to_string()]),
+                    launch_args: "-debug".to_string(),
+                    created_at: "1".to_string(),
+                    updated_at: "2".to_string(),
+                },
+                Profile {
+                    id: "next-mod".to_string(),
+                    name: "Next Mod".to_string(),
+                    profile_type: "mods".to_string(),
+                    enabled_map_ids: None,
+                    enabled_mod_ids: Some(vec!["mod".to_string()]),
+                    launch_args: String::new(),
+                    created_at: "1".to_string(),
+                    updated_at: "2".to_string(),
+                },
+            ],
         });
 
         let profiles = state.profiles_state();
-        assert_eq!(profiles.active_profile_id, "next");
+        assert_eq!(profiles.active_map_profile_id, "next-map");
+        assert_eq!(profiles.active_mod_profile_id, "next-mod");
         assert_eq!(profiles.profiles[0].launch_args, "-debug");
     }
 
@@ -155,7 +189,8 @@ mod tests {
         let loaded: AppState = read_json(&file).expect("read state");
         let _ = fs::remove_file(&file);
 
-        assert_eq!(loaded.active_profile_id, state.active_profile_id);
+        assert_eq!(loaded.active_map_profile_id, state.active_map_profile_id);
+        assert_eq!(loaded.active_mod_profile_id, state.active_mod_profile_id);
         assert_eq!(loaded.profiles.len(), state.profiles.len());
     }
 }

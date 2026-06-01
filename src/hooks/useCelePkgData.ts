@@ -11,7 +11,7 @@ const emptyScan: ScanResult = {
   gameExecutable: "",
   maps: [],
   otherMods: [],
-  profiles: { activeProfileId: "default", profiles: [] },
+  profiles: { activeMapProfileId: "default-maps", activeModProfileId: "default-mods", profiles: [] },
   warnings: []
 };
 

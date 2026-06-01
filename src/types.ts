@@ -53,6 +53,7 @@ export type ModRecord = {
 export type Profile = {
   id: string;
   name: string;
+  profileType: "maps" | "mods";
   enabledMapIds: string[] | null;
   enabledModIds: string[] | null;
   launchArgs: string;
@@ -61,7 +62,8 @@ export type Profile = {
 };
 
 export type ProfilesState = {
-  activeProfileId: string;
+  activeMapProfileId: string;
+  activeModProfileId: string;
   profiles: Profile[];
 };
 
