@@ -1,7 +1,8 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, PanelRightOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import { MapDetail } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
+import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
 import { Sidebar } from "./components/Sidebar";
 import { StatusStrip } from "./components/StatusStrip";
@@ -9,6 +10,7 @@ import { TopBar } from "./components/TopBar";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
+import { useUiLayout } from "./hooks/useUiLayout";
 import type { ModRecord } from "./types";
 import { isDraftEnabled } from "./utils/format";
 import type { ActiveView } from "./viewTypes";
@@ -28,6 +30,7 @@ export function App() {
   const [activeView, setActiveView] = useState<ActiveView>("maps");
   const [selectedMapId, setSelectedMapId] = useState("");
   const [selectedModId, setSelectedModId] = useState("");
+  const uiLayout = useUiLayout();
 
   const profileDraft = useProfileDraft({
     celestePath,
@@ -75,7 +78,7 @@ export function App() {
   function enableAllInCurrentView() {
     if (activeView === "maps") {
       enableVisibleMaps();
-    } else {
+    } else if (activeView === "mods") {
       const modIds = filters.filteredMods.map((modItem) => modItem.id);
       profileDraft.setEnabledModDraft((current) => new Set([...current, ...modIds]));
     }
@@ -84,14 +87,14 @@ export function App() {
   function disableAllInCurrentView() {
     if (activeView === "maps") {
       disableVisibleMaps();
-    } else {
+    } else if (activeView === "mods") {
       const modIds = new Set(filters.filteredMods.map((modItem) => modItem.id));
       profileDraft.setEnabledModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
     }
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell density-${uiLayout.tableDensity}`}>
       <TopBar
         celestePath={celestePath}
         loading={loading}
@@ -103,59 +106,85 @@ export function App() {
 
       <StatusStrip enabledCount={enabledCount} enabledModCount={enabledModCount} scan={scan} />
 
-      <section className="workspace">
+      <section className={`${uiLayout.detailCollapsed ? "workspace detail-collapsed" : "workspace"} ${activeView === "profiles" ? "profile-view" : ""}`}>
         <Sidebar
           activeView={activeView}
           enabledFilter={filters.enabledFilter}
           helperMapCount={filters.helperMapMods.length}
-          launchArgs={profileDraft.launchArgs}
-          loading={loading}
-          profileName={profileDraft.profileName}
-          profiles={scan.profiles.profiles}
           progressFilter={filters.progressFilter}
           query={filters.query}
-          selectedProfileId={profileDraft.selectedProfileId}
           showHelperMaps={filters.showHelperMaps}
           sortKey={filters.sortKey}
           onActiveViewChange={setActiveView}
-          onApplyProfile={profileDraft.applySelectedProfile}
           onEnabledFilterChange={filters.setEnabledFilter}
-          onLaunchArgsChange={profileDraft.setLaunchArgs}
-          onProfileNameChange={profileDraft.setProfileName}
-          onProfileSelect={profileDraft.setProfileDraft}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
-          onSaveAsProfile={profileDraft.saveAsProfile}
-          onSaveProfile={profileDraft.saveCurrentProfile}
           onShowHelperMapsChange={filters.setShowHelperMaps}
           onSortKeyChange={filters.setSortKey}
         />
 
-        <RecordList
-          activeView={activeView}
-          filteredMaps={filters.filteredMaps}
-          filteredMods={filters.filteredMods}
-          selectedMap={selectedMap}
-          selectedMod={selectedMod}
-          visibleMapCount={filters.visibleMapRecords.length}
-          modCount={scan.otherMods.length}
-          onDisableAll={disableAllInCurrentView}
-          onEnableAll={enableAllInCurrentView}
-          onMapSelect={setSelectedMapId}
-          onMapToggle={toggleMapLikeRecord}
-          onModSelect={setSelectedModId}
-          onModToggle={profileDraft.toggleMod}
-          isMapEnabled={(record) => isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)}
-          isModEnabled={(id) => profileDraft.enabledModDraft.has(id)}
-        />
-
-        {activeView === "maps" ? (
-          <MapDetail
-            map={selectedMap}
-            draftEnabled={selectedMap ? isDraftEnabled(selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft) : false}
+        {activeView === "profiles" ? (
+          <ProfileManager
+            enabledMapCount={enabledCount}
+            enabledModCount={enabledModCount}
+            launchArgs={profileDraft.launchArgs}
+            loading={loading}
+            profileName={profileDraft.profileName}
+            profiles={scan.profiles.profiles}
+            selectedProfileId={profileDraft.selectedProfileId}
+            totalMapCount={scan.maps.length}
+            totalModCount={scan.otherMods.length}
+            onApplyProfile={profileDraft.applySelectedProfile}
+            onLaunch={profileDraft.launchSelectedProfile}
+            onLaunchArgsChange={profileDraft.setLaunchArgs}
+            onProfileNameChange={profileDraft.setProfileName}
+            onProfileSelect={profileDraft.setProfileDraft}
+            onSaveAsProfile={profileDraft.saveAsProfile}
+            onSaveProfile={profileDraft.saveCurrentProfile}
           />
         ) : (
-          <ModDetail modItem={selectedMod} draftEnabled={selectedMod ? profileDraft.enabledModDraft.has(selectedMod.id) : false} />
+          <RecordList
+            activeView={activeView}
+            filteredMaps={filters.filteredMaps}
+            filteredMods={filters.filteredMods}
+            selectedMap={selectedMap}
+            selectedMod={selectedMod}
+            visibleMapCount={filters.visibleMapRecords.length}
+            modCount={scan.otherMods.length}
+            onDisableAll={disableAllInCurrentView}
+            onEnableAll={enableAllInCurrentView}
+            onMapSelect={setSelectedMapId}
+            onMapToggle={toggleMapLikeRecord}
+            onModSelect={setSelectedModId}
+            onModToggle={profileDraft.toggleMod}
+            isMapEnabled={(record) => isDraftEnabled(record, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)}
+            isModEnabled={(id) => profileDraft.enabledModDraft.has(id)}
+          />
+        )}
+
+        {activeView === "profiles" ? null : uiLayout.detailCollapsed ? (
+          <aside className="detail-rail">
+            <button onClick={() => uiLayout.setDetailCollapsed(false)} title="展开详情">
+              <PanelRightOpen size={18} />
+              详情
+            </button>
+          </aside>
+        ) : activeView === "maps" ? (
+          <MapDetail
+            activeTab={uiLayout.mapDetailTab}
+            map={selectedMap}
+            draftEnabled={selectedMap ? isDraftEnabled(selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft) : false}
+            onCollapse={() => uiLayout.setDetailCollapsed(true)}
+            onTabChange={uiLayout.setMapDetailTab}
+          />
+        ) : (
+          <ModDetail
+            activeTab={uiLayout.modDetailTab}
+            modItem={selectedMod}
+            draftEnabled={selectedMod ? profileDraft.enabledModDraft.has(selectedMod.id) : false}
+            onCollapse={() => uiLayout.setDetailCollapsed(true)}
+            onTabChange={uiLayout.setModDetailTab}
+          />
         )}
       </section>
 
