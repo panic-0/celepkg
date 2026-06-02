@@ -41,6 +41,24 @@ pub fn count_strawberry_counts(bytes: &[u8]) -> Option<StrawberryCounts> {
     count_element_strawberries(&mut reader, &lookup).ok()
 }
 
+pub fn read_map_icon(bytes: &[u8]) -> Option<String> {
+    let mut reader = BinReader::new(bytes);
+    let header = reader.take_string().ok()?;
+    if header != "CELESTE MAP" {
+        return None;
+    }
+    let _package = reader.take_string().ok()?;
+    let lookup_count = reader.take_i16().ok()?;
+    if lookup_count < 0 {
+        return None;
+    }
+    let mut lookup = Vec::with_capacity(lookup_count as usize);
+    for _ in 0..lookup_count {
+        lookup.push(reader.take_string().ok()?);
+    }
+    read_element_map_icon(&mut reader, &lookup).ok().flatten()
+}
+
 #[cfg(test)]
 pub fn is_strawberry_entity(name: &str) -> bool {
     is_strawberry_entity_name(&normalized_entity_name(name))
@@ -67,6 +85,34 @@ fn count_element_strawberries(
         count = count.saturating_add(count_element_strawberries(reader, lookup)?);
     }
     Ok(count)
+}
+
+fn read_element_map_icon(
+    reader: &mut BinReader<'_>,
+    lookup: &[String],
+) -> Result<Option<String>, ()> {
+    let name = reader.take_lookup(lookup)?;
+    let is_meta = name.eq_ignore_ascii_case("meta");
+    let mut icon = None;
+    let attr_count = reader.take_u8()?;
+    for _ in 0..attr_count {
+        let key = reader.take_lookup(lookup)?;
+        if is_meta && key.eq_ignore_ascii_case("Icon") {
+            let value = reader.take_attr_string(lookup)?;
+            if !value.trim().is_empty() {
+                icon = Some(value);
+            }
+        } else {
+            reader.skip_attr(lookup)?;
+        }
+    }
+    let child_count = reader.take_u16()?;
+    for _ in 0..child_count {
+        if let Some(child_icon) = read_element_map_icon(reader, lookup)? {
+            icon.get_or_insert(child_icon);
+        }
+    }
+    Ok(icon)
 }
 
 fn strawberry_counts_for_entity(name: &str, moon: bool) -> StrawberryCounts {
@@ -235,6 +281,26 @@ impl<'a> BinReader<'a> {
             _ => Err(()),
         }
     }
+
+    fn take_attr_string(&mut self, lookup: &[String]) -> Result<String, ()> {
+        match self.take_u8()? {
+            0 => Ok((self.take_u8()? != 0).to_string()),
+            1 => Ok(self.take_u8()?.to_string()),
+            2 => Ok(self.take_u16()?.to_string()),
+            3 | 4 => Ok(self.take_u32()?.to_string()),
+            5 => Ok(self.take_lookup(lookup)?.to_string()),
+            6 => self.take_string(),
+            7 => {
+                let len = self.take_i16()?;
+                if len < 0 {
+                    return Err(());
+                }
+                let bytes = self.take_exact(len as usize)?;
+                Ok(String::from_utf8_lossy(bytes).to_string())
+            }
+            _ => Err(()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -295,6 +361,16 @@ mod tests {
         assert_eq!(counts.total, 202);
     }
 
+    #[test]
+    fn reads_meta_icon_from_map_bin() {
+        let bytes = fake_meta_map_bin("areas/SJ2021/meters/3-hard");
+
+        assert_eq!(
+            read_map_icon(&bytes),
+            Some("areas/SJ2021/meters/3-hard".to_string())
+        );
+    }
+
     fn fake_entity(name: &'static str, attrs: &'static [(&'static str, bool)]) -> FakeEntity {
         FakeEntity { name, attrs }
     }
@@ -338,6 +414,20 @@ mod tests {
         bytes
     }
 
+    fn fake_meta_map_bin(icon: &str) -> Vec<u8> {
+        let lookup = vec!["Map", "meta", "Icon", icon];
+        let mut bytes = Vec::new();
+        push_string(&mut bytes, "CELESTE MAP");
+        push_string(&mut bytes, "pkg");
+        bytes.extend_from_slice(&(lookup.len() as i16).to_le_bytes());
+        for value in &lookup {
+            push_string(&mut bytes, value);
+        }
+        let meta = element_with_string_attrs(1, &[("Icon", icon)], vec![], &lookup);
+        bytes.extend(element_with_string_attrs(0, &[], vec![meta], &lookup));
+        bytes
+    }
+
     fn element(
         name_index: u16,
         attrs: &[(&str, bool)],
@@ -351,6 +441,27 @@ mod tests {
             bytes.extend_from_slice(&lookup_index(lookup, key).to_le_bytes());
             bytes.push(0);
             bytes.push(u8::from(*value));
+        }
+        bytes.extend_from_slice(&(children.len() as u16).to_le_bytes());
+        for child in children {
+            bytes.extend(child);
+        }
+        bytes
+    }
+
+    fn element_with_string_attrs(
+        name_index: u16,
+        attrs: &[(&str, &str)],
+        children: Vec<Vec<u8>>,
+        lookup: &[&str],
+    ) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&name_index.to_le_bytes());
+        bytes.push(attrs.len() as u8);
+        for (key, value) in attrs {
+            bytes.extend_from_slice(&lookup_index(lookup, key).to_le_bytes());
+            bytes.push(6);
+            push_string(&mut bytes, value);
         }
         bytes.extend_from_slice(&(children.len() as u16).to_le_bytes());
         for child in children {

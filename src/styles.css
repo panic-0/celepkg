@@ -403,9 +403,10 @@ h1 {
   gap: 8px;
 }
 
-.filter-toggle {
-  width: 100%;
-  justify-content: flex-start;
+.filter-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   border-color: transparent;
   background: transparent;
   min-height: 32px;
@@ -413,7 +414,7 @@ h1 {
   font-weight: 800;
 }
 
-.filter-toggle small {
+.filter-heading small {
   margin-left: auto;
   border: 1px solid #d3dce4;
   border-radius: 999px;
@@ -500,8 +501,7 @@ h1 {
   font-size: 11px;
 }
 
-.search-box,
-.sub-map-search {
+.search-box {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -512,8 +512,7 @@ h1 {
   padding-left: 9px;
 }
 
-.search-box input,
-.sub-map-search input {
+.search-box input {
   border: 0;
   box-shadow: none;
 }
@@ -1438,18 +1437,9 @@ h1 {
   margin-left: 6px;
 }
 
-.sub-map-search {
-  margin-bottom: 0;
-}
-
 .sub-map-tab-panel {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-}
-
-.sub-map-search input {
-  min-height: 32px;
-  padding: 6px 8px;
 }
 
 .sub-map-breadcrumbs {
@@ -1507,11 +1497,15 @@ h1 {
 }
 
 .sub-map-table {
-  min-width: 700px;
+  min-width: 780px;
 }
 
 .sub-map-table col.w-sub-name {
   width: auto;
+}
+
+.sub-map-table col.w-sub-difficulty {
+  width: 104px;
 }
 
 .sub-map-name-cell {

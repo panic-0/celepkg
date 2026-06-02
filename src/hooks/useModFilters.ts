@@ -182,7 +182,7 @@ function mapSearchText(map: ModRecord) {
     map.metadata.author,
     map.metadata.description,
     ...map.mapIds,
-    ...map.subMaps.map((subMap) => `${subMap.displayName} ${subMap.chapter} ${subMap.filePath}`)
+    ...map.subMaps.map((subMap) => `${subMap.displayName} ${subMap.chapter} ${subMap.filePath} ${subMap.difficulty}`)
   ]
     .join(" ")
     .toLowerCase();

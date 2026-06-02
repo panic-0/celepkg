@@ -73,6 +73,8 @@ pub struct SubMapInfo {
     pub display_name: String,
     pub chapter: String,
     pub file_path: String,
+    #[serde(default)]
+    pub difficulty: String,
     pub strawberry_count: u64,
     pub strawberry_total_count: u64,
     pub completion_status: CompletionStatus,

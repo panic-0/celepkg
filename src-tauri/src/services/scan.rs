@@ -6,7 +6,7 @@ use crate::parsers::dialog::{
     dialog_title_for_key, dialog_title_for_sid, is_dialog_file, read_dialog_titles,
 };
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
-use crate::parsers::map_bin::{count_strawberry_counts, StrawberryCounts};
+use crate::parsers::map_bin::{count_strawberry_counts, read_map_icon, StrawberryCounts};
 use crate::parsers::save_stats::{
     is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
 };
@@ -22,7 +22,7 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 11;
+const SCAN_CACHE_VERSION: u32 = 13;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -415,6 +415,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
                 display_name: official_sub_map_display_name(&file.area_name, file.mode_index),
                 chapter: format!("Celeste/{}", file.area_name),
                 file_path: format!("Content/Maps/{}", file.file_name),
+                difficulty: String::new(),
                 strawberry_count: strawberry_counts.visible,
                 strawberry_total_count: strawberry_counts.total,
                 completion_status: CompletionStatus::Unknown,
@@ -732,6 +733,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
+    let mut map_difficulties = HashMap::new();
     for entry in WalkDir::new(dir_path).into_iter().flatten() {
         if !entry.file_type().is_file() {
             continue;
@@ -741,7 +743,21 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         if let Some(sid) = map_sid_from_entry(&relative) {
             if let Ok(bytes) = fs::read(entry.path()) {
                 if let Some(counts) = count_strawberry_counts(&bytes) {
-                    strawberry_counts.insert(sid, counts);
+                    strawberry_counts.insert(sid.clone(), counts);
+                }
+                if let Some(difficulty) =
+                    read_map_icon(&bytes).and_then(|icon| difficulty_from_map_icon(&icon))
+                {
+                    map_difficulties.insert(sid, difficulty);
+                }
+            }
+        }
+        if let Some(sid) = map_meta_sid_from_entry(&relative) {
+            if let Ok(text) = fs::read_to_string(entry.path()) {
+                if let Some(difficulty) =
+                    read_meta_yaml_icon(&text).and_then(|icon| difficulty_from_map_icon(&icon))
+                {
+                    map_difficulties.insert(sid, difficulty);
                 }
             }
         }
@@ -766,6 +782,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         parse_metadata(&yaml_text),
         read_dialog_titles(dialog_texts),
         strawberry_counts,
+        map_difficulties,
     ))
 }
 
@@ -776,6 +793,7 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
+    let mut map_difficulties = HashMap::new();
     for index in 0..archive.len() {
         let mut file = archive.by_index(index).ok()?;
         let name = normalize_slash(file.name());
@@ -784,7 +802,12 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             let mut bytes = Vec::new();
             let _ = file.read_to_end(&mut bytes);
             if let Some(counts) = count_strawberry_counts(&bytes) {
-                strawberry_counts.insert(sid, counts);
+                strawberry_counts.insert(sid.clone(), counts);
+            }
+            if let Some(difficulty) =
+                read_map_icon(&bytes).and_then(|icon| difficulty_from_map_icon(&icon))
+            {
+                map_difficulties.insert(sid, difficulty);
             }
         }
         if path_basename(&name).eq_ignore_ascii_case("everest.yaml")
@@ -795,6 +818,13 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         } else if is_dialog_file(&name) {
             let _ = file.read_to_string(&mut text);
             dialog_texts.push((name.clone(), text));
+        } else if let Some(sid) = map_meta_sid_from_entry(&name) {
+            let _ = file.read_to_string(&mut text);
+            if let Some(difficulty) =
+                read_meta_yaml_icon(&text).and_then(|icon| difficulty_from_map_icon(&icon))
+            {
+                map_difficulties.insert(sid, difficulty);
+            }
         }
         entries.push(name);
     }
@@ -806,6 +836,7 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         parse_metadata(&yaml_text),
         read_dialog_titles(dialog_texts),
         strawberry_counts,
+        map_difficulties,
     ))
 }
 
@@ -817,6 +848,7 @@ fn create_mod_record(
     metadata: ModMetadata,
     dialog_titles: HashMap<String, String>,
     strawberry_counts: HashMap<String, StrawberryCounts>,
+    map_difficulties: HashMap<String, String>,
 ) -> ModRecord {
     let relative_path = normalize_slash(
         &absolute_path
@@ -842,6 +874,7 @@ fn create_mod_record(
                 .unwrap_or_else(|| sub_map_display_name(sid)),
             chapter: sub_map_chapter(sid),
             file_path: format!("Maps/{sid}.bin"),
+            difficulty: map_difficulties.get(sid).cloned().unwrap_or_default(),
             strawberry_count: strawberry_counts
                 .get(sid)
                 .map(|counts| counts.visible)
@@ -911,6 +944,66 @@ fn map_sid_from_entry(entry: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+fn map_meta_sid_from_entry(entry: &str) -> Option<String> {
+    let lower = entry.to_lowercase();
+    if lower.starts_with("maps/") && lower.ends_with(".meta.yaml") {
+        Some(entry[5..entry.len() - 10].to_string())
+    } else {
+        None
+    }
+}
+
+fn read_meta_yaml_icon(text: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let trimmed = line.trim();
+        let (key, value) = trimmed.split_once(':')?;
+        if !key.trim().eq_ignore_ascii_case("Icon") {
+            return None;
+        }
+        let value = value.trim().trim_matches(['"', '\'']).trim();
+        (!value.is_empty()).then(|| value.to_string())
+    })
+}
+
+fn difficulty_from_map_icon(icon: &str) -> Option<String> {
+    let normalized = icon.trim().replace('\\', "/");
+    let lower = normalized.to_lowercase();
+    let (_, value) = lower.rsplit_once("/meters/")?;
+    let value = value.rsplit('/').next().unwrap_or(value);
+    let label = value
+        .split_once('-')
+        .map(|(_, label)| label)
+        .unwrap_or(value)
+        .trim();
+    let display = match label {
+        "easy" => "Easy",
+        "med" | "medium" => "Medium",
+        "hard" => "Hard",
+        "wtf" => "WTF",
+        "cracked" => "Cracked",
+        "hellish" => "Hellish",
+        "lobby" => return None,
+        other if !other.is_empty() => return Some(title_case_difficulty(other)),
+        _ => return None,
+    };
+    Some(display.to_string())
+}
+
+fn title_case_difficulty(value: &str) -> String {
+    value
+        .split(['-', '_', ' '])
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn is_map_mod_record(
@@ -1148,6 +1241,10 @@ mod tests {
                 },
             ),
         ]);
+        let map_difficulties = HashMap::from([
+            ("pack/one".to_string(), "Medium".to_string()),
+            ("pack/two".to_string(), "Hard".to_string()),
+        ]);
 
         let record = create_mod_record(
             &mod_path,
@@ -1157,14 +1254,47 @@ mod tests {
             metadata("BerryPack"),
             HashMap::new(),
             strawberry_counts,
+            map_difficulties,
         );
 
         assert_eq!(record.strawberry_count, 8);
         assert_eq!(record.strawberry_total_count, 11);
         assert_eq!(record.sub_maps[0].strawberry_count, 3);
         assert_eq!(record.sub_maps[0].strawberry_total_count, 4);
+        assert_eq!(record.sub_maps[0].difficulty, "Medium");
         assert_eq!(record.sub_maps[1].strawberry_count, 5);
         assert_eq!(record.sub_maps[1].strawberry_total_count, 7);
+        assert_eq!(record.sub_maps[1].difficulty, "Hard");
+    }
+
+    #[test]
+    fn reads_collab_difficulty_from_map_icons() {
+        assert_eq!(
+            difficulty_from_map_icon("areas/SJ2021/meters/2-med"),
+            Some("Medium".to_string())
+        );
+        assert_eq!(
+            difficulty_from_map_icon("areas/CNY2024/meters/4-hellish"),
+            Some("Hellish".to_string())
+        );
+        assert_eq!(
+            difficulty_from_map_icon("areas/SJ2021/lobby/1-Beginner"),
+            None
+        );
+    }
+
+    #[test]
+    fn reads_map_icon_from_meta_yaml() {
+        let text = r#"
+Icon: 'areas/CNY2024/meters/5-Lobby'
+CompleteScreen:
+  Atlas: Endscreens/ChineseNewYear2024
+"#;
+
+        assert_eq!(
+            read_meta_yaml_icon(text).and_then(|icon| difficulty_from_map_icon(&icon)),
+            None
+        );
     }
 
     #[test]

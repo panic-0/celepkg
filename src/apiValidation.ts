@@ -186,6 +186,7 @@ function validateSubMapInfo(value: unknown, path: string): SubMapInfo {
     displayName: stringAt(object.displayName, `${path}.displayName`),
     chapter: stringAt(object.chapter, `${path}.chapter`),
     filePath: stringAt(object.filePath, `${path}.filePath`),
+    difficulty: stringAt(object.difficulty, `${path}.difficulty`),
     strawberryCount: numberAt(object.strawberryCount, `${path}.strawberryCount`),
     strawberryTotalCount: numberAt(object.strawberryTotalCount, `${path}.strawberryTotalCount`),
     completionStatus: oneOfAt(object.completionStatus, ["completed", "unfinished", "unknown", "notApplicable"], `${path}.completionStatus`),

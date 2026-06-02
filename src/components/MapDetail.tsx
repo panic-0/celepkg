@@ -1,13 +1,14 @@
-import { ArrowLeft, Clock, CircleDot, Folder, FolderOpen, Heart, Search, Skull } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState, type MutableRefObject } from "react";
+import { ArrowLeft, Clock, CircleDot, Folder, FolderOpen, Heart, Skull } from "lucide-react";
+import { Fragment, useMemo } from "react";
+import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
+import { compareDifficulties, sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
 import {
   ALL_SUB_MAP_FOLDER,
   collectSubMapFolderOptions,
-  getSubMapRootPath,
   normalizeFolderPath,
   subMapIsDirectChildOfFolder,
   subMapMatchesFolder
@@ -15,17 +16,11 @@ import {
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
 
-export type MapDetailMemoryState = {
-  selectedSubMapId: string;
-  subMapPath: string;
-  subMapQuery: string;
-};
-
 type MapDetailProps = {
   activeTab: MapDetailTab;
   draftEnabled: boolean;
   map?: ModRecord;
-  mapDetailMemory: MutableRefObject<Record<string, MapDetailMemoryState>>;
+  mapDetailControls: MapDetailControls;
   scrollMemory: ScrollMemory;
   strawberryDenominator: StrawberryDenominator;
   onBack: () => void;
@@ -36,20 +31,26 @@ export function MapDetail({
   activeTab,
   draftEnabled,
   map,
-  mapDetailMemory,
+  mapDetailControls,
   scrollMemory,
   strawberryDenominator,
   onBack,
   onTabChange
 }: MapDetailProps) {
-  const [selectedSubMapId, setSelectedSubMapId] = useState("");
-  const [subMapPath, setSubMapPath] = useState(ALL_SUB_MAP_FOLDER);
-  const [subMapQuery, setSubMapQuery] = useState("");
   const mapId = map?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:${activeTab}:panel`, scrollMemory);
   const subMapTableRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:submaps:table`, scrollMemory);
-  const subMapRootPath = useMemo(() => (map ? getSubMapRootPath(map.subMaps) : ALL_SUB_MAP_FOLDER), [map]);
-  const effectiveSubMapPath = subMapPath === ALL_SUB_MAP_FOLDER ? subMapRootPath : subMapPath;
+  const {
+    effectiveSubMapPath,
+    groupSubMapsByDifficulty,
+    selectedSubMapId,
+    subMapQuery,
+    subMapRootPath,
+    subMapSortDescending,
+    subMapSortKey,
+    selectSubMap,
+    updateSubMapPath
+  } = mapDetailControls;
   const subMapBreadcrumbs = useMemo(
     () => buildSubMapBreadcrumbs(effectiveSubMapPath, subMapRootPath),
     [effectiveSubMapPath, subMapRootPath]
@@ -61,54 +62,32 @@ export function MapDetail({
   const filteredSubMaps = useMemo(() => {
     if (!map) return [];
     const needle = subMapQuery.trim().toLowerCase();
-    return map.subMaps.filter((subMap) => {
+    const matchingSubMaps = map.subMaps.filter((subMap) => {
       if (!subMapMatchesFolder(subMap, effectiveSubMapPath)) return false;
       if (!needle && subMapFolderOptions.length > 0 && !subMapIsDirectChildOfFolder(subMap, effectiveSubMapPath)) return false;
       if (!needle) return true;
-      return [subMap.displayName, subMap.sid, subMap.chapter, subMap.filePath].join(" ").toLowerCase().includes(needle);
+      return [subMap.displayName, subMap.sid, subMap.chapter, subMap.filePath, subMap.difficulty].join(" ").toLowerCase().includes(needle);
     });
-  }, [effectiveSubMapPath, map, subMapFolderOptions.length, subMapQuery]);
+    return sortSubMaps(matchingSubMaps, {
+      descending: subMapSortDescending,
+      groupByDifficulty: groupSubMapsByDifficulty,
+      sortKey: subMapSortKey,
+      strawberryDenominator
+    });
+  }, [
+    effectiveSubMapPath,
+    groupSubMapsByDifficulty,
+    map,
+    strawberryDenominator,
+    subMapFolderOptions.length,
+    subMapQuery,
+    subMapSortDescending,
+    subMapSortKey
+  ]);
   const selectedSubMap = useMemo(() => {
     if (!map) return undefined;
     return filteredSubMaps.find((subMap) => subMap.id === selectedSubMapId);
   }, [filteredSubMaps, map, selectedSubMapId]);
-
-  useEffect(() => {
-    const saved = mapId === "empty" ? undefined : mapDetailMemory.current[mapId];
-    const savedPath = saved?.subMapPath === subMapRootPath ? ALL_SUB_MAP_FOLDER : saved?.subMapPath;
-    setSelectedSubMapId(saved?.selectedSubMapId ?? "");
-    setSubMapPath(savedPath ?? ALL_SUB_MAP_FOLDER);
-    setSubMapQuery(saved?.subMapQuery ?? "");
-  }, [mapId, mapDetailMemory, subMapRootPath]);
-
-  function updateMapDetailMemory(value: Partial<MapDetailMemoryState>) {
-    if (!map) return;
-    const current = mapDetailMemory.current[map.id] ?? {
-      selectedSubMapId: "",
-      subMapPath: ALL_SUB_MAP_FOLDER,
-      subMapQuery: ""
-    };
-    mapDetailMemory.current[map.id] = {
-      ...current,
-      ...value
-    };
-  }
-
-  function updateSubMapQuery(value: string) {
-    setSubMapQuery(value);
-    updateMapDetailMemory({ subMapQuery: value });
-  }
-
-  function updateSubMapPath(value: string) {
-    setSubMapPath(value);
-    setSelectedSubMapId("");
-    updateMapDetailMemory({ selectedSubMapId: "", subMapPath: value });
-  }
-
-  function selectSubMap(id: string) {
-    setSelectedSubMapId(id);
-    updateMapDetailMemory({ selectedSubMapId: id });
-  }
 
   if (!map) {
     return (
@@ -186,14 +165,6 @@ export function MapDetail({
         <div className="detail-tab-panel sub-map-tab-panel" ref={detailPanelRef}>
           {map.subMaps.length ? (
             <>
-              <label className="sub-map-search">
-                <Search size={15} />
-                <input
-                  value={subMapQuery}
-                  onChange={(event) => updateSubMapQuery(event.target.value)}
-                  placeholder={effectiveSubMapPath === ALL_SUB_MAP_FOLDER ? "筛选小图名称、SID" : `当前：${effectiveSubMapPath}`}
-                />
-              </label>
               <nav className="sub-map-breadcrumbs" aria-label="小图目录">
                 {subMapBreadcrumbs.map((crumb, index) => (
                   <span key={`${crumb.path}-${index}`} className="breadcrumb-part">
@@ -212,6 +183,7 @@ export function MapDetail({
                 <table className="sub-map-table">
                   <colgroup>
                     <col className="w-sub-name" />
+                    <col className="w-sub-difficulty" />
                     <col className="w-sub-progress" />
                     <col className="w-sub-number" />
                     <col className="w-sub-time" />
@@ -221,6 +193,7 @@ export function MapDetail({
                   <thead>
                     <tr>
                       <th>名称</th>
+                      <th>难度</th>
                       <th>完成</th>
                       <th className="num">死亡</th>
                       <th className="num">用时</th>
@@ -240,6 +213,7 @@ export function MapDetail({
                               <small>{folder.count} 张</small>
                             </span>
                           </td>
+                          <td>{summary.difficulties}</td>
                           <td>{summary.completion}</td>
                           <td className="num">{summary.deaths}</td>
                           <td className="num">{summary.time}</td>
@@ -257,6 +231,7 @@ export function MapDetail({
                               <small>{subMapSidName(subMap.sid)}</small>
                             </span>
                           </td>
+                          <td>{subMap.difficulty || "-"}</td>
                           <td>{formatCompletionStatus(subMap.completionStatus)}</td>
                           <td className="num">{subMap.stats?.deaths ?? "-"}</td>
                           <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
@@ -271,10 +246,11 @@ export function MapDetail({
                         </tr>
                         {selectedSubMap?.id === subMap.id && (
                           <tr className="sub-map-inline-detail">
-                            <td colSpan={6}>
+                            <td colSpan={7}>
                               <div className="inline-detail-grid">
                                 <Info label="名称" value={subMap.displayName || "未知"} />
                                 <Info label="章节" value={subMap.chapter || "未知"} />
+                                <Info label="难度" value={subMap.difficulty || "未知"} />
                                 <Info label="完成" value={formatCompletionStatus(subMap.completionStatus)} />
                                 <Info
                                   label="草莓"
@@ -358,6 +334,7 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDe
   const timePlayed = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.timePlayed ?? 0), 0);
   const hearts = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.hearts ?? 0), 0);
   const cassettes = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.cassettes ?? 0), 0);
+  const difficulties = formatDifficulties(members);
   const completable = members.filter((subMap) => subMap.completionStatus !== "notApplicable");
   const known = completable.filter((subMap) => subMap.completionStatus !== "unknown");
   const completed = known.filter((subMap) => subMap.completionStatus === "completed").length;
@@ -365,10 +342,17 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDe
   return {
     completion: completable.length === 0 ? "不适用" : known.length ? `${completed}/${known.length}` : "未知",
     deaths: statsMembers.length ? deaths : "-",
+    difficulties,
     heartCassette: statsMembers.length ? `${hearts}/${cassettes}` : "-",
     strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries, strawberriesKnown),
     time: statsMembers.length ? formatTime(timePlayed) : "-"
   };
+}
+
+function formatDifficulties(subMaps: SubMapInfo[]) {
+  const difficulties = [...new Set(subMaps.map((subMap) => subMap.difficulty).filter(Boolean))];
+  if (!difficulties.length) return "-";
+  return difficulties.sort(compareDifficulties).join(" / ");
 }
 
 function strawberryTotal(record: ModRecord | SubMapInfo, strawberryDenominator: StrawberryDenominator) {

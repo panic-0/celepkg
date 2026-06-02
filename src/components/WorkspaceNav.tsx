@@ -1,7 +1,7 @@
 import {
+  ArrowDownAZ,
+  ArrowUpAZ,
   Archive,
-  ChevronDown,
-  ChevronRight,
   Gamepad2,
   Layers,
   Search,
@@ -11,7 +11,9 @@ import {
   ToggleRight,
   UserRound
 } from "lucide-react";
-import { useState } from "react";
+import type { MapDetailControls } from "../hooks/useMapDetailControls";
+import type { MapDetailTab } from "../hooks/useUiLayout";
+import type { SubMapSortKey } from "../utils/subMapSorting";
 import type { ActiveView, EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { Select } from "./common";
 
@@ -30,6 +32,9 @@ type WorkspaceNavProps = {
   showHelperMaps: boolean;
   showOnlyUnreferencedMods: boolean;
   sortKey: SortKey;
+  mainMode: "list" | "detail";
+  mapDetailControls: MapDetailControls;
+  mapDetailTab: MapDetailTab;
   totalMapCount: number;
   totalModCount: number;
   onActiveViewChange: (view: ActiveView) => void;
@@ -56,6 +61,9 @@ export function WorkspaceNav({
   showHelperMaps,
   showOnlyUnreferencedMods,
   sortKey,
+  mainMode,
+  mapDetailControls,
+  mapDetailTab,
   totalMapCount,
   totalModCount,
   onActiveViewChange,
@@ -66,15 +74,20 @@ export function WorkspaceNav({
   onShowOnlyUnreferencedModsChange,
   onSortKeyChange
 }: WorkspaceNavProps) {
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const showsRecordFilters = activeView === "maps" || activeView === "mods";
+  const showsSubMapFilters = activeView === "maps" && mainMode === "detail" && mapDetailTab === "submaps";
   const filterCount =
-    Number(query.trim().length > 0) +
-    Number(enabledFilter !== "all") +
-    Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
-    Number(activeView === "maps" && sortKey !== "name") +
-    Number(activeView === "maps" && showHelperMaps) +
-    Number(activeView === "mods" && showOnlyUnreferencedMods);
+    showsSubMapFilters
+      ? Number(mapDetailControls.subMapQuery.trim().length > 0) +
+        Number(mapDetailControls.subMapSortKey !== "file") +
+        Number(mapDetailControls.subMapSortDescending) +
+        Number(!mapDetailControls.groupSubMapsByDifficulty)
+      : Number(query.trim().length > 0) +
+        Number(enabledFilter !== "all") +
+        Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
+        Number(activeView === "maps" && sortKey !== "name") +
+        Number(activeView === "maps" && showHelperMaps) +
+        Number(activeView === "mods" && showOnlyUnreferencedMods);
 
   return (
     <aside className="workspace-nav">
@@ -118,14 +131,14 @@ export function WorkspaceNav({
 
       {showsRecordFilters && (
         <section className="nav-section filter-dock">
-          <button className="filter-toggle" onClick={() => setFiltersExpanded((value) => !value)}>
-            {filtersExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+          <div className="filter-heading">
             <SlidersHorizontal size={17} />
-            筛选
+            <span>{showsSubMapFilters ? "小图筛选" : "筛选"}</span>
             {filterCount > 0 && <small>{filterCount}</small>}
-          </button>
-          {!filtersExpanded && <p className="filter-summary">{filterCount > 0 ? "筛选条件已生效，展开可调整。" : "筛选已折叠。"}</p>}
-          {filtersExpanded && (
+          </div>
+          {showsSubMapFilters ? (
+            <SubMapFilters controls={mapDetailControls} />
+          ) : (
             <div className="filter-content">
               <label className="search-box">
                 <Search size={17} />
@@ -191,5 +204,44 @@ export function WorkspaceNav({
         </section>
       )}
     </aside>
+  );
+}
+
+function SubMapFilters({ controls }: { controls: MapDetailControls }) {
+  return (
+    <div className="filter-content">
+      <label className="search-box">
+        <Search size={17} />
+        <input
+          value={controls.subMapQuery}
+          onChange={(event) => controls.updateSubMapQuery(event.target.value)}
+          placeholder="搜索小图名称、SID"
+        />
+      </label>
+      <Select label="排序" value={controls.subMapSortKey} onChange={(value) => controls.updateSubMapSortKey(value as SubMapSortKey)}>
+        <option value="file">文件顺序</option>
+        <option value="name">名称</option>
+        <option value="completion">完成</option>
+        <option value="deaths">死亡</option>
+        <option value="time">用时</option>
+        <option value="strawberries">草莓</option>
+      </Select>
+      <button
+        className={controls.subMapSortDescending ? "inline-toggle active" : "inline-toggle"}
+        onClick={() => controls.updateSubMapSortDescending(!controls.subMapSortDescending)}
+        title="反转当前排序关键字的组内顺序"
+      >
+        {controls.subMapSortDescending ? <ArrowDownAZ size={18} /> : <ArrowUpAZ size={18} />}
+        倒序
+      </button>
+      <button
+        className={controls.groupSubMapsByDifficulty ? "inline-toggle active" : "inline-toggle"}
+        onClick={() => controls.updateGroupSubMapsByDifficulty(!controls.groupSubMapsByDifficulty)}
+        title="先按 Easy、Medium、Hard、高难组分组，再按排序关键字排列"
+      >
+        {controls.groupSubMapsByDifficulty ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+        按难度分组
+      </button>
+    </div>
   );
 }

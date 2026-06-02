@@ -739,6 +739,7 @@ mod tests {
             display_name: sid.to_string(),
             chapter: String::new(),
             file_path: format!("Maps/{sid}.bin"),
+            difficulty: String::new(),
             strawberry_count: 0,
             strawberry_total_count: 0,
             completion_status,

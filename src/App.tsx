@@ -1,7 +1,7 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useRef } from "react";
 import { BackupManager } from "./components/BackupManager";
-import { MapDetail, type MapDetailMemoryState } from "./components/MapDetail";
+import { MapDetail } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
 import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
@@ -10,6 +10,7 @@ import { AppToolbar } from "./components/AppToolbar";
 import { WorkspaceNav } from "./components/WorkspaceNav";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
+import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
 import { useRecordActions } from "./hooks/useRecordActions";
@@ -70,6 +71,7 @@ export function App() {
     visibleMapRecords: filters.visibleMapRecords,
     onBackupsOpen: () => void backups.refreshBackups()
   });
+  const mapDetailControls = useMapDetailControls(workspaceView.selectedMap, mapDetailMemory);
   const recordActions = useRecordActions({
     activeView: workspaceView.activeView,
     celestePath,
@@ -129,6 +131,9 @@ export function App() {
           showHelperMaps={filters.showHelperMaps}
           showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
           sortKey={filters.sortKey}
+          mainMode={workspaceView.mainMode}
+          mapDetailTab={uiLayout.mapDetailTab}
+          mapDetailControls={mapDetailControls}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
           onActiveViewChange={workspaceView.changeActiveView}
@@ -198,7 +203,7 @@ export function App() {
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
             map={workspaceView.selectedMap}
-            mapDetailMemory={mapDetailMemory}
+            mapDetailControls={mapDetailControls}
             strawberryDenominator={uiLayout.strawberryDenominator}
             draftEnabled={
               workspaceView.selectedMap

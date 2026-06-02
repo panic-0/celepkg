@@ -40,6 +40,7 @@ export type SubMapInfo = {
   displayName: string;
   chapter: string;
   filePath: string;
+  difficulty: string;
   strawberryCount: number;
   strawberryTotalCount: number;
   completionStatus: CompletionStatus;
