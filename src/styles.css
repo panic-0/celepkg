@@ -1497,15 +1497,11 @@ h1 {
 }
 
 .sub-map-table {
-  min-width: 780px;
+  min-width: 700px;
 }
 
 .sub-map-table col.w-sub-name {
   width: auto;
-}
-
-.sub-map-table col.w-sub-difficulty {
-  width: 104px;
 }
 
 .sub-map-name-cell {

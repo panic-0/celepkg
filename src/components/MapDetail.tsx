@@ -4,7 +4,7 @@ import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
-import { compareDifficulties, sortSubMaps } from "../utils/subMapSorting";
+import { sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
 import {
   ALL_SUB_MAP_FOLDER,
@@ -183,7 +183,6 @@ export function MapDetail({
                 <table className="sub-map-table">
                   <colgroup>
                     <col className="w-sub-name" />
-                    <col className="w-sub-difficulty" />
                     <col className="w-sub-progress" />
                     <col className="w-sub-number" />
                     <col className="w-sub-time" />
@@ -193,7 +192,6 @@ export function MapDetail({
                   <thead>
                     <tr>
                       <th>名称</th>
-                      <th>难度</th>
                       <th>完成</th>
                       <th className="num">死亡</th>
                       <th className="num">用时</th>
@@ -213,7 +211,6 @@ export function MapDetail({
                               <small>{folder.count} 张</small>
                             </span>
                           </td>
-                          <td>{summary.difficulties}</td>
                           <td>{summary.completion}</td>
                           <td className="num">{summary.deaths}</td>
                           <td className="num">{summary.time}</td>
@@ -231,7 +228,6 @@ export function MapDetail({
                               <small>{subMapSidName(subMap.sid)}</small>
                             </span>
                           </td>
-                          <td>{subMap.difficulty || "-"}</td>
                           <td>{formatCompletionStatus(subMap.completionStatus)}</td>
                           <td className="num">{subMap.stats?.deaths ?? "-"}</td>
                           <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
@@ -246,11 +242,11 @@ export function MapDetail({
                         </tr>
                         {selectedSubMap?.id === subMap.id && (
                           <tr className="sub-map-inline-detail">
-                            <td colSpan={7}>
+                            <td colSpan={6}>
                               <div className="inline-detail-grid">
                                 <Info label="名称" value={subMap.displayName || "未知"} />
                                 <Info label="章节" value={subMap.chapter || "未知"} />
-                                <Info label="难度" value={subMap.difficulty || "未知"} />
+                                {subMap.difficulty && <Info label="难度" value={subMap.difficulty} />}
                                 <Info label="完成" value={formatCompletionStatus(subMap.completionStatus)} />
                                 <Info
                                   label="草莓"
@@ -334,7 +330,6 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDe
   const timePlayed = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.timePlayed ?? 0), 0);
   const hearts = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.hearts ?? 0), 0);
   const cassettes = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.cassettes ?? 0), 0);
-  const difficulties = formatDifficulties(members);
   const completable = members.filter((subMap) => subMap.completionStatus !== "notApplicable");
   const known = completable.filter((subMap) => subMap.completionStatus !== "unknown");
   const completed = known.filter((subMap) => subMap.completionStatus === "completed").length;
@@ -342,17 +337,10 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDe
   return {
     completion: completable.length === 0 ? "不适用" : known.length ? `${completed}/${known.length}` : "未知",
     deaths: statsMembers.length ? deaths : "-",
-    difficulties,
     heartCassette: statsMembers.length ? `${hearts}/${cassettes}` : "-",
     strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries, strawberriesKnown),
     time: statsMembers.length ? formatTime(timePlayed) : "-"
   };
-}
-
-function formatDifficulties(subMaps: SubMapInfo[]) {
-  const difficulties = [...new Set(subMaps.map((subMap) => subMap.difficulty).filter(Boolean))];
-  if (!difficulties.length) return "-";
-  return difficulties.sort(compareDifficulties).join(" / ");
 }
 
 function strawberryTotal(record: ModRecord | SubMapInfo, strawberryDenominator: StrawberryDenominator) {
