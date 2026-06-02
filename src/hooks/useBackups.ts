@@ -1,25 +1,25 @@
 import { useState } from "react";
 import { createBackup, listBackups, openBackupFolder, openBackupLocation, restoreBackup } from "../api";
-import type { BackupInfo, RestoreScope, ScanResult } from "../types";
+import type { AppNotifier, BackupInfo, RestoreScope, ScanResult } from "../types";
 import { readError } from "../utils/format";
 
 type BackupsOptions = {
   celestePath: string;
+  notifier: AppNotifier;
   refresh: (nextPath?: string) => Promise<ScanResult | undefined>;
   setLoading: (loading: boolean) => void;
-  setMessage: (message: string) => void;
 };
 
-export function useBackups({ celestePath, refresh, setLoading, setMessage }: BackupsOptions) {
+export function useBackups({ celestePath, notifier, refresh, setLoading }: BackupsOptions) {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
 
   async function refreshBackups() {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       setBackups(await listBackups());
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }
@@ -27,13 +27,13 @@ export function useBackups({ celestePath, refresh, setLoading, setMessage }: Bac
 
   async function createManualBackup() {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       const backup = await createBackup(celestePath, "manual");
       setBackups(await listBackups());
-      setMessage(`已创建备份：${backup.id}`);
+      notifier.showSuccess(`已创建备份：${backup.id}`);
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }
@@ -41,14 +41,14 @@ export function useBackups({ celestePath, refresh, setLoading, setMessage }: Bac
 
   async function restoreSelectedBackup(backupId: string, scope: RestoreScope) {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       await restoreBackup(backupId, scope);
       setBackups(await listBackups());
       await refresh(celestePath);
-      setMessage("已还原游戏文件。");
+      notifier.showSuccess("已还原游戏文件。");
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }
@@ -56,11 +56,11 @@ export function useBackups({ celestePath, refresh, setLoading, setMessage }: Bac
 
   async function openCurrentBackupFolder() {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       await openBackupFolder(celestePath);
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }
@@ -68,11 +68,11 @@ export function useBackups({ celestePath, refresh, setLoading, setMessage }: Bac
 
   async function openSelectedBackupLocation(backupPath: string) {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       await openBackupLocation(backupPath);
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }

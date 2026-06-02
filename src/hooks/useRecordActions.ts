@@ -1,6 +1,6 @@
 import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { setRecordFavorite, setRecordProtected } from "../api";
-import type { ModRecord, ScanResult } from "../types";
+import type { AppNotifier, ModRecord, ScanResult } from "../types";
 import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import { isDraftEnabled, readError } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
@@ -13,12 +13,12 @@ type RecordActionsOptions = {
   dependencyModDraft: Set<string>;
   filteredMaps: ModRecord[];
   filteredMods: ModRecord[];
+  notifier: AppNotifier;
   scan: ScanResult;
   setEnabledExplicitModDraft: Dispatch<SetStateAction<Set<string>>>;
   setEnabledMapDraft: Dispatch<SetStateAction<Set<string>>>;
   setEnabledMapModDraft: Dispatch<SetStateAction<Set<string>>>;
   setLoading: (loading: boolean) => void;
-  setMessage: (message: string) => void;
   setScan: Dispatch<SetStateAction<ScanResult>>;
   toggleMap: (id: string) => void;
   toggleMapMod: (id: string) => void;
@@ -33,12 +33,12 @@ export function useRecordActions({
   enabledModDraft,
   filteredMaps,
   filteredMods,
+  notifier,
   scan,
   setEnabledExplicitModDraft,
   setEnabledMapDraft,
   setEnabledMapModDraft,
   setLoading,
-  setMessage,
   setScan,
   toggleMap,
   toggleMapMod,
@@ -81,15 +81,15 @@ export function useRecordActions({
   async function updateRecordFavorite(record: ModRecord) {
     const favorite = !record.favorite;
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     setRecordFavoriteInScan(record.id, favorite);
     try {
       const result = await setRecordFavorite(celestePath, record.id, favorite);
       setScan(result);
-      setMessage(favorite ? "已加入收藏。" : "已取消收藏。");
+      notifier.showSuccess(favorite ? "已加入收藏。" : "已取消收藏。");
     } catch (error) {
       setRecordFavoriteInScan(record.id, record.favorite);
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }
@@ -97,13 +97,13 @@ export function useRecordActions({
 
   async function updateRecordProtected(record: ModRecord) {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       const result = await setRecordProtected(celestePath, record.id, !record.protected);
       setScan(result);
-      setMessage(record.protected ? "已取消始终启用。" : "已设为始终启用，应用 Profile 时不会写入 blacklist。");
+      notifier.showSuccess(record.protected ? "已取消始终启用。" : "已设为始终启用，应用 Profile 时不会写入 blacklist。");
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }
@@ -134,11 +134,11 @@ export function useRecordActions({
   function canToggleProfileRecord(record: ModRecord) {
     const enabled = isDraftEnabled(record, enabledMapDraft, enabledModDraft);
     if (record.readOnly) {
-      setMessage(`${record.name} 是内置项目，不能通过 Profile 启用或禁用。`);
+      notifier.showWarning(`${record.name} 是内置项目，不能通过 Profile 启用或禁用。`);
       return false;
     }
     if (record.kind === "mod" && enabled && dependencyModDraft.has(record.id)) {
-      setMessage(`${record.name} 被以下已启用项目依赖，不能直接禁用：${dependentSummary(record)}。`);
+      notifier.showWarning(`${record.name} 被以下已启用项目依赖，不能直接禁用：${dependentSummary(record)}。`);
       return false;
     }
     return true;

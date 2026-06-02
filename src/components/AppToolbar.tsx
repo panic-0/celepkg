@@ -4,11 +4,13 @@ import type { ScanResult } from "../types";
 type AppToolbarProps = {
   canLaunch: boolean;
   celestePath: string;
+  issueCount: number;
   loading: boolean;
   loadingMessage: string;
   scan: ScanResult;
   onApplyAndLaunch: () => void;
   onDirectLaunch: () => void;
+  onIssuesOpen: () => void;
   onPathBrowse: () => void;
   onPathChange: (path: string) => void;
   onRefresh: () => void;
@@ -18,18 +20,19 @@ type AppToolbarProps = {
 export function AppToolbar({
   canLaunch,
   celestePath,
+  issueCount,
   loading,
   loadingMessage,
   scan,
   onApplyAndLaunch,
   onDirectLaunch,
+  onIssuesOpen,
   onPathBrowse,
   onPathChange,
   onRefresh,
   onRescan
 }: AppToolbarProps) {
   const completedCount = scan.maps.filter((map) => map.completionStatus === "completed").length;
-  const warningCount = [...scan.maps, ...scan.otherMods].filter((record) => record.warnings.length).length;
 
   return (
     <header className="app-toolbar">
@@ -51,7 +54,14 @@ export function AppToolbar({
 
       <div className="toolbar-metrics" aria-label="当前扫描状态">
         <MetricPill icon={<CheckCircle2 size={14} />} label="完成" value={completedCount} />
-        <MetricPill icon={<AlertTriangle size={14} />} label="警告" value={warningCount} tone={warningCount ? "warn" : "ok"} />
+        <MetricPill
+          icon={<AlertTriangle size={14} />}
+          label="问题"
+          value={issueCount}
+          tone={issueCount ? "warn" : "ok"}
+          disabled={!issueCount}
+          onClick={onIssuesOpen}
+        />
       </div>
 
       <div className="toolbar-actions">
@@ -75,12 +85,40 @@ export function AppToolbar({
   );
 }
 
-function MetricPill({ icon, label, tone, value }: { icon: React.ReactNode; label: string; tone?: "ok" | "warn"; value: React.ReactNode }) {
-  return (
-    <span className={tone ? `toolbar-pill ${tone}` : "toolbar-pill"}>
+function MetricPill({
+  disabled,
+  icon,
+  label,
+  tone,
+  value,
+  onClick
+}: {
+  disabled?: boolean;
+  icon: React.ReactNode;
+  label: string;
+  tone?: "ok" | "warn";
+  value: React.ReactNode;
+  onClick?: () => void;
+}) {
+  const content = (
+    <>
       {icon}
       <small>{label}</small>
       <strong>{value}</strong>
-    </span>
+    </>
   );
+  const className = tone ? `toolbar-pill ${tone}` : "toolbar-pill";
+  if (onClick) {
+    return (
+      <button
+        className={`${className} toolbar-pill-button`}
+        onClick={onClick}
+        disabled={disabled}
+        title={disabled ? "当前没有问题" : "查看问题"}
+      >
+        {content}
+      </button>
+    );
+  }
+  return <span className={className}>{content}</span>;
 }

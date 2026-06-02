@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, deleteProfile, launchGame, saveProfile } from "../api";
-import type { Profile, ScanResult } from "../types";
+import type { AppNotifier, Profile, ScanResult } from "../types";
 import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import { readError } from "../utils/format";
 
 type ProfileDraftOptions = {
   celestePath: string;
+  notifier: AppNotifier;
   scan: ScanResult;
   setLoading: (loading: boolean) => void;
-  setMessage: (message: string) => void;
   setScan: React.Dispatch<React.SetStateAction<ScanResult>>;
 };
 
 export type ProfileOverwriteMode = "enabled" | "all";
 
-export function useProfileDraft({ celestePath, scan, setLoading, setMessage, setScan }: ProfileDraftOptions) {
+export function useProfileDraft({ celestePath, notifier, scan, setLoading, setScan }: ProfileDraftOptions) {
   const [enabledMapDraft, setEnabledMapDraft] = useState<Set<string>>(new Set());
   const [enabledMapModDraft, setEnabledMapModDraft] = useState<Set<string>>(new Set());
   const [enabledExplicitModDraft, setEnabledExplicitModDraft] = useState<Set<string>>(new Set());
@@ -82,10 +82,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
           })
         )
           .then((profiles) => setScan((value) => ({ ...value, profiles })))
-          .catch((error) => setMessage(readError(error)));
+          .catch((error) => notifier.showError(readError(error)));
       }
     },
-    [enqueueProfileSave, scan.maps, scan.otherMods, setMessage, setScan]
+    [enqueueProfileSave, notifier, scan.maps, scan.otherMods, setScan]
   );
 
   const hydrateModDraft = useCallback(
@@ -106,10 +106,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
           })
         )
           .then((profiles) => setScan((value) => ({ ...value, profiles })))
-          .catch((error) => setMessage(readError(error)));
+          .catch((error) => notifier.showError(readError(error)));
       }
     },
-    [enqueueProfileSave, scan.otherMods, setMessage, setScan]
+    [enqueueProfileSave, notifier, scan.otherMods, setScan]
   );
 
   useEffect(() => {
@@ -182,10 +182,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     if (!mapAutoSaveReadyRef.current) return;
     const timer = window.setTimeout(() => {
       if (!mapAutoSaveReadyRef.current) return;
-      void persistMapProfile().catch((error) => setMessage(readError(error)));
+      void persistMapProfile().catch((error) => notifier.showError(readError(error)));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, persistMapProfile, selectedMapProfile, setMessage]);
+  }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, notifier, persistMapProfile, selectedMapProfile]);
 
   useEffect(() => {
     if (!initializedRef.current || !selectedModProfile) return;
@@ -196,10 +196,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     if (!modAutoSaveReadyRef.current) return;
     const timer = window.setTimeout(() => {
       if (!modAutoSaveReadyRef.current) return;
-      void persistModProfile().catch((error) => setMessage(readError(error)));
+      void persistModProfile().catch((error) => notifier.showError(readError(error)));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabledExplicitModDraft, modDirty, persistModProfile, selectedModProfile, setMessage]);
+  }, [enabledExplicitModDraft, modDirty, notifier, persistModProfile, selectedModProfile]);
 
   function setMapProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
@@ -270,7 +270,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setLaunchArgs(sourceLaunchArgs);
       setEnabledMapDraft(new Set(content.enabledMapIds));
       setEnabledMapModDraft(new Set(content.enabledModIds));
-      setMessage("地图 Profile 已复制。");
+      notifier.showSuccess("地图 Profile 已复制。");
     });
   }
 
@@ -299,7 +299,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setScan((value) => ({ ...value, profiles }));
       setSelectedModProfileId(profiles.activeModProfileId);
       setEnabledExplicitModDraft(new Set(content.enabledModIds));
-      setMessage("Mod Profile 已复制。");
+      notifier.showSuccess("Mod Profile 已复制。");
     });
   }
 
@@ -325,7 +325,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setLaunchArgs("");
       setEnabledMapDraft(new Set(enabledMapIds));
       setEnabledMapModDraft(new Set());
-      setMessage("已新建空地图 Profile。");
+      notifier.showSuccess("已新建空地图 Profile。");
     });
   }
 
@@ -346,7 +346,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setSelectedModProfileId(profiles.activeModProfileId);
       setModProfileName("");
       setEnabledExplicitModDraft(new Set());
-      setMessage("已新建空 Mod Profile。");
+      notifier.showSuccess("已新建空 Mod Profile。");
     });
   }
 
@@ -356,7 +356,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setMapDirty(false);
       setScan((value) => ({ ...value, profiles }));
       setSelectedMapProfileId(profiles.activeMapProfileId);
-      setMessage("地图 Profile 已删除。");
+      notifier.showSuccess("地图 Profile 已删除。");
     });
   }
 
@@ -366,7 +366,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setModDirty(false);
       setScan((value) => ({ ...value, profiles }));
       setSelectedModProfileId(profiles.activeModProfileId);
-      setMessage("Mod Profile 已删除。");
+      notifier.showSuccess("Mod Profile 已删除。");
     });
   }
 
@@ -385,14 +385,14 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const applied = await enqueueProfileSave(() => applyProfile(celestePath, mapId, modId));
       setScan(applied);
       const result = await launchGame(celestePath, launchArgs);
-      setMessage(`已启动：${result.executable}`);
+      notifier.showSuccess(`已启动：${result.executable}`);
     });
   }
 
   async function launchCurrentGame() {
     await runProfileTask(async () => {
       const result = await launchGame(celestePath, launchArgs);
-      setMessage(`已启动：${result.executable}`);
+      notifier.showSuccess(`已启动：${result.executable}`);
     });
   }
 
@@ -424,7 +424,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setMapDirty(false);
       mapAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setMessage("已用当前游戏启用情况覆盖地图 Profile，始终启用条目已保留原 Profile 选择。");
+      notifier.showSuccess("已用当前游戏启用情况覆盖地图 Profile，始终启用条目已保留原 Profile 选择。");
     });
   }
 
@@ -450,7 +450,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setModDirty(false);
       modAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setMessage("已用当前游戏启用情况覆盖 Mod Profile，始终启用条目已保留原 Profile 选择。");
+      notifier.showSuccess("已用当前游戏启用情况覆盖 Mod Profile，始终启用条目已保留原 Profile 选择。");
     });
   }
 
@@ -480,7 +480,9 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setMapDirty(false);
       mapAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setMessage(mode === "all" ? "已用来源 Profile 覆盖地图 Profile 全部内容。" : "已用来源 Profile 覆盖地图 Profile 启用情况。");
+      notifier.showSuccess(
+        mode === "all" ? "已用来源 Profile 覆盖地图 Profile 全部内容。" : "已用来源 Profile 覆盖地图 Profile 启用情况。"
+      );
     });
   }
 
@@ -505,7 +507,9 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setModDirty(false);
       modAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setMessage(mode === "all" ? "已用来源 Profile 覆盖 Mod Profile 全部内容。" : "已用来源 Profile 覆盖 Mod Profile 启用情况。");
+      notifier.showSuccess(
+        mode === "all" ? "已用来源 Profile 覆盖 Mod Profile 全部内容。" : "已用来源 Profile 覆盖 Mod Profile 启用情况。"
+      );
     });
   }
 
@@ -514,16 +518,16 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     setMapDirty(false);
     setModDirty(false);
     setScan(result);
-    setMessage(successMessage);
+    notifier.showSuccess(successMessage);
   }
 
   async function runProfileTask(task: () => Promise<void>) {
     setLoading(true);
-    setMessage("");
+    notifier.clearNotice();
     try {
       await task();
     } catch (error) {
-      setMessage(readError(error));
+      notifier.showError(readError(error));
     } finally {
       setLoading(false);
     }

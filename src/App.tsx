@@ -1,12 +1,14 @@
-import { AlertTriangle, LoaderCircle } from "lucide-react";
-import { useRef } from "react";
+import { LoaderCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackupManager } from "./components/BackupManager";
+import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
 import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
 import { SettingsManager } from "./components/SettingsManager";
 import { AppToolbar } from "./components/AppToolbar";
+import { ToastHost } from "./components/ToastHost";
 import { WorkspaceNav } from "./components/WorkspaceNav";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
@@ -23,36 +25,49 @@ export function App() {
   const {
     autoBackupEnabled,
     celestePath,
+    clearNotice,
+    configWarnings,
     loading,
     loadingMessage,
-    message,
+    notice,
+    notifier,
     refresh,
     savePathAndRefresh,
     savePathAndRescan,
     scan,
     selectPathAndRefresh,
     setLoading,
-    setMessage,
     setPathInput,
     setScan,
     updateAutoBackupEnabled,
     updateSelectedSaveFiles
   } = useCelePkgData();
+  const [issuesOpen, setIssuesOpen] = useState(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
+  const itemWarnings = useMemo(
+    () => [...scan.maps, ...scan.otherMods].filter((record) => record.warnings.length),
+    [scan.maps, scan.otherMods]
+  );
+  const issueCount = configWarnings.length + scan.warnings.length + itemWarnings.length;
+
+  useEffect(() => {
+    if (configWarnings.length && !celestePath.trim()) setIssuesOpen(true);
+  }, [celestePath, configWarnings.length]);
+
   const backups = useBackups({
     celestePath,
+    notifier,
     refresh,
-    setLoading,
-    setMessage
+    setLoading
   });
 
   const profileDraft = useProfileDraft({
     celestePath,
+    notifier,
     scan,
     setLoading,
-    setMessage,
     setScan
   });
   const filters = useModFilters({
@@ -81,12 +96,12 @@ export function App() {
     enabledModDraft: profileDraft.enabledModDraft,
     filteredMaps: filters.filteredMaps,
     filteredMods: filters.filteredMods,
+    notifier,
     scan,
     setEnabledExplicitModDraft: profileDraft.setEnabledExplicitModDraft,
     setEnabledMapDraft: profileDraft.setEnabledMapDraft,
     setEnabledMapModDraft: profileDraft.setEnabledMapModDraft,
     setLoading,
-    setMessage,
     setScan,
     toggleMap: profileDraft.toggleMap,
     toggleMapMod: profileDraft.toggleMapMod,
@@ -101,9 +116,11 @@ export function App() {
         loading={loading}
         loadingMessage={loadingMessage}
         canLaunch={Boolean(scan.gameExecutable)}
+        issueCount={issueCount}
         scan={scan}
         onApplyAndLaunch={profileDraft.launchSelectedProfiles}
         onDirectLaunch={profileDraft.launchCurrentGame}
+        onIssuesOpen={() => setIssuesOpen(true)}
         onPathBrowse={selectPathAndRefresh}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
@@ -261,12 +278,14 @@ export function App() {
         )}
       </section>
 
-      {(message || scan.warnings.length > 0) && (
-        <footer className="message-bar">
-          <AlertTriangle size={16} />
-          <span>{[message, ...scan.warnings].filter(Boolean).join("；")}</span>
-        </footer>
-      )}
+      <IssueDrawer
+        configWarnings={configWarnings}
+        itemWarnings={itemWarnings}
+        open={issuesOpen}
+        scanWarnings={scan.warnings}
+        onClose={() => setIssuesOpen(false)}
+      />
+      <ToastHost notice={notice} onClose={clearNotice} />
     </main>
   );
 }

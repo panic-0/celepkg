@@ -89,6 +89,22 @@ export type ProfilesState = {
   profiles: Profile[];
 };
 
+export type AppNoticeTone = "success" | "info" | "warning" | "error";
+
+export type AppNotice = {
+  id: number;
+  tone: AppNoticeTone;
+  text: string;
+};
+
+export type AppNotifier = {
+  clearNotice: () => void;
+  showError: (text: string) => void;
+  showInfo: (text: string) => void;
+  showSuccess: (text: string) => void;
+  showWarning: (text: string) => void;
+};
+
 export type ConfigResponse = {
   celestePath: string;
   autoBackupEnabled: boolean;
