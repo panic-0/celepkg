@@ -149,11 +149,7 @@ export function WorkspaceNav({
                   placeholder={activeView === "maps" ? "搜索地图、SID" : "搜索 Mod、依赖"}
                 />
               </label>
-              <Select label="启用状态" value={enabledFilter} onChange={(value) => onEnabledFilterChange(value as EnabledFilter)}>
-                <option value="all">全部</option>
-                <option value="enabled">仅启用</option>
-                <option value="disabled">仅禁用</option>
-              </Select>
+              <EnabledFilterControl value={enabledFilter} onChange={onEnabledFilterChange} />
               {activeView === "maps" ? (
                 <>
                   <Select label="进度" value={progressFilter} onChange={(value) => onProgressFilterChange(value as ProgressFilter)}>
@@ -181,6 +177,7 @@ export function WorkspaceNav({
                 </>
               ) : (
                 <>
+                  <ReferenceFilterControl value={referenceFilter} onChange={onReferenceFilterChange} />
                   <Select
                     label="警告"
                     value={progressFilter === "warnings" ? "warnings" : "all"}
@@ -189,7 +186,6 @@ export function WorkspaceNav({
                     <option value="all">全部 Mod</option>
                     <option value="warnings">有警告</option>
                   </Select>
-                  <ReferenceFilterControl value={referenceFilter} onChange={onReferenceFilterChange} />
                 </>
               )}
             </div>
@@ -200,26 +196,52 @@ export function WorkspaceNav({
   );
 }
 
+function EnabledFilterControl({ value, onChange }: { value: EnabledFilter; onChange: (value: EnabledFilter) => void }) {
+  return (
+    <div className="filter-segmented-field">
+      <span className="filter-segmented-label">启用状态</span>
+      <div className="filter-segmented" aria-label="启用状态">
+        <button className={value === "all" ? "active" : ""} onClick={() => onChange("all")} title="显示全部条目">
+          全部
+        </button>
+        <button className={value === "enabled" ? "active" : ""} onClick={() => onChange("enabled")} title="只显示当前 Profile 中启用的条目">
+          仅启用
+        </button>
+        <button
+          className={value === "disabled" ? "active" : ""}
+          onClick={() => onChange("disabled")}
+          title="只显示当前 Profile 中禁用的条目"
+        >
+          仅禁用
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReferenceFilterControl({ value, onChange }: { value: ReferenceFilter; onChange: (value: ReferenceFilter) => void }) {
   return (
-    <div className="filter-segmented" aria-label="依赖显示选项">
-      <button className={value === "all" ? "active" : ""} onClick={() => onChange("all")} title="显示全部 Mod">
-        全部
-      </button>
-      <button
-        className={value === "unreferenced" ? "active" : ""}
-        onClick={() => onChange("unreferenced")}
-        title="只显示没有被地图或其他 Mod 声明为必需依赖的 Mod"
-      >
-        不被依赖
-      </button>
-      <button
-        className={value === "unreferencedAndOptional" ? "active" : ""}
-        onClick={() => onChange("unreferencedAndOptional")}
-        title="只显示没有被声明为必需依赖或可选依赖的 Mod"
-      >
-        不被依赖与可选依赖
-      </button>
+    <div className="filter-segmented-field">
+      <span className="filter-segmented-label">依赖关系</span>
+      <div className="filter-segmented" aria-label="依赖关系">
+        <button className={value === "all" ? "active" : ""} onClick={() => onChange("all")} title="显示全部 Mod">
+          全部
+        </button>
+        <button
+          className={value === "unreferenced" ? "active" : ""}
+          onClick={() => onChange("unreferenced")}
+          title="只显示没有被地图或其他 Mod 声明为必需依赖的 Mod"
+        >
+          不被依赖
+        </button>
+        <button
+          className={value === "unreferencedAndOptional" ? "active" : ""}
+          onClick={() => onChange("unreferencedAndOptional")}
+          title="只显示没有被声明为必需依赖或可选依赖的 Mod"
+        >
+          不被依赖与可选依赖
+        </button>
+      </div>
     </div>
   );
 }

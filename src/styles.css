@@ -484,6 +484,17 @@ h1 {
   padding: 6px 8px;
 }
 
+.filter-segmented-field {
+  display: grid;
+  gap: 4px;
+}
+
+.filter-segmented-label {
+  color: #627080;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
 .filter-segmented {
   display: grid;
   grid-template-columns: repeat(3, max-content);
