@@ -191,7 +191,7 @@ function MapTable({
                       active={map.protected}
                       disabled={map.readOnly}
                       icon={map.protected ? <Lock size={16} /> : <Shield size={16} />}
-                      label="保护"
+                      label="始终启用"
                       variant="protected"
                       onClick={() => onProtectedToggle(map)}
                     />
@@ -291,7 +291,7 @@ function ModTable({
                     <FlagButton
                       active={modItem.protected}
                       icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />}
-                      label="保护"
+                      label="始终启用"
                       variant="protected"
                       onClick={() => onProtectedToggle(modItem)}
                     />

@@ -17,10 +17,10 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
   - 应用并启动会先应用当前地图 / Mod Profile，再启动游戏。
   - 直接启动不会改写 Profile 或 `blacklist.txt`。
 - 支持删除 Profile，并可为新建 Profile 指定名称。
-- 支持收藏和保护条目：
+- 支持收藏和始终启用条目：
   - 收藏状态写入 `Mods/favorites.txt`。
   - Profile 应用会写入 `Mods/blacklist.txt`。
-  - Protected 条目不会被 Profile 操作直接启用或禁用。
+  - 始终启用条目可以在 Profile 中记录期望启用状态，但应用 Profile 时不会写入 blacklist，因此会保持实际启用，并会一起启用它声明的依赖。
 - 支持游戏文件备份与还原：
   - 手动备份。
   - 默认开启“修改前自动备份”。
@@ -77,7 +77,7 @@ CelePkg 可能修改的游戏目录文件：
 - 使用前请确认 Celeste 路径指向有效的游戏目录，普通文件夹不会通过校验。
 - 官方地图只用于查看统计，不会被 CelePkg 禁用。
 - 应用 Profile 会重写 CelePkg 管理范围内的 blacklist 条目，但会保留非管理范围内容。
-- Profile 页面可以从当前游戏或另一个同类 Profile 覆盖当前 Profile。从当前游戏覆盖时只覆盖启用情况；从 Profile 覆盖时可选择只覆盖启用情况或覆盖全部内容。Favorite 和 Protected 不会被覆盖。
+- Profile 页面可以从当前游戏或另一个同类 Profile 覆盖当前 Profile。从当前游戏覆盖时只覆盖非始终启用条目的启用情况，并保留始终启用条目的 Profile 选择；从 Profile 覆盖时可选择只覆盖启用情况或覆盖全部内容。Favorite / 始终启用标记不会被覆盖。
 - 修改前自动备份默认开启，建议保持开启。
 
 ## 开发说明

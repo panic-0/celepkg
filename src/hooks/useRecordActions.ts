@@ -44,8 +44,6 @@ export function useRecordActions({
   toggleMapMod,
   toggleMod
 }: RecordActionsOptions) {
-  const protectedVisibleMaps = filteredMaps.filter((record) => record.protected);
-  const protectedVisibleMods = filteredMods.filter((record) => record.protected);
   const dependentNamesByModId = useMemo(
     () => findDependentNamesByModId(scan, enabledMapDraft, enabledModDraft),
     [enabledMapDraft, enabledModDraft, scan]
@@ -66,10 +64,8 @@ export function useRecordActions({
     if (activeView === "maps") {
       enableVisibleMaps();
     } else if (activeView === "mods") {
-      const skipped = protectedVisibleMods.length;
-      const modIds = filteredMods.filter((modItem) => !modItem.protected).map((modItem) => modItem.id);
+      const modIds = filteredMods.map((modItem) => modItem.id);
       setEnabledExplicitModDraft((current) => new Set([...current, ...modIds]));
-      showProtectedSkip(skipped);
     }
   }
 
@@ -77,10 +73,8 @@ export function useRecordActions({
     if (activeView === "maps") {
       disableVisibleMaps();
     } else if (activeView === "mods") {
-      const skipped = protectedVisibleMods.length;
-      const modIds = new Set(filteredMods.filter((modItem) => !modItem.protected).map((modItem) => modItem.id));
+      const modIds = new Set(filteredMods.filter((modItem) => !modItem.readOnly).map((modItem) => modItem.id));
       setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-      showProtectedSkip(skipped);
     }
   }
 
@@ -107,7 +101,7 @@ export function useRecordActions({
     try {
       const result = await setRecordProtected(celestePath, record.id, !record.protected);
       setScan(result);
-      setMessage(record.protected ? "已取消保护。" : "已设为保护。");
+      setMessage(record.protected ? "已取消始终启用。" : "已设为始终启用，应用 Profile 时不会写入 blacklist。");
     } catch (error) {
       setMessage(readError(error));
     } finally {
@@ -124,27 +118,23 @@ export function useRecordActions({
   }
 
   function enableVisibleMaps() {
-    const skipped = protectedVisibleMaps.length;
-    const mapIds = filteredMaps.filter((record) => record.kind === "map" && !record.protected).map((record) => record.id);
-    const modIds = filteredMaps.filter((record) => record.kind === "mod" && !record.protected).map((record) => record.id);
+    const mapIds = filteredMaps.filter((record) => record.kind === "map").map((record) => record.id);
+    const modIds = filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id);
     setEnabledMapDraft((current) => new Set([...current, ...mapIds]));
     setEnabledMapModDraft((current) => new Set([...current, ...modIds]));
-    showProtectedSkip(skipped);
   }
 
   function disableVisibleMaps() {
-    const skipped = protectedVisibleMaps.length;
-    const mapIds = new Set(filteredMaps.filter((record) => record.kind === "map" && !record.protected).map((record) => record.id));
-    const modIds = new Set(filteredMaps.filter((record) => record.kind === "mod" && !record.protected).map((record) => record.id));
+    const mapIds = new Set(filteredMaps.filter((record) => record.kind === "map" && !record.readOnly).map((record) => record.id));
+    const modIds = new Set(filteredMaps.filter((record) => record.kind === "mod" && !record.readOnly).map((record) => record.id));
     setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
     setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-    showProtectedSkip(skipped);
   }
 
   function canToggleProfileRecord(record: ModRecord) {
     const enabled = isDraftEnabled(record, enabledMapDraft, enabledModDraft);
-    if (record.protected) {
-      setMessage(`${record.name} 已设为 Protected，不能通过 Profile 启用或禁用。`);
+    if (record.readOnly) {
+      setMessage(`${record.name} 是内置项目，不能通过 Profile 启用或禁用。`);
       return false;
     }
     if (record.kind === "mod" && enabled && dependencyModDraft.has(record.id)) {
@@ -169,10 +159,6 @@ export function useRecordActions({
     }));
   }
 
-  function showProtectedSkip(skipped: number) {
-    if (skipped > 0) setMessage(`已跳过 ${skipped} 个受保护项目。`);
-  }
-
   return {
     disableAllInCurrentView,
     enableAllInCurrentView,
@@ -190,8 +176,8 @@ function findDependentNamesByModId(scan: ScanResult, enabledMapDraft: Set<string
 
   const dependentNames = new Map<string, Set<string>>();
   const enabledItems = [
-    ...scan.maps.filter((map) => enabledMapDraft.has(map.id)),
-    ...scan.otherMods.filter((modItem) => enabledModDraft.has(modItem.id))
+    ...scan.maps.filter((map) => map.protected || enabledMapDraft.has(map.id)),
+    ...scan.otherMods.filter((modItem) => modItem.protected || enabledModDraft.has(modItem.id))
   ];
   for (const item of enabledItems) {
     for (const dependency of item.dependencies) {

@@ -227,13 +227,22 @@ fn resolve_required_mod_ids(
         .map(|mod_item| (mod_item.id.clone(), mod_item))
         .collect();
     let alias_to_mod_id = mod_alias_map(scan);
-    let mut enabled: HashSet<String> = base_mod_ids.iter().cloned().collect();
-    let mut queue: VecDeque<String> = base_mod_ids.iter().cloned().collect();
+    let protected_mod_ids = scan
+        .other_mods
+        .iter()
+        .filter(|mod_item| mod_item.protected)
+        .map(|mod_item| mod_item.id.clone());
+    let mut enabled: HashSet<String> = base_mod_ids
+        .iter()
+        .cloned()
+        .chain(protected_mod_ids)
+        .collect();
+    let mut queue: VecDeque<String> = enabled.iter().cloned().collect();
 
     for map in scan
         .maps
         .iter()
-        .filter(|map| enabled_map_ids.contains(&map.id))
+        .filter(|map| map.protected || enabled_map_ids.contains(&map.id))
     {
         for dependency in &map.dependencies {
             if let Some(mod_id) = resolve_dependency_id(&dependency.name, &alias_to_mod_id) {
@@ -279,6 +288,7 @@ fn mod_alias_map(scan: &ScanResult) -> HashMap<String, String> {
             }
         }
     }
+
     aliases
 }
 
@@ -359,6 +369,70 @@ mod tests {
                 "core-helper".to_string(),
                 "helper-one".to_string(),
                 "visual-pack".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn resolves_required_mods_from_always_enabled_records() {
+        let mut always_enabled_map = record(
+            "always-enabled-map",
+            "AlwaysEnabledMap.zip",
+            ModKind::Map,
+            "Always Enabled Map",
+            &[dependency("MapHelper")],
+        );
+        always_enabled_map.protected = true;
+        let mut always_enabled_mod = record(
+            "always-enabled-mod",
+            "AlwaysEnabledMod.zip",
+            ModKind::Mod,
+            "Always Enabled Mod",
+            &[dependency("ModHelper")],
+        );
+        always_enabled_mod.protected = true;
+        let scan = ScanResult {
+            celeste_path: String::new(),
+            mods_path: String::new(),
+            blacklist_path: String::new(),
+            blacklist_entries: vec![],
+            game_executable: String::new(),
+            maps: vec![always_enabled_map],
+            other_mods: vec![
+                always_enabled_mod,
+                record(
+                    "map-helper",
+                    "MapHelper.zip",
+                    ModKind::Mod,
+                    "MapHelper",
+                    &[],
+                ),
+                record(
+                    "mod-helper",
+                    "ModHelper.zip",
+                    ModKind::Mod,
+                    "ModHelper",
+                    &[],
+                ),
+            ],
+            profiles: ProfilesState {
+                active_map_profile_id: "maps".to_string(),
+                active_mod_profile_id: "mods".to_string(),
+                profiles: vec![],
+            },
+            available_save_files: vec![],
+            selected_save_files: vec![],
+            warnings: vec![],
+        };
+
+        let resolved = resolve_required_mod_ids(&scan, &[], &[]);
+
+        assert_eq!(
+            resolved,
+            vec![
+                "always-enabled-mod".to_string(),
+                "map-helper".to_string(),
+                "mod-helper".to_string()
             ]
         );
     }

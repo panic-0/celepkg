@@ -147,7 +147,7 @@ pub async fn set_record_protected(
         Ok(scan)
     })
     .await
-    .map_err(|error| format!("更新 Protected 任务失败：{error}"))?
+    .map_err(|error| format!("更新始终启用任务失败：{error}"))?
 }
 
 #[tauri::command]

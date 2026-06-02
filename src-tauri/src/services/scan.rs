@@ -640,7 +640,7 @@ pub fn write_profile_blacklist(
                 return true;
             }
             let key = normalize_slash(trimmed).to_lowercase();
-            protected_keys.contains(&key) || !managed_keys.contains(&key)
+            !protected_keys.contains(&key) && !managed_keys.contains(&key)
         })
         .collect();
     let enabled_maps: HashSet<&String> = enabled_map_ids.iter().collect();
@@ -722,7 +722,7 @@ pub fn set_scan_protected_state(
         .find(|record| record.id == record_id)
         .ok_or_else(|| "Mod 不存在".to_string())?;
     if record.read_only {
-        return Err("内置项目不能修改保护状态".to_string());
+        return Err("内置项目不能修改始终启用状态".to_string());
     }
     record.protected = protected;
     Ok(())
@@ -1355,20 +1355,30 @@ CompleteScreen:
     }
 
     #[test]
-    fn blacklist_preserves_protected_records() {
+    fn blacklist_removes_always_enabled_records() {
         let root = std::env::temp_dir().join(format!(
-            "celepkg-protected-blacklist-test-{}",
+            "celepkg-always-enabled-blacklist-test-{}",
             stable_id(&crate::utils::now_string())
         ));
         let mods_path = root.join("Mods");
         fs::create_dir_all(&mods_path).expect("mods dir");
-        fs::write(mods_path.join("blacklist.txt"), "DisabledProtected.zip\n").expect("blacklist");
-        let mut enabled_protected =
-            record("enabled-protected", "EnabledProtected.zip", ModKind::Mod);
-        enabled_protected.protected = true;
-        let mut disabled_protected =
-            record("disabled-protected", "DisabledProtected.zip", ModKind::Mod);
-        disabled_protected.protected = true;
+        fs::write(
+            mods_path.join("blacklist.txt"),
+            "DisabledAlwaysEnabled.zip\n",
+        )
+        .expect("blacklist");
+        let mut enabled_always_enabled = record(
+            "enabled-always-enabled",
+            "EnabledAlwaysEnabled.zip",
+            ModKind::Mod,
+        );
+        enabled_always_enabled.protected = true;
+        let mut disabled_always_enabled = record(
+            "disabled-always-enabled",
+            "DisabledAlwaysEnabled.zip",
+            ModKind::Mod,
+        );
+        disabled_always_enabled.protected = true;
         let scan = ScanResult {
             celeste_path: root.to_string_lossy().to_string(),
             mods_path: mods_path.to_string_lossy().to_string(),
@@ -1379,20 +1389,20 @@ CompleteScreen:
             blacklist_entries: vec![],
             game_executable: String::new(),
             maps: vec![],
-            other_mods: vec![enabled_protected, disabled_protected],
+            other_mods: vec![enabled_always_enabled, disabled_always_enabled],
             profiles: empty_profiles(),
             available_save_files: vec![],
             selected_save_files: vec![],
             warnings: vec![],
         };
 
-        write_profile_blacklist(&root, &[], &["disabled-protected".to_string()], &scan)
+        write_profile_blacklist(&root, &[], &["disabled-always-enabled".to_string()], &scan)
             .expect("write blacklist");
         let text = fs::read_to_string(mods_path.join("blacklist.txt")).expect("read blacklist");
         let _ = fs::remove_dir_all(&root);
 
-        assert!(text.contains("DisabledProtected.zip"));
-        assert!(!text.contains("EnabledProtected.zip"));
+        assert!(!text.contains("DisabledAlwaysEnabled.zip"));
+        assert!(!text.contains("EnabledAlwaysEnabled.zip"));
     }
 
     #[test]

@@ -399,8 +399,12 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   async function overwriteMapProfileFromCurrent() {
     await runProfileTask(async () => {
       mapAutoSaveReadyRef.current = false;
-      const mapIds = scan.maps.filter((map) => map.enabled || map.readOnly).map((map) => map.id);
-      const modIds = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0 && modItem.enabled).map((modItem) => modItem.id);
+      const mapIds = scan.maps
+        .filter((map) => map.readOnly || (map.protected ? enabledMapDraft.has(map.id) : map.enabled))
+        .map((map) => map.id);
+      const modIds = scan.otherMods
+        .filter((modItem) => modItem.subMaps.length > 0 && (modItem.protected ? enabledMapModDraft.has(modItem.id) : modItem.enabled))
+        .map((modItem) => modItem.id);
       setEnabledMapDraft(new Set(mapIds));
       setEnabledMapModDraft(new Set(modIds));
       setMapDirty(true);
@@ -420,14 +424,16 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setMapDirty(false);
       mapAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setMessage("已用当前游戏启用情况覆盖地图 Profile。");
+      setMessage("已用当前游戏启用情况覆盖地图 Profile，始终启用条目已保留原 Profile 选择。");
     });
   }
 
   async function overwriteModProfileFromCurrent() {
     await runProfileTask(async () => {
       modAutoSaveReadyRef.current = false;
-      const modIds = scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
+      const modIds = scan.otherMods
+        .filter((modItem) => (modItem.protected ? enabledExplicitModDraft.has(modItem.id) : modItem.enabled))
+        .map((modItem) => modItem.id);
       setEnabledExplicitModDraft(new Set(modIds));
       setModDirty(true);
       const current = selectedModProfile;
@@ -444,7 +450,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       setModDirty(false);
       modAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setMessage("已用当前游戏启用情况覆盖 Mod Profile。");
+      setMessage("已用当前游戏启用情况覆盖 Mod Profile，始终启用条目已保留原 Profile 选择。");
     });
   }
 
@@ -622,20 +628,21 @@ function nextNewProfileName(base: string, profiles: Profile[]) {
 function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {
   const aliasToModId = buildModAliasMap(scan.otherMods);
   const modById = new Map(scan.otherMods.map((modItem) => [modItem.id, modItem]));
+  const baseSeedModIds = new Set([...baseModIds, ...scan.otherMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id)]);
   const inferred = new Set<string>();
   const queue: string[] = [];
   const addDependency = (name: string) => {
     const id = aliasToModId.get(normalizeDependencyName(name));
-    if (id && !baseModIds.has(id) && !inferred.has(id)) {
+    if (id && !baseSeedModIds.has(id) && !inferred.has(id)) {
       inferred.add(id);
       queue.push(id);
     }
   };
 
   for (const map of scan.maps) {
-    if (enabledMapIds.has(map.id)) map.dependencies.forEach((dependency) => addDependency(dependency.name));
+    if (map.protected || enabledMapIds.has(map.id)) map.dependencies.forEach((dependency) => addDependency(dependency.name));
   }
-  for (const id of baseModIds) queue.push(id);
+  for (const id of baseSeedModIds) queue.push(id);
   while (queue.length) {
     const modItem = modById.get(queue.shift() ?? "");
     modItem?.dependencies.forEach((dependency) => addDependency(dependency.name));

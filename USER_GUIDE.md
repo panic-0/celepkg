@@ -10,17 +10,17 @@ Favorite 是“标记”，不是“启用”。它只方便你识别重要条�
 <Celeste>/Mods/favorites.txt
 ```
 
-例子：你收藏了 `StrawberryJam2021.zip`。之后应用一个不包含草莓酱的 Profile，它仍然会被禁用。Favorite 不会保护启用状态。
+例子：你收藏了 `StrawberryJam2021.zip`。之后应用一个不包含草莓酱的 Profile，它仍然会被禁用。Favorite 不会维持启用状态。
 
 开启“只显示不被依赖的 Mod”时，Favorite 条目仍会显示；但搜索、启用状态、有警告等其他筛选仍然生效。
 
-## Protected
+## 始终启用
 
-Protected 是“不要让 Profile 自动改这个条目”。它适合常驻 Helper、调试 Mod、手动管理的本地 Mod。
+始终启用是“应用 Profile 时不要把这个条目写进 blacklist”。它适合常驻 Helper、调试 Mod、手动管理的本地 Mod。
 
-例子：你把 `CollabUtils2.zip` 设为 Protected。之后应用某个 Profile，即使该 Profile 没选 CollabUtils2，CelePkg 也不会直接禁用它。
+例子：你把 `CollabUtils2.zip` 设为始终启用。之后应用某个 Profile，即使该 Profile 没选 CollabUtils2，CelePkg 也不会把它写入 blacklist，因此它会保持启用。它声明的必需依赖也会一起保持启用。
 
-注意：Protected 会阻止 CelePkg 通过 Profile 操作启用或禁用这个条目，包括列表中的单项切换和批量启用 / 禁用。它不阻止你在游戏目录里手动编辑文件。官方地图默认不可禁用，也视为受保护。
+注意：始终启用不阻止你在 Profile 里勾选或取消勾选这个条目，也不阻止批量启用 / 禁用把它写进 Profile。它是全局标记，不属于某一个 Profile；只有应用 Profile 写入 `blacklist.txt` 时才生效。官方地图默认不可禁用，也会始终启用。
 
 ## Profile 和 blacklist
 
@@ -34,14 +34,16 @@ Profile 不会删除或移动 Mod 文件。应用 Profile 时，CelePkg 通过�
 <Celeste>/Mods/blacklist.txt
 ```
 
-例子：当前地图 Profile 是“草莓酱”。你在地图列表中启用草莓酱大厅和几张小图，这些选择会自动写入“草莓酱”Profile。应用它时，CelePkg 会启用相关地图和可识别依赖，并把其他可管理条目写进 blacklist。被 Protected 的条目不会被 Profile 强行改掉。
+例子：当前地图 Profile 是“草莓酱”。你在地图列表中启用草莓酱大厅和几张小图，这些选择会自动写入“草莓酱”Profile。应用它时，CelePkg 会启用相关地图和可识别依赖，并把其他可管理条目写进 blacklist。始终启用条目可以保存在 Profile 里，但应用时不会被写进 blacklist；如果它本身声明了依赖，依赖也会一起启用。
 
-Profile 页面里的“覆盖启用情况”是反向操作：读取当前 `blacklist.txt` 对应的实际启用情况，并覆写到当前选中的 Profile。它只覆盖启用列表，不会覆盖 Profile 名称、启动参数、Favorite 或 Protected。这个操作会要求确认，适合你先在游戏目录里手动调整好启用状态，再让 CelePkg 记住它。
+Profile 页面里的“从当前游戏覆盖启用情况”是反向操作：读取当前 `blacklist.txt` 对应的实际启用情况，并覆写到当前选中的 Profile。它只覆盖非始终启用条目的启用列表，始终启用条目会保留当前 Profile 里的选择；它不会覆盖 Profile 名称、启动参数、Favorite 或始终启用标记。这个操作会要求确认，适合你先在游戏目录里手动调整好启用状态，再让 CelePkg 记住它。
 
 也可以从另一个同类 Profile 覆盖当前 Profile。比如你想让 `P2` 先变成 `P1` 的配置，可以先选中 `P2`，选择覆盖范围，再点 `P1` 行右侧的覆盖按钮：
 
 - 只覆盖启用情况：只复制地图 / Mod 启用列表，`P2` 的名称和启动参数不变。
 - 覆盖全部内容：复制名称、启用情况和启动参数，但 `P2` 的 Profile id 和创建时间不变。
+
+从另一个 Profile 覆盖会复制始终启用条目的 Profile 选择，但不会改变 Favorite / 始终启用标记本身。之后应用 Profile 时，始终启用条目和它的必需依赖仍然不会被写进 blacklist。
 
 Profile 列表每一行右侧都有复制按钮。它会完整复制对应的 Profile，生成一个新 Profile 并自动选中。新名称会使用 `原名 Copy`，重名时会自动递增。
 

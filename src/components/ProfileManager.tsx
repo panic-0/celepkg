@@ -234,10 +234,10 @@ function ProfileColumn({
                     const confirmed =
                       overwriteMode === "all"
                         ? window.confirm(
-                            `用「${profile.name}」的全部内容覆盖「${selectedProfile.name}」？这会覆盖名称、启用情况和启动参数，但不会改变 Profile id。`
+                            `用「${profile.name}」的全部内容覆盖「${selectedProfile.name}」？这会覆盖名称、启用情况和启动参数，但不会改变 Profile id，也不会改变 Favorite / 始终启用标记。`
                           )
                         : window.confirm(
-                            `只用「${profile.name}」的启用情况覆盖「${selectedProfile.name}」？名称、启动参数、Favorite 和 Protected 不会被覆盖。`
+                            `只用「${profile.name}」的启用情况覆盖「${selectedProfile.name}」？名称和启动参数不变，Favorite / 始终启用标记不会改变。`
                           );
                     if (confirmed) onOverwriteFromProfile(profile.id, overwriteMode);
                   }}
@@ -288,7 +288,7 @@ function ProfileColumn({
         onClick={() => {
           if (
             window.confirm(
-              `只用当前游戏启用情况覆盖「${selectedProfile?.name || title}」？Profile 名称、启动参数、Favorite 和 Protected 不会被覆盖。`
+              `只用当前游戏启用情况覆盖「${selectedProfile?.name || title}」？Profile 名称和启动参数不变，始终启用条目会保留当前 Profile 选择。`
             )
           ) {
             onOverwriteFromCurrent();
