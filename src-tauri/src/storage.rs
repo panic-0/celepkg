@@ -50,10 +50,16 @@ pub fn write_state(state: &AppState) -> Result<(), String> {
 }
 
 pub fn resolve_input_path(value: &str) -> PathBuf {
-    if value.trim().is_empty() {
-        PathBuf::from(load_state().celeste_path)
+    let state = load_state();
+    resolve_input_path_from_state(value, &state)
+}
+
+pub fn resolve_input_path_from_state(value: &str, state: &AppState) -> PathBuf {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        PathBuf::from(state.celeste_path.trim())
     } else {
-        PathBuf::from(value.trim())
+        PathBuf::from(trimmed)
     }
 }
 

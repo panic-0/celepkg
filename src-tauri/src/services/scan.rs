@@ -570,6 +570,24 @@ pub fn set_scan_favorite_state(
     Ok(())
 }
 
+pub fn set_scan_protected_state(
+    scan: &mut ScanResult,
+    record_id: &str,
+    protected: bool,
+) -> Result<(), String> {
+    let record = scan
+        .maps
+        .iter_mut()
+        .chain(scan.other_mods.iter_mut())
+        .find(|record| record.id == record_id)
+        .ok_or_else(|| "Mod 不存在".to_string())?;
+    if record.read_only {
+        return Err("内置项目不能修改保护状态".to_string());
+    }
+    record.protected = protected;
+    Ok(())
+}
+
 fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut entries = vec![];
     let mut yaml_text = String::new();

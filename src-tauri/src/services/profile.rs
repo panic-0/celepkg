@@ -1,7 +1,7 @@
 use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult};
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
-use crate::storage::{load_state, resolve_input_path, write_state};
+use crate::storage::{load_state, resolve_input_path_from_state, write_state};
 use crate::utils::{normalize_dependency_name, now_string, stable_id};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
@@ -144,8 +144,8 @@ fn apply_profile_to_blacklist(
     map_profile_id: String,
     mod_profile_id: String,
 ) -> Result<AppliedProfile, String> {
-    let path = resolve_input_path(&celeste_path);
     let mut state = load_state();
+    let path = resolve_input_path_from_state(&celeste_path, &state);
     let mut profiles = state.profiles_state();
     let map_profile = profiles
         .profiles

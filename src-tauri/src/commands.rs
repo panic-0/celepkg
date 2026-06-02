@@ -2,7 +2,7 @@ use crate::domain::{
     AppConfig, BackupInfo, ConfigResponse, LaunchResult, ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
-use crate::storage::{load_state, resolve_input_path, write_state};
+use crate::storage::{load_state, resolve_input_path, resolve_input_path_from_state, write_state};
 use std::path::Path;
 use std::process::Command;
 
@@ -43,7 +43,7 @@ pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigRespon
 #[tauri::command]
 pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
     let mut state = load_state();
-    let path = resolve_input_path("");
+    let path = resolve_input_path_from_state("", &state);
     let available = services::scan::list_available_save_files(&path);
     state.selected_save_files =
         crate::parsers::save_stats::normalize_selected_save_files(&available, &save_files);
@@ -60,7 +60,7 @@ pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse
 pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state();
-        let path = resolve_input_path(&celeste_path);
+        let path = resolve_input_path_from_state(&celeste_path, &state);
         Ok(services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
@@ -80,7 +80,7 @@ pub async fn set_record_favorite(
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state();
-        let path = resolve_input_path(&celeste_path);
+        let path = resolve_input_path_from_state(&celeste_path, &state);
         let mut scan = services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
@@ -105,24 +105,14 @@ pub async fn set_record_protected(
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut state = load_state();
-        let path = resolve_input_path(&celeste_path);
-        let scan = services::scan::full_scan_cached(
+        let path = resolve_input_path_from_state(&celeste_path, &state);
+        let mut scan = services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
             &state.protected_record_ids,
             &state.selected_save_files,
         );
-        let Some(record) = scan
-            .maps
-            .iter()
-            .chain(scan.other_mods.iter())
-            .find(|record| record.id == record_id)
-        else {
-            return Err("Mod 不存在".to_string());
-        };
-        if record.read_only {
-            return Err("内置项目不能修改保护状态".to_string());
-        }
+        services::scan::set_scan_protected_state(&mut scan, &record_id, protected)?;
         if protected {
             if !state.protected_record_ids.contains(&record_id) {
                 state.protected_record_ids.push(record_id);
@@ -133,12 +123,8 @@ pub async fn set_record_protected(
         state.protected_record_ids.sort();
         state.protected_record_ids.dedup();
         write_state(&state)?;
-        Ok(services::scan::full_scan_cached(
-            &path,
-            state.profiles_state(),
-            &state.protected_record_ids,
-            &state.selected_save_files,
-        ))
+        services::scan::write_scan_cache(&path, &scan);
+        Ok(scan)
     })
     .await
     .map_err(|error| format!("更新 Protected 任务失败：{error}"))?
