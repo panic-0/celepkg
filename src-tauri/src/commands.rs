@@ -2,7 +2,10 @@ use crate::domain::{
     AppConfig, BackupInfo, ConfigResponse, LaunchResult, ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
-use crate::storage::{load_state, resolve_input_path, resolve_input_path_from_state, write_state};
+use crate::storage::{
+    load_state, resolve_input_path_from_state, resolve_required_celeste_path,
+    resolve_required_celeste_path_from_state, write_state,
+};
 use std::path::Path;
 use std::process::Command;
 
@@ -20,7 +23,8 @@ pub fn get_config() -> Result<ConfigResponse, String> {
 #[tauri::command]
 pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
     let mut state = load_state();
-    state.celeste_path = celeste_path.trim().to_string();
+    let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
+    state.celeste_path = path.to_string_lossy().to_string();
     write_state(&state)?;
     Ok(AppConfig {
         celeste_path: state.celeste_path,
@@ -96,7 +100,7 @@ pub async fn set_record_favorite(
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state();
-        let path = resolve_input_path_from_state(&celeste_path, &state);
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
         let mut scan = services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
@@ -197,7 +201,7 @@ pub async fn launch_game(
 #[tauri::command]
 pub async fn create_backup(celeste_path: String, kind: String) -> Result<BackupInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let path = resolve_input_path(&celeste_path);
+        let path = resolve_required_celeste_path(&celeste_path)?;
         match kind.as_str() {
             "manual" => services::backup::create_manual_backup(&path),
             "auto" => services::backup::create_auto_backup(&path),
@@ -211,7 +215,7 @@ pub async fn create_backup(celeste_path: String, kind: String) -> Result<BackupI
 #[tauri::command]
 pub async fn list_backups() -> Result<Vec<BackupInfo>, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let path = resolve_input_path("");
+        let path = resolve_required_celeste_path("")?;
         services::backup::list_backups(&path)
     })
     .await
@@ -221,7 +225,7 @@ pub async fn list_backups() -> Result<Vec<BackupInfo>, String> {
 #[tauri::command]
 pub async fn restore_backup(backup_id: String, scope: String) -> Result<BackupInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let path = resolve_input_path("");
+        let path = resolve_required_celeste_path("")?;
         services::backup::restore_backup(&path, &backup_id, &scope)
     })
     .await
@@ -231,7 +235,7 @@ pub async fn restore_backup(backup_id: String, scope: String) -> Result<BackupIn
 #[tauri::command]
 pub async fn open_backup_folder(celeste_path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let path = resolve_input_path(&celeste_path);
+        let path = resolve_required_celeste_path(&celeste_path)?;
         let backups_path = services::backup::backups_dir(&path);
         std::fs::create_dir_all(&backups_path)
             .map_err(|error| format!("创建备份目录失败：{error}"))?;

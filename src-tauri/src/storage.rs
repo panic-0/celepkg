@@ -50,11 +50,6 @@ pub fn write_state(state: &AppState) -> Result<(), String> {
     write_json(&state_path(), state)
 }
 
-pub fn resolve_input_path(value: &str) -> PathBuf {
-    let state = load_state();
-    resolve_input_path_from_state(value, &state)
-}
-
 pub fn resolve_input_path_from_state(value: &str, state: &AppState) -> PathBuf {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -62,6 +57,44 @@ pub fn resolve_input_path_from_state(value: &str, state: &AppState) -> PathBuf {
     } else {
         PathBuf::from(trimmed)
     }
+}
+
+pub fn resolve_required_celeste_path(value: &str) -> Result<PathBuf, String> {
+    let state = load_state();
+    resolve_required_celeste_path_from_state(value, &state)
+}
+
+pub fn resolve_required_celeste_path_from_state(
+    value: &str,
+    state: &AppState,
+) -> Result<PathBuf, String> {
+    let path = resolve_input_path_from_state(value, state);
+    validate_celeste_path(&path)?;
+    Ok(path)
+}
+
+fn validate_celeste_path(path: &Path) -> Result<(), String> {
+    if path.as_os_str().is_empty() {
+        return Err("请先设置 Celeste 安装目录".to_string());
+    }
+    if !path.is_absolute() {
+        return Err("Celeste 安装目录必须是绝对路径".to_string());
+    }
+    if !path.is_dir() {
+        return Err("Celeste 安装目录不存在".to_string());
+    }
+    if !looks_like_celeste_dir(path) {
+        return Err("请选择 Celeste 安装目录，而不是普通文件夹".to_string());
+    }
+    Ok(())
+}
+
+fn looks_like_celeste_dir(path: &Path) -> bool {
+    path.join("Mods").is_dir()
+        || path.join("Content").is_dir()
+        || ["Celeste.exe", "Celeste", "Celeste.bin.x86_64"]
+            .iter()
+            .any(|name| path.join(name).is_file())
 }
 
 fn default_state() -> AppState {
@@ -296,6 +329,42 @@ mod tests {
     }
 
     #[test]
+    fn required_celeste_path_rejects_empty_or_relative_paths() {
+        let mut state = default_state();
+        state.celeste_path = String::new();
+
+        assert!(resolve_required_celeste_path_from_state("", &state).is_err());
+        assert!(resolve_required_celeste_path_from_state("Celeste", &state).is_err());
+    }
+
+    #[test]
+    fn required_celeste_path_rejects_plain_directory() {
+        let root = temp_dir("plain");
+        fs::create_dir_all(&root).expect("plain dir");
+        let mut state = default_state();
+        state.celeste_path = root.to_string_lossy().to_string();
+
+        assert!(resolve_required_celeste_path_from_state("", &state).is_err());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn required_celeste_path_accepts_directory_that_looks_like_celeste() {
+        let root = temp_dir("celeste");
+        fs::create_dir_all(root.join("Mods")).expect("mods dir");
+        let mut state = default_state();
+        state.celeste_path = root.to_string_lossy().to_string();
+
+        assert_eq!(
+            resolve_required_celeste_path_from_state("", &state).expect("celeste path"),
+            root
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn state_json_can_be_written_and_read() {
         let file = std::env::temp_dir().join(format!("celepkg-state-test-{}.json", now_string()));
         let state = default_state();
@@ -307,5 +376,9 @@ mod tests {
         assert_eq!(loaded.active_map_profile_id, state.active_map_profile_id);
         assert_eq!(loaded.active_mod_profile_id, state.active_mod_profile_id);
         assert_eq!(loaded.profiles.len(), state.profiles.len());
+    }
+
+    fn temp_dir(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("celepkg-storage-{label}-{}", now_string()))
     }
 }

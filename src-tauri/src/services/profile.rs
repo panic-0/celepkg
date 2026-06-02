@@ -1,7 +1,7 @@
 use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult};
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
-use crate::storage::{load_state, resolve_input_path_from_state, write_state};
+use crate::storage::{load_state, resolve_required_celeste_path_from_state, write_state};
 use crate::utils::{normalize_dependency_name, now_string, stable_id};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
@@ -134,7 +134,7 @@ pub fn launch_profile(
 
 pub fn launch_game(celeste_path: String, launch_args: String) -> Result<LaunchResult, String> {
     let state = load_state();
-    let path = resolve_input_path_from_state(&celeste_path, &state);
+    let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
     let executable = resolve_game_executable(&path);
     if executable.is_empty() {
         return Err("没有找到 Celeste 可执行文件".to_string());
@@ -165,7 +165,7 @@ fn apply_profile_to_blacklist(
     mod_profile_id: String,
 ) -> Result<AppliedProfile, String> {
     let mut state = load_state();
-    let path = resolve_input_path_from_state(&celeste_path, &state);
+    let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
     let mut profiles = state.profiles_state();
     let map_profile = profiles
         .profiles
