@@ -196,25 +196,31 @@ function ProfileColumn({
         <span>{summary}</span>
       </div>
       <div className="profile-list table-like" ref={profileListRef}>
-        {profiles.map((profile) => (
-          <div className={profile.id === selectedProfileId ? "profile-row active" : "profile-row"} key={profile.id}>
-            <button className="profile" onClick={() => onProfileSelect(profile)}>
-              <span>{profile.name}</span>
-              <small>{profileSummary(profile)}</small>
-            </button>
-            <button
-              className="profile-delete-button"
-              disabled={loading || isDefaultProfile(profile)}
-              title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (window.confirm(`删除 Profile「${profile.name}」？`)) onProfileDelete(profile);
-              }}
-            >
-              <Trash2 size={14} />
-            </button>
+        {profiles.length ? (
+          profiles.map((profile) => (
+            <div className={profile.id === selectedProfileId ? "profile-row active" : "profile-row"} key={profile.id}>
+              <button className="profile" onClick={() => onProfileSelect(profile)}>
+                <span>{profile.name}</span>
+                <small>{profileSummary(profile)}</small>
+              </button>
+              <button
+                className="profile-delete-button"
+                disabled={loading || isDefaultProfile(profile)}
+                title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (window.confirm(`删除 Profile「${profile.name}」？`)) onProfileDelete(profile);
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))
+        ) : (
+          <div className="empty-state compact profile-list-empty">
+            <p>还没有 Profile。</p>
           </div>
-        ))}
+        )}
       </div>
       <label className="field">
         <span>{nameLabel}</span>

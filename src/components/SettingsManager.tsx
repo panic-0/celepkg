@@ -106,7 +106,10 @@ export function SettingsManager({
               })}
             </div>
           ) : (
-            <p className="filter-summary">没有找到数字存档。</p>
+            <div className="empty-state compact settings-empty">
+              <Save size={22} />
+              <p>没有找到数字存档。</p>
+            </div>
           )}
         </section>
       </div>

@@ -71,9 +71,19 @@ export function BackupManager({
             ))}
           </div>
         ) : (
-          <div className="empty-state table-empty">
+          <div className="empty-state table-empty backup-empty">
             <Archive size={28} />
             <p>暂无备份。</p>
+            <div className="empty-actions">
+              <button onClick={onBackupCreate} disabled={loading}>
+                <Archive size={16} />
+                立即备份
+              </button>
+              <button onClick={onBackupFolderOpen} disabled={loading}>
+                <FolderOpen size={16} />
+                打开文件夹
+              </button>
+            </div>
           </div>
         )}
       </div>
