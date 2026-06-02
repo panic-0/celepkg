@@ -119,7 +119,7 @@ function BackupItem({
         </button>
         <button onClick={() => onRestore(backup.id, "game")} disabled={loading}>
           <RotateCcw size={16} />
-          游戏文件
+          还原游戏文件
         </button>
       </div>
     </article>
