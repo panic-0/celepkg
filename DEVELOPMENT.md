@@ -76,6 +76,8 @@ Rust 测试：
 
 ```bash
 cd src-tauri
+cargo fmt -- --check
+cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 

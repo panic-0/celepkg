@@ -64,9 +64,17 @@ CelePkg 可能修改的游戏目录文件：
 
 应用配置和扫描缓存位于系统配置目录下的 `celepkg` 文件夹。扫描缓存可重新生成，不属于备份范围。
 
+写入游戏目录或启动游戏前，CelePkg 会校验当前路径必须是绝对路径、目录存在，并且看起来像 Celeste 安装目录。满足以下任一条件即可通过校验：
+
+- 包含 `Mods` 目录。
+- 包含 `Content` 目录。
+- 包含 `Celeste.exe`、`Celeste` 或 `Celeste.bin.x86_64`。
+
+这可以避免在路径为空、相对路径或普通文件夹时误创建 `Mods`、`blacklist.txt` 或备份目录。
+
 ## 注意事项
 
-- 使用前请确认 Celeste 路径指向包含 `Mods` 目录的游戏目录。
+- 使用前请确认 Celeste 路径指向有效的游戏目录，普通文件夹不会通过校验。
 - 官方地图只用于查看统计，不会被 CelePkg 禁用。
 - 应用 Profile 会重写 CelePkg 管理范围内的 blacklist 条目，但会保留非管理范围内容。
 - Profile 页面可以从当前游戏或另一个同类 Profile 覆盖当前 Profile。从当前游戏覆盖时只覆盖启用情况；从 Profile 覆盖时可选择只覆盖启用情况或覆盖全部内容。Favorite 和 Protected 不会被覆盖。

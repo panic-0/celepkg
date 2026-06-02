@@ -20,7 +20,7 @@ Protected 是“不要让 Profile 自动改这个条目”。它适合常驻 Hel
 
 例子：你把 `CollabUtils2.zip` 设为 Protected。之后应用某个 Profile，即使该 Profile 没选 CollabUtils2，CelePkg 也不会直接禁用它。
 
-注意：Protected 不阻止你的手动启用 / 禁用操作。官方地图默认不可禁用，也视为受保护。
+注意：Protected 会阻止 CelePkg 通过 Profile 操作启用或禁用这个条目，包括列表中的单项切换和批量启用 / 禁用。它不阻止你在游戏目录里手动编辑文件。官方地图默认不可禁用，也视为受保护。
 
 ## Profile 和 blacklist
 
