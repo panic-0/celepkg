@@ -202,6 +202,22 @@ h1 {
   padding: 0;
 }
 
+.cache-rescan-button {
+  min-width: 106px;
+  gap: 6px;
+  padding-inline: 12px;
+  color: #8a4a12;
+  border-color: #e2b36d;
+  background: #fff8ed;
+  font-weight: 700;
+}
+
+.cache-rescan-button:hover:not(:disabled) {
+  border-color: #c98224;
+  background: #fff1d8;
+  color: #733b0b;
+}
+
 .primary-button {
   background: #0f77ad;
   border-color: #0f77ad;

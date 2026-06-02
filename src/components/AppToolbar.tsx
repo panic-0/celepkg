@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, FolderOpen, Map, Package, Play, RefreshCcw, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, DatabaseZap, FolderOpen, Map, Package, Play, RefreshCcw } from "lucide-react";
 import type { ScanResult } from "../types";
 
 type AppToolbarProps = {
@@ -56,8 +56,9 @@ export function AppToolbar({
         <button className="icon-button" onClick={onRefresh} disabled={loading} title="保存路径并扫描">
           <RefreshCcw size={18} />
         </button>
-        <button className="icon-button" onClick={onRescan} disabled={loading} title="刷新缓存并重新扫描地图">
-          <RefreshCw size={18} />
+        <button className="cache-rescan-button" onClick={onRescan} disabled={loading} title="刷新缓存并重新扫描地图">
+          <DatabaseZap size={17} />
+          重扫缓存
         </button>
         <button className="primary-button" onClick={onLaunch} disabled={loading || !canLaunch}>
           <Play size={18} />
