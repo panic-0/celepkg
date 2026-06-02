@@ -40,8 +40,14 @@ export function useWorkspaceView({
     () => otherMods.find((modItem) => modItem.id === selectedModId) ?? otherMods[0],
     [otherMods, selectedModId]
   );
-  const enabledMapCount = maps.filter((map) => enabledMapDraft.has(map.id)).length;
-  const enabledModCount = otherMods.filter((modItem) => enabledModDraft.has(modItem.id)).length;
+  const enabledMapCount = useMemo(
+    () => maps.filter((map) => enabledMapDraft.has(map.id)).length,
+    [enabledMapDraft, maps]
+  );
+  const enabledModCount = useMemo(
+    () => otherMods.filter((modItem) => enabledModDraft.has(modItem.id)).length,
+    [enabledModDraft, otherMods]
+  );
   const mapProfileName = mapProfiles.find((profile) => profile.id === selectedMapProfileId)?.name ?? "";
   const modProfileName = modProfiles.find((profile) => profile.id === selectedModProfileId)?.name ?? "";
 

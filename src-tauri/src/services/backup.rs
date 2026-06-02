@@ -83,7 +83,7 @@ fn create_backup_in(
 ) -> Result<BackupInfo, String> {
     let kind = normalize_backup_kind(kind)?;
     let now = backup_timestamp();
-    let id = format!("{now}-{}", std::process::id());
+    let id = now.clone();
     let backup_path = backups_root.join(&id);
     fs::create_dir_all(&backup_path).map_err(|error| format!("创建备份目录失败：{error}"))?;
 
