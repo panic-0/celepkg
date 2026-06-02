@@ -144,6 +144,7 @@ function validateModRecord(value: unknown, path: string): ModRecord {
     subMaps: arrayAt(object.subMaps, `${path}.subMaps`).map((item, index) => validateSubMapInfo(item, `${path}.subMaps[${index}]`)),
     mapCount: numberAt(object.mapCount, `${path}.mapCount`),
     strawberryCount: numberAt(object.strawberryCount, `${path}.strawberryCount`),
+    strawberryTotalCount: numberAt(object.strawberryTotalCount, `${path}.strawberryTotalCount`),
     completionStatus: oneOfAt(object.completionStatus, ["completed", "unfinished", "unknown", "notApplicable"], `${path}.completionStatus`),
     dependencies: arrayAt(object.dependencies, `${path}.dependencies`).map((item, index) => validateDependency(item, `${path}.dependencies[${index}]`)),
     optionalDependencies: arrayAt(object.optionalDependencies, `${path}.optionalDependencies`).map((item, index) =>
@@ -186,6 +187,7 @@ function validateSubMapInfo(value: unknown, path: string): SubMapInfo {
     chapter: stringAt(object.chapter, `${path}.chapter`),
     filePath: stringAt(object.filePath, `${path}.filePath`),
     strawberryCount: numberAt(object.strawberryCount, `${path}.strawberryCount`),
+    strawberryTotalCount: numberAt(object.strawberryTotalCount, `${path}.strawberryTotalCount`),
     completionStatus: oneOfAt(object.completionStatus, ["completed", "unfinished", "unknown", "notApplicable"], `${path}.completionStatus`),
     stats: nullableMapStatsAt(object.stats, `${path}.stats`)
   };

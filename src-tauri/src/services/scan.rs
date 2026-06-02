@@ -6,7 +6,7 @@ use crate::parsers::dialog::{
     dialog_title_for_key, dialog_title_for_sid, is_dialog_file, read_dialog_titles,
 };
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
-use crate::parsers::map_bin::count_strawberries;
+use crate::parsers::map_bin::{count_strawberry_counts, StrawberryCounts};
 use crate::parsers::save_stats::{
     is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
 };
@@ -22,7 +22,7 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 10;
+const SCAN_CACHE_VERSION: u32 = 11;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -403,10 +403,10 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
     let sub_maps: Vec<SubMapInfo> = files
         .iter()
         .map(|file| {
-            let strawberry_count = fs::read(&file.path)
+            let strawberry_counts = fs::read(&file.path)
                 .ok()
-                .and_then(|bytes| count_strawberries(&bytes))
-                .unwrap_or(0);
+                .and_then(|bytes| count_strawberry_counts(&bytes))
+                .unwrap_or_default();
             let sid = format!("{}/{}", file.sid, file.side_name);
             SubMapInfo {
                 id: stable_id(&format!("vanilla::{sid}")),
@@ -415,7 +415,8 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
                 display_name: official_sub_map_display_name(&file.area_name, file.mode_index),
                 chapter: format!("Celeste/{}", file.area_name),
                 file_path: format!("Content/Maps/{}", file.file_name),
-                strawberry_count,
+                strawberry_count: strawberry_counts.visible,
+                strawberry_total_count: strawberry_counts.total,
                 completion_status: CompletionStatus::Unknown,
                 stats: None,
             }
@@ -424,6 +425,10 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
     let strawberry_count = sub_maps
         .iter()
         .map(|sub_map| sub_map.strawberry_count)
+        .sum();
+    let strawberry_total_count = sub_maps
+        .iter()
+        .map(|sub_map| sub_map.strawberry_total_count)
         .sum();
     let mut map_ids: Vec<String> = files.iter().map(|file| file.sid.clone()).collect();
     map_ids.sort();
@@ -450,6 +455,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
         sub_maps,
         map_count: files.len(),
         strawberry_count,
+        strawberry_total_count,
         completion_status: CompletionStatus::Unknown,
         dependencies: vec![],
         optional_dependencies: vec![],
@@ -734,8 +740,8 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             normalize_slash(&entry.path().strip_prefix(dir_path).ok()?.to_string_lossy());
         if let Some(sid) = map_sid_from_entry(&relative) {
             if let Ok(bytes) = fs::read(entry.path()) {
-                if let Some(count) = count_strawberries(&bytes) {
-                    strawberry_counts.insert(sid, count);
+                if let Some(counts) = count_strawberry_counts(&bytes) {
+                    strawberry_counts.insert(sid, counts);
                 }
             }
         }
@@ -777,8 +783,8 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         if let Some(sid) = map_sid_from_entry(&name) {
             let mut bytes = Vec::new();
             let _ = file.read_to_end(&mut bytes);
-            if let Some(count) = count_strawberries(&bytes) {
-                strawberry_counts.insert(sid, count);
+            if let Some(counts) = count_strawberry_counts(&bytes) {
+                strawberry_counts.insert(sid, counts);
             }
         }
         if path_basename(&name).eq_ignore_ascii_case("everest.yaml")
@@ -810,7 +816,7 @@ fn create_mod_record(
     entries: Vec<String>,
     metadata: ModMetadata,
     dialog_titles: HashMap<String, String>,
-    strawberry_counts: HashMap<String, u64>,
+    strawberry_counts: HashMap<String, StrawberryCounts>,
 ) -> ModRecord {
     let relative_path = normalize_slash(
         &absolute_path
@@ -836,7 +842,14 @@ fn create_mod_record(
                 .unwrap_or_else(|| sub_map_display_name(sid)),
             chapter: sub_map_chapter(sid),
             file_path: format!("Maps/{sid}.bin"),
-            strawberry_count: strawberry_counts.get(sid).copied().unwrap_or(0),
+            strawberry_count: strawberry_counts
+                .get(sid)
+                .map(|counts| counts.visible)
+                .unwrap_or(0),
+            strawberry_total_count: strawberry_counts
+                .get(sid)
+                .map(|counts| counts.total)
+                .unwrap_or(0),
             completion_status: CompletionStatus::Unknown,
             stats: None,
         })
@@ -844,6 +857,10 @@ fn create_mod_record(
     let strawberry_count = sub_maps
         .iter()
         .map(|sub_map| sub_map.strawberry_count)
+        .sum();
+    let strawberry_total_count = sub_maps
+        .iter()
+        .map(|sub_map| sub_map.strawberry_total_count)
         .sum();
     let is_map_mod = is_map_mod_record(&file_name, &relative_path, &metadata, &map_ids, &entries);
     let fallback_name = file_name.trim_end_matches(".zip").replace(['_', '-'], " ");
@@ -882,6 +899,7 @@ fn create_mod_record(
         stats: None,
         completion_status: CompletionStatus::Unknown,
         strawberry_count,
+        strawberry_total_count,
         warnings: vec![],
     }
 }
@@ -1114,8 +1132,22 @@ mod tests {
             "Maps/pack/one.bin".to_string(),
             "Maps/pack/two.bin".to_string(),
         ];
-        let strawberry_counts =
-            HashMap::from([("pack/one".to_string(), 3), ("pack/two".to_string(), 5)]);
+        let strawberry_counts = HashMap::from([
+            (
+                "pack/one".to_string(),
+                StrawberryCounts {
+                    visible: 3,
+                    total: 4,
+                },
+            ),
+            (
+                "pack/two".to_string(),
+                StrawberryCounts {
+                    visible: 5,
+                    total: 7,
+                },
+            ),
+        ]);
 
         let record = create_mod_record(
             &mod_path,
@@ -1128,8 +1160,11 @@ mod tests {
         );
 
         assert_eq!(record.strawberry_count, 8);
+        assert_eq!(record.strawberry_total_count, 11);
         assert_eq!(record.sub_maps[0].strawberry_count, 3);
+        assert_eq!(record.sub_maps[0].strawberry_total_count, 4);
         assert_eq!(record.sub_maps[1].strawberry_count, 5);
+        assert_eq!(record.sub_maps[1].strawberry_total_count, 7);
     }
 
     #[test]
@@ -1436,10 +1471,7 @@ mod tests {
         let content_maps = root.join("Content").join("Maps");
         fs::create_dir_all(&content_maps).expect("content maps dir");
         fs::create_dir_all(root.join("Mods")).expect("mods dir");
-        write_official_dialog(
-            &root,
-            "area_1=被遗弃的城市\narea_9=核心\narea_10=再见\n",
-        );
+        write_official_dialog(&root, "area_1=被遗弃的城市\narea_9=核心\narea_10=再见\n");
         fs::write(content_maps.join("1-ForsakenCity.bin"), "").expect("a side");
         fs::write(content_maps.join("1H-ForsakenCity.bin"), "").expect("b side");
         fs::write(content_maps.join("1X-ForsakenCity.bin"), "").expect("c side");
@@ -1470,10 +1502,7 @@ mod tests {
         assert_eq!(official.relative_path, "Celeste/");
         assert_eq!(official.sub_maps.len(), 3);
         assert_eq!(official.sub_maps[1].sid, "Celeste/1-ForsakenCity/B-Side");
-        assert_eq!(
-            official.sub_maps[1].display_name,
-            "1 - 被遗弃的城市 B-Side"
-        );
+        assert_eq!(official.sub_maps[1].display_name, "1 - 被遗弃的城市 B-Side");
         assert_eq!(official.sub_maps[1].chapter, "Celeste/1 - 被遗弃的城市");
         assert_eq!(
             official.sub_maps[1]
@@ -1503,11 +1532,7 @@ mod tests {
         )]);
         let cases = [
             ("0-Intro.bin", "序章", "序章"),
-            (
-                "1-ForsakenCity.bin",
-                "1 - 被遗弃的城市",
-                "1 - 被遗弃的城市",
-            ),
+            ("1-ForsakenCity.bin", "1 - 被遗弃的城市", "1 - 被遗弃的城市"),
             ("8-Epilogue.bin", "尾声", "尾声"),
             ("9-Core.bin", "8 - 核心", "8 - 核心"),
             ("LostLevels.bin", "9 - 再见", "9 - 再见"),
@@ -1519,9 +1544,8 @@ mod tests {
         ];
 
         for (file_name, area_name, display_name) in cases {
-            let file =
-                official_map_file_info(std::path::Path::new(file_name), &titles)
-                    .expect("official file");
+            let file = official_map_file_info(std::path::Path::new(file_name), &titles)
+                .expect("official file");
             assert_eq!(file.area_name, area_name);
             assert_eq!(
                 official_sub_map_display_name(&file.area_name, file.mode_index),
@@ -1554,6 +1578,7 @@ mod tests {
             sub_maps: vec![],
             map_count: 0,
             strawberry_count: 0,
+            strawberry_total_count: 0,
             completion_status: CompletionStatus::Unknown,
             dependencies: Vec::<Dependency>::new(),
             optional_dependencies: vec![],

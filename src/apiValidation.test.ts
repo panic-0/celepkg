@@ -81,6 +81,7 @@ describe("api validation", () => {
             subMaps: [],
             mapCount: 1,
             strawberryCount: 0,
+            strawberryTotalCount: 0,
             completionStatus: "unknown",
             dependencies: [],
             optionalDependencies: [],

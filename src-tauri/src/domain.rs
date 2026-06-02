@@ -74,6 +74,7 @@ pub struct SubMapInfo {
     pub chapter: String,
     pub file_path: String,
     pub strawberry_count: u64,
+    pub strawberry_total_count: u64,
     pub completion_status: CompletionStatus,
     pub stats: Option<MapStats>,
 }
@@ -98,6 +99,7 @@ pub struct ModRecord {
     pub sub_maps: Vec<SubMapInfo>,
     pub map_count: usize,
     pub strawberry_count: u64,
+    pub strawberry_total_count: u64,
     pub completion_status: CompletionStatus,
     pub dependencies: Vec<Dependency>,
     pub optional_dependencies: Vec<Dependency>,

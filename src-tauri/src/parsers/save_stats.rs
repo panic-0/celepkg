@@ -740,6 +740,7 @@ mod tests {
             chapter: String::new(),
             file_path: format!("Maps/{sid}.bin"),
             strawberry_count: 0,
+            strawberry_total_count: 0,
             completion_status,
             stats: None,
         }

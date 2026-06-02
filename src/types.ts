@@ -41,6 +41,7 @@ export type SubMapInfo = {
   chapter: string;
   filePath: string;
   strawberryCount: number;
+  strawberryTotalCount: number;
   completionStatus: CompletionStatus;
   stats: MapStats | null;
 };
@@ -62,6 +63,7 @@ export type ModRecord = {
   subMaps: SubMapInfo[];
   mapCount: number;
   strawberryCount: number;
+  strawberryTotalCount: number;
   completionStatus: CompletionStatus;
   dependencies: Dependency[];
   optionalDependencies: Dependency[];

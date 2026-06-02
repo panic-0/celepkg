@@ -1,4 +1,29 @@
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StrawberryCounts {
+    pub visible: u64,
+    pub total: u64,
+}
+
+impl StrawberryCounts {
+    fn saturating_add(self, other: Self) -> Self {
+        Self {
+            visible: self.visible.saturating_add(other.visible),
+            total: self.total.saturating_add(other.total),
+        }
+    }
+}
+
+#[cfg(test)]
 pub fn count_strawberries(bytes: &[u8]) -> Option<u64> {
+    count_strawberry_counts(bytes).map(|counts| counts.total)
+}
+
+#[cfg(test)]
+pub fn count_visible_strawberries(bytes: &[u8]) -> Option<u64> {
+    count_strawberry_counts(bytes).map(|counts| counts.visible)
+}
+
+pub fn count_strawberry_counts(bytes: &[u8]) -> Option<StrawberryCounts> {
     let mut reader = BinReader::new(bytes);
     let header = reader.take_string().ok()?;
     if header != "CELESTE MAP" {
@@ -16,15 +41,67 @@ pub fn count_strawberries(bytes: &[u8]) -> Option<u64> {
     count_element_strawberries(&mut reader, &lookup).ok()
 }
 
+#[cfg(test)]
 pub fn is_strawberry_entity(name: &str) -> bool {
-    let normalized = name
-        .rsplit(['/', ':'])
+    is_strawberry_entity_name(&normalized_entity_name(name))
+}
+
+fn count_element_strawberries(
+    reader: &mut BinReader<'_>,
+    lookup: &[String],
+) -> Result<StrawberryCounts, ()> {
+    let name = reader.take_lookup(lookup)?;
+    let mut moon = false;
+    let attr_count = reader.take_u8()?;
+    for _ in 0..attr_count {
+        let key = reader.take_lookup(lookup)?;
+        if key.eq_ignore_ascii_case("moon") {
+            moon = reader.take_boolish_attr(lookup)?;
+        } else {
+            reader.skip_attr(lookup)?;
+        }
+    }
+    let mut count = strawberry_counts_for_entity(name, moon);
+    let child_count = reader.take_u16()?;
+    for _ in 0..child_count {
+        count = count.saturating_add(count_element_strawberries(reader, lookup)?);
+    }
+    Ok(count)
+}
+
+fn strawberry_counts_for_entity(name: &str, moon: bool) -> StrawberryCounts {
+    let normalized = normalized_entity_name(name);
+    let total = is_strawberry_entity_name(&normalized);
+    let visible = match normalized.as_str() {
+        "strawberry" => !moon,
+        "returnberry"
+        | "strawberrywithreturn"
+        | "multiroomstrawberry"
+        | "nonpoppingstrawberry"
+        | "explodingstrawberry"
+        | "cassettefriendlystrawberry"
+        | "diagonalwingedstrawberry"
+        | "glassberry"
+        | "customizableberry" => true,
+        _ => false,
+    };
+    StrawberryCounts {
+        visible: u64::from(total && visible),
+        total: u64::from(total),
+    }
+}
+
+fn normalized_entity_name(name: &str) -> String {
+    name.rsplit(['/', ':'])
         .next()
         .unwrap_or(name)
         .replace(['_', '-'], "")
-        .to_lowercase();
+        .to_lowercase()
+}
+
+fn is_strawberry_entity_name(normalized: &str) -> bool {
     matches!(
-        normalized.as_str(),
+        normalized,
         "strawberry"
             | "goldenberry"
             | "moonberry"
@@ -36,22 +113,13 @@ pub fn is_strawberry_entity(name: &str) -> bool {
             | "multiroomstrawberry"
             | "explodingstrawberry"
             | "nonpoppingstrawberry"
+            | "cassettefriendlystrawberry"
+            | "diagonalwingedstrawberry"
+            | "glassberry"
+            | "customizableberry"
+            | "secretberry"
+            | "goldenstrawberrycustomconditions"
     )
-}
-
-fn count_element_strawberries(reader: &mut BinReader<'_>, lookup: &[String]) -> Result<u64, ()> {
-    let name = reader.take_lookup(lookup)?;
-    let mut count = u64::from(is_strawberry_entity(name));
-    let attr_count = reader.take_u8()?;
-    for _ in 0..attr_count {
-        let _key = reader.take_lookup(lookup)?;
-        reader.skip_attr(lookup)?;
-    }
-    let child_count = reader.take_u16()?;
-    for _ in 0..child_count {
-        count = count.saturating_add(count_element_strawberries(reader, lookup)?);
-    }
-    Ok(count)
 }
 
 struct BinReader<'a> {
@@ -148,6 +216,25 @@ impl<'a> BinReader<'a> {
         }
         Ok(())
     }
+
+    fn take_boolish_attr(&mut self, lookup: &[String]) -> Result<bool, ()> {
+        match self.take_u8()? {
+            0 | 1 => Ok(self.take_u8()? != 0),
+            2 => Ok(self.take_u16()? != 0),
+            3 | 4 => Ok(self.take_u32()? != 0),
+            5 => Ok(!self.take_lookup(lookup)?.is_empty()),
+            6 => Ok(!self.take_string()?.is_empty()),
+            7 => {
+                let len = self.take_i16()?;
+                if len < 0 {
+                    return Err(());
+                }
+                let bytes = self.take_exact(len as usize)?;
+                Ok(!bytes.is_empty())
+            }
+            _ => Err(()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -170,27 +257,61 @@ mod tests {
     }
 
     #[test]
-    fn counts_strawberry_elements_in_binary_map() {
+    fn separates_visible_and_total_strawberries() {
         let bytes = fake_map_bin(&[
-            "strawberry",
-            "goldenBerry",
-            "moonBerry",
-            "memorialTextController",
-            "SorbetHelper/ReturnBerry",
-            "LunaticHelper/StrawberryWithReturn",
-            "CollabUtils2/RainbowBerry",
-            "MaxHelpingHand/MultiRoomStrawberry",
-            "SJ2021/ExplodingStrawberry",
-            "MaxHelpingHand/NonPoppingStrawberry",
-            "spinner",
+            fake_entity("strawberry", &[("winged", true)]),
+            fake_entity("strawberry", &[("moon", true)]),
+            fake_entity("goldenBerry", &[]),
+            fake_entity("memorialTextController", &[]),
+            fake_entity("CollabUtils2/SilverBerry", &[]),
+            fake_entity("CollabUtils2/RainbowBerry", &[]),
+            fake_entity("SorbetHelper/ReturnBerry", &[]),
+            fake_entity("LunaticHelper/StrawberryWithReturn", &[]),
+            fake_entity("MaxHelpingHand/MultiRoomStrawberry", &[]),
+            fake_entity("SJ2021/ExplodingStrawberry", &[]),
+            fake_entity("MaxHelpingHand/NonPoppingStrawberry", &[]),
+            fake_entity("spinner", &[]),
         ]);
 
-        assert_eq!(count_strawberries(&bytes), Some(10));
+        let counts = count_strawberry_counts(&bytes).expect("map counts");
+        assert_eq!(counts.visible, 6);
+        assert_eq!(counts.total, 11);
+        assert_eq!(count_visible_strawberries(&bytes), Some(6));
+        assert_eq!(count_strawberries(&bytes), Some(11));
     }
 
-    fn fake_map_bin(entity_names: &[&str]) -> Vec<u8> {
+    #[test]
+    fn vanilla_totals_match_chapter_overview_rules() {
+        let mut entities = vec![];
+        entities.extend((0..165).map(|_| fake_entity("strawberry", &[])));
+        entities.extend((0..10).map(|_| fake_entity("strawberry", &[("winged", true)])));
+        entities.push(fake_entity("strawberry", &[("moon", true)]));
+        entities.extend((0..25).map(|_| fake_entity("goldenBerry", &[])));
+        entities.push(fake_entity("memorialTextController", &[]));
+
+        let counts = count_strawberry_counts(&fake_map_bin(&entities)).expect("map counts");
+
+        assert_eq!(counts.visible, 175);
+        assert_eq!(counts.total, 202);
+    }
+
+    fn fake_entity(name: &'static str, attrs: &'static [(&'static str, bool)]) -> FakeEntity {
+        FakeEntity { name, attrs }
+    }
+
+    struct FakeEntity {
+        name: &'static str,
+        attrs: &'static [(&'static str, bool)],
+    }
+
+    fn fake_map_bin(entities: &[FakeEntity]) -> Vec<u8> {
         let mut lookup = vec!["Map", "levels", "level", "entities"];
-        lookup.extend(entity_names.iter().copied());
+        for entity in entities {
+            push_lookup(&mut lookup, entity.name);
+            for (key, _) in entity.attrs {
+                push_lookup(&mut lookup, key);
+            }
+        }
         let mut bytes = Vec::new();
         push_string(&mut bytes, "CELESTE MAP");
         push_string(&mut bytes, "pkg");
@@ -199,25 +320,56 @@ mod tests {
             push_string(&mut bytes, value);
         }
 
-        let entity_children: Vec<Vec<u8>> = (0..entity_names.len())
-            .map(|index| element((4 + index) as u16, vec![]))
+        let entity_children: Vec<Vec<u8>> = entities
+            .iter()
+            .map(|entity| {
+                element(
+                    lookup_index(&lookup, entity.name),
+                    entity.attrs,
+                    vec![],
+                    &lookup,
+                )
+            })
             .collect();
-        let entities = element(3, entity_children);
-        let level = element(2, vec![entities]);
-        let levels = element(1, vec![level]);
-        bytes.extend(element(0, vec![levels]));
+        let entities = element(3, &[], entity_children, &lookup);
+        let level = element(2, &[], vec![entities], &lookup);
+        let levels = element(1, &[], vec![level], &lookup);
+        bytes.extend(element(0, &[], vec![levels], &lookup));
         bytes
     }
 
-    fn element(name_index: u16, children: Vec<Vec<u8>>) -> Vec<u8> {
+    fn element(
+        name_index: u16,
+        attrs: &[(&str, bool)],
+        children: Vec<Vec<u8>>,
+        lookup: &[&str],
+    ) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&name_index.to_le_bytes());
-        bytes.push(0);
+        bytes.push(attrs.len() as u8);
+        for (key, value) in attrs {
+            bytes.extend_from_slice(&lookup_index(lookup, key).to_le_bytes());
+            bytes.push(0);
+            bytes.push(u8::from(*value));
+        }
         bytes.extend_from_slice(&(children.len() as u16).to_le_bytes());
         for child in children {
             bytes.extend(child);
         }
         bytes
+    }
+
+    fn lookup_index(lookup: &[&str], value: &str) -> u16 {
+        lookup
+            .iter()
+            .position(|item| *item == value)
+            .expect("lookup value") as u16
+    }
+
+    fn push_lookup<'a>(lookup: &mut Vec<&'a str>, value: &'a str) {
+        if !lookup.contains(&value) {
+            lookup.push(value);
+        }
     }
 
     fn push_string(bytes: &mut Vec<u8>, value: &str) {
