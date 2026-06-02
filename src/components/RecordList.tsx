@@ -184,9 +184,6 @@ function MapTable({
               <td className="name-cell">
                 <div className="name-title-row">
                   <strong title={map.name}>{map.name}</strong>
-                  <span className="file-name-text" title={map.fileName}>
-                    {map.fileName}
-                  </span>
                   {map.metadata.version && (
                     <span className="version-text" title={map.metadata.version}>
                       {map.metadata.version}

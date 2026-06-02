@@ -1041,12 +1041,6 @@ h1 {
   flex: 1 1 auto;
 }
 
-.name-title-row .file-name-text {
-  flex: 0 1 190px;
-  color: #657384;
-  font-size: 12px;
-}
-
 .name-title-row .version-text {
   flex: 0 0 auto;
   max-width: 96px;
@@ -1056,7 +1050,6 @@ h1 {
 }
 
 .name-cell strong,
-.name-cell .file-name-text,
 .name-cell .version-text,
 .name-cell small {
   display: block;
