@@ -1,4 +1,4 @@
-import { Copy, Gamepad2, Layers, Plus, RefreshCw, ToggleRight, Trash2 } from "lucide-react";
+import { AlertTriangle, Copy, Gamepad2, Layers, Plus, RefreshCw, ToggleRight, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ProfileOverwriteMode } from "../hooks/useProfileDraft";
@@ -192,7 +192,63 @@ function ProfileColumn({
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
   const [overwriteMode, setOverwriteMode] = useState<ProfileOverwriteMode>("enabled");
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const profileListRef = useScrollMemory<HTMLDivElement>(scrollKey, scrollMemory);
+  const overwriteModeLabel = overwriteMode === "all" ? "覆盖全部内容" : "只覆盖启用情况";
+
+  function openOverwriteFromProfileDialog(sourceProfile: Profile) {
+    if (!selectedProfile || sourceProfile.id === selectedProfileId) return;
+    setConfirmDialog({
+      title: "确认覆盖 Profile",
+      description:
+        overwriteMode === "all"
+          ? "这会覆盖目标 Profile 的名称、启用情况和启动参数，但不会改变 Profile id，也不会改变 Favorite / 始终启用标记。"
+          : "这只会复制来源 Profile 的启用情况，目标 Profile 的名称和启动参数不变，Favorite / 始终启用标记不会改变。",
+      actionLabel: "确认覆盖",
+      rows: [
+        { label: "目标 Profile", value: selectedProfile.name },
+        { label: "来源 Profile", value: sourceProfile.name },
+        { label: "覆盖范围", value: overwriteModeLabel }
+      ],
+      onConfirm: () => onOverwriteFromProfile(sourceProfile.id, overwriteMode)
+    });
+  }
+
+  function openOverwriteFromCurrentDialog() {
+    if (!selectedProfile) return;
+    setConfirmDialog({
+      title: "确认覆盖 Profile",
+      description: "Profile 名称和启动参数不变，始终启用条目会保留当前 Profile 选择。",
+      actionLabel: "确认覆盖",
+      rows: [
+        { label: "目标 Profile", value: selectedProfile.name || title },
+        { label: "来源 Profile", value: "当前游戏启用情况" },
+        { label: "覆盖范围", value: "只覆盖启用情况" }
+      ],
+      onConfirm: onOverwriteFromCurrent
+    });
+  }
+
+  function openDeleteDialog(profile: Profile) {
+    setConfirmDialog({
+      title: "确认删除 Profile",
+      description: "删除后无法从 CelePkg 内直接恢复。默认 Profile 不能删除。",
+      actionLabel: "确认删除",
+      danger: true,
+      rows: [
+        { label: "目标 Profile", value: profile.name },
+        { label: "来源 Profile", value: "不适用" },
+        { label: "覆盖范围", value: "删除整个 Profile" }
+      ],
+      onConfirm: () => onProfileDelete(profile)
+    });
+  }
+
+  function confirmPendingAction() {
+    const action = confirmDialog?.onConfirm;
+    setConfirmDialog(null);
+    action?.();
+  }
 
   return (
     <aside className="profile-editor">
@@ -230,16 +286,7 @@ function ProfileColumn({
                   title={profile.id === selectedProfileId ? "不能从当前 Profile 覆盖自己" : "从此 Profile 覆盖当前 Profile"}
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (!selectedProfile || profile.id === selectedProfileId) return;
-                    const confirmed =
-                      overwriteMode === "all"
-                        ? window.confirm(
-                            `用「${profile.name}」的全部内容覆盖「${selectedProfile.name}」？这会覆盖名称、启用情况和启动参数，但不会改变 Profile id，也不会改变 Favorite / 始终启用标记。`
-                          )
-                        : window.confirm(
-                            `只用「${profile.name}」的启用情况覆盖「${selectedProfile.name}」？名称和启动参数不变，Favorite / 始终启用标记不会改变。`
-                          );
-                    if (confirmed) onOverwriteFromProfile(profile.id, overwriteMode);
+                    openOverwriteFromProfileDialog(profile);
                   }}
                 >
                   <RefreshCw size={14} />
@@ -250,7 +297,7 @@ function ProfileColumn({
                   title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
                   onClick={(event) => {
                     event.stopPropagation();
-                    if (window.confirm(`删除 Profile「${profile.name}」？`)) onProfileDelete(profile);
+                    openDeleteDialog(profile);
                   }}
                 >
                   <Trash2 size={14} />
@@ -283,23 +330,63 @@ function ProfileColumn({
           </select>
         </label>
       </div>
-      <button
-        className="wide-button overwrite-button"
-        onClick={() => {
-          if (
-            window.confirm(
-              `只用当前游戏启用情况覆盖「${selectedProfile?.name || title}」？Profile 名称和启动参数不变，始终启用条目会保留当前 Profile 选择。`
-            )
-          ) {
-            onOverwriteFromCurrent();
-          }
-        }}
-        disabled={loading || !selectedProfile}
-      >
+      <button className="wide-button overwrite-button" onClick={openOverwriteFromCurrentDialog} disabled={loading || !selectedProfile}>
         <RefreshCw size={16} />
         从当前游戏覆盖启用情况
       </button>
+      {confirmDialog && (
+        <ConfirmDialog dialog={confirmDialog} loading={loading} onCancel={() => setConfirmDialog(null)} onConfirm={confirmPendingAction} />
+      )}
     </aside>
+  );
+}
+
+type ConfirmDialogState = {
+  actionLabel: string;
+  danger?: boolean;
+  description: string;
+  rows: Array<{ label: string; value: string }>;
+  title: string;
+  onConfirm: () => void;
+};
+
+function ConfirmDialog({
+  dialog,
+  loading,
+  onCancel,
+  onConfirm
+}: {
+  dialog: ConfirmDialogState;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+        <div className="confirm-dialog-heading">
+          <AlertTriangle size={18} />
+          <h3 id="confirm-dialog-title">{dialog.title}</h3>
+        </div>
+        <p>{dialog.description}</p>
+        <dl className="confirm-dialog-facts">
+          {dialog.rows.map((row) => (
+            <div key={row.label}>
+              <dt>{row.label}</dt>
+              <dd title={row.value}>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="confirm-dialog-actions">
+          <button onClick={onCancel} disabled={loading}>
+            取消
+          </button>
+          <button className={dialog.danger ? "confirm-danger-button" : "confirm-primary-button"} onClick={onConfirm} disabled={loading}>
+            {dialog.actionLabel}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
