@@ -67,7 +67,7 @@ pub fn normalize_selected_save_files(
         .filter(|name| available_names.contains(name.as_str()))
         .cloned()
         .collect();
-    normalized.sort_by(|left, right| save_sort_key(left).cmp(&save_sort_key(right)));
+    normalized.sort_by_key(|left| save_sort_key(left));
     normalized.dedup();
     if normalized.is_empty() && available_names.contains("0.celeste") {
         normalized.push("0.celeste".to_string());
@@ -335,10 +335,9 @@ fn accumulate_save_stats(
                     strawberry_depth = Some(depth);
                 } else if strawberry_depth.is_some()
                     && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
+                    && add_berry_id(&event, &area_sid, accumulator)
                 {
-                    if add_berry_id(&event, &area_sid, accumulator) {
-                        area_mode_berry_ids_seen += 1;
-                    }
+                    area_mode_berry_ids_seen += 1;
                 }
             }
             Ok(Event::Empty(event)) => {
@@ -356,10 +355,9 @@ fn accumulate_save_stats(
                     }
                 } else if strawberry_depth.is_some()
                     && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
+                    && add_berry_id(&event, &area_sid, accumulator)
                 {
-                    if add_berry_id(&event, &area_sid, accumulator) {
-                        area_mode_berry_ids_seen += 1;
-                    }
+                    area_mode_berry_ids_seen += 1;
                 }
             }
             Ok(Event::End(event)) => {
@@ -374,11 +372,9 @@ fn accumulate_save_stats(
                 if strawberry_depth == Some(depth) {
                     strawberry_depth = None;
                 }
-                if area_depth == Some(depth) {
-                    area_depth = None;
-                    area_sid.clear();
-                    next_area_mode_index = 0;
-                } else if event.name().as_ref().eq_ignore_ascii_case(b"AreaStats") {
+                if area_depth == Some(depth)
+                    || event.name().as_ref().eq_ignore_ascii_case(b"AreaStats")
+                {
                     area_depth = None;
                     area_sid.clear();
                     next_area_mode_index = 0;

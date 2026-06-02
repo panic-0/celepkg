@@ -120,6 +120,98 @@ fn backup_sources(celeste_path: &Path) -> Vec<BackupSource> {
     ]
 }
 
+fn copy_backup_source(backup_path: &Path, source: BackupSource) -> Result<BackupFileEntry, String> {
+    let destination = backup_path.join(&source.backup_relative);
+    let existed = source.target.is_file();
+    if existed {
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|error| format!("创建备份文件夹失败：{error}"))?;
+        }
+        fs::copy(&source.target, &destination)
+            .map_err(|error| format!("复制备份文件失败：{error}"))?;
+    }
+    Ok(BackupFileEntry {
+        category: source.category.to_string(),
+        label: source.label.to_string(),
+        target_path: source.target.to_string_lossy().to_string(),
+        backup_path: normalize_slash(&source.backup_relative.to_string_lossy()),
+        existed,
+    })
+}
+
+fn restore_file(backup_path: &Path, file: &BackupFileEntry) -> Result<(), String> {
+    let target = PathBuf::from(&file.target_path);
+    if file.existed {
+        let source = backup_path.join(&file.backup_path);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| format!("创建还原目录失败：{error}"))?;
+        }
+        fs::copy(source, target).map_err(|error| format!("还原备份文件失败：{error}"))?;
+    } else if target.exists() {
+        fs::remove_file(target).map_err(|error| format!("移除还原目标失败：{error}"))?;
+    }
+    Ok(())
+}
+
+fn read_backup_info(backup_path: &Path) -> Option<BackupInfo> {
+    let manifest: BackupManifest = read_json(&backup_path.join("manifest.json"))?;
+    Some(BackupInfo {
+        id: manifest.id,
+        created_at: manifest.created_at,
+        kind: manifest.kind,
+        celeste_path: manifest.celeste_path,
+        backup_path: backup_path.to_string_lossy().to_string(),
+        files: manifest.files,
+    })
+}
+
+fn should_restore_file(file: &BackupFileEntry, scope: &str) -> bool {
+    file.category == RESTORE_SCOPE_GAME
+        && (scope == RESTORE_SCOPE_ALL || scope == RESTORE_SCOPE_GAME)
+}
+
+fn normalize_backup_kind(kind: &str) -> Result<&'static str, String> {
+    match kind {
+        BACKUP_KIND_AUTO => Ok(BACKUP_KIND_AUTO),
+        BACKUP_KIND_MANUAL => Ok(BACKUP_KIND_MANUAL),
+        _ => Err("备份类型无效".to_string()),
+    }
+}
+
+fn normalize_restore_scope(scope: &str) -> Result<&'static str, String> {
+    match scope {
+        RESTORE_SCOPE_ALL => Ok(RESTORE_SCOPE_ALL),
+        RESTORE_SCOPE_GAME => Ok(RESTORE_SCOPE_GAME),
+        _ => Err("还原范围无效".to_string()),
+    }
+}
+
+pub fn backups_dir(celeste_path: &Path) -> PathBuf {
+    celeste_path.join("celepkg").join("backups")
+}
+
+fn backup_timestamp() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos()
+        .to_string()
+}
+
+fn safe_backup_id(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-')
+        .collect()
+}
+
+struct BackupSource {
+    category: &'static str,
+    label: &'static str,
+    target: PathBuf,
+    backup_relative: PathBuf,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,96 +373,4 @@ mod tests {
             std::process::id()
         ))
     }
-}
-
-fn copy_backup_source(backup_path: &Path, source: BackupSource) -> Result<BackupFileEntry, String> {
-    let destination = backup_path.join(&source.backup_relative);
-    let existed = source.target.is_file();
-    if existed {
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent).map_err(|error| format!("创建备份文件夹失败：{error}"))?;
-        }
-        fs::copy(&source.target, &destination)
-            .map_err(|error| format!("复制备份文件失败：{error}"))?;
-    }
-    Ok(BackupFileEntry {
-        category: source.category.to_string(),
-        label: source.label.to_string(),
-        target_path: source.target.to_string_lossy().to_string(),
-        backup_path: normalize_slash(&source.backup_relative.to_string_lossy()),
-        existed,
-    })
-}
-
-fn restore_file(backup_path: &Path, file: &BackupFileEntry) -> Result<(), String> {
-    let target = PathBuf::from(&file.target_path);
-    if file.existed {
-        let source = backup_path.join(&file.backup_path);
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(|error| format!("创建还原目录失败：{error}"))?;
-        }
-        fs::copy(source, target).map_err(|error| format!("还原备份文件失败：{error}"))?;
-    } else if target.exists() {
-        fs::remove_file(target).map_err(|error| format!("移除还原目标失败：{error}"))?;
-    }
-    Ok(())
-}
-
-fn read_backup_info(backup_path: &Path) -> Option<BackupInfo> {
-    let manifest: BackupManifest = read_json(&backup_path.join("manifest.json"))?;
-    Some(BackupInfo {
-        id: manifest.id,
-        created_at: manifest.created_at,
-        kind: manifest.kind,
-        celeste_path: manifest.celeste_path,
-        backup_path: backup_path.to_string_lossy().to_string(),
-        files: manifest.files,
-    })
-}
-
-fn should_restore_file(file: &BackupFileEntry, scope: &str) -> bool {
-    file.category == RESTORE_SCOPE_GAME
-        && (scope == RESTORE_SCOPE_ALL || scope == RESTORE_SCOPE_GAME)
-}
-
-fn normalize_backup_kind(kind: &str) -> Result<&'static str, String> {
-    match kind {
-        BACKUP_KIND_AUTO => Ok(BACKUP_KIND_AUTO),
-        BACKUP_KIND_MANUAL => Ok(BACKUP_KIND_MANUAL),
-        _ => Err("备份类型无效".to_string()),
-    }
-}
-
-fn normalize_restore_scope(scope: &str) -> Result<&'static str, String> {
-    match scope {
-        RESTORE_SCOPE_ALL => Ok(RESTORE_SCOPE_ALL),
-        RESTORE_SCOPE_GAME => Ok(RESTORE_SCOPE_GAME),
-        _ => Err("还原范围无效".to_string()),
-    }
-}
-
-pub fn backups_dir(celeste_path: &Path) -> PathBuf {
-    celeste_path.join("celepkg").join("backups")
-}
-
-fn backup_timestamp() -> String {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos()
-        .to_string()
-}
-
-fn safe_backup_id(value: &str) -> String {
-    value
-        .chars()
-        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-')
-        .collect()
-}
-
-struct BackupSource {
-    category: &'static str,
-    label: &'static str,
-    target: PathBuf,
-    backup_relative: PathBuf,
 }

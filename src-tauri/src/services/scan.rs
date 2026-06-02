@@ -778,11 +778,13 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         dir_path,
         mods_path,
         false,
-        entries,
-        parse_metadata(&yaml_text),
-        read_dialog_titles(dialog_texts),
-        strawberry_counts,
-        map_difficulties,
+        ScannedModData {
+            entries,
+            metadata: parse_metadata(&yaml_text),
+            dialog_titles: read_dialog_titles(dialog_texts),
+            strawberry_counts,
+            map_difficulties,
+        },
     ))
 }
 
@@ -832,24 +834,37 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         zip_path,
         mods_path,
         true,
-        entries,
-        parse_metadata(&yaml_text),
-        read_dialog_titles(dialog_texts),
-        strawberry_counts,
-        map_difficulties,
+        ScannedModData {
+            entries,
+            metadata: parse_metadata(&yaml_text),
+            dialog_titles: read_dialog_titles(dialog_texts),
+            strawberry_counts,
+            map_difficulties,
+        },
     ))
+}
+
+struct ScannedModData {
+    entries: Vec<String>,
+    metadata: ModMetadata,
+    dialog_titles: HashMap<String, String>,
+    strawberry_counts: HashMap<String, StrawberryCounts>,
+    map_difficulties: HashMap<String, String>,
 }
 
 fn create_mod_record(
     absolute_path: &Path,
     mods_path: &Path,
     is_archive: bool,
-    entries: Vec<String>,
-    metadata: ModMetadata,
-    dialog_titles: HashMap<String, String>,
-    strawberry_counts: HashMap<String, StrawberryCounts>,
-    map_difficulties: HashMap<String, String>,
+    data: ScannedModData,
 ) -> ModRecord {
+    let ScannedModData {
+        entries,
+        metadata,
+        dialog_titles,
+        strawberry_counts,
+        map_difficulties,
+    } = data;
     let relative_path = normalize_slash(
         &absolute_path
             .strip_prefix(mods_path)
@@ -1250,11 +1265,13 @@ mod tests {
             &mod_path,
             &mods_path,
             true,
-            entries,
-            metadata("BerryPack"),
-            HashMap::new(),
-            strawberry_counts,
-            map_difficulties,
+            ScannedModData {
+                entries,
+                metadata: metadata("BerryPack"),
+                dialog_titles: HashMap::new(),
+                strawberry_counts,
+                map_difficulties,
+            },
         );
 
         assert_eq!(record.strawberry_count, 8);
