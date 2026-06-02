@@ -76,18 +76,17 @@ export function WorkspaceNav({
 }: WorkspaceNavProps) {
   const showsRecordFilters = activeView === "maps" || activeView === "mods";
   const showsSubMapFilters = activeView === "maps" && mainMode === "detail" && mapDetailTab === "submaps";
-  const filterCount =
-    showsSubMapFilters
-      ? Number(mapDetailControls.subMapQuery.trim().length > 0) +
-        Number(mapDetailControls.subMapSortKey !== "file") +
-        Number(mapDetailControls.subMapSortDescending) +
-        Number(!mapDetailControls.groupSubMapsByDifficulty)
-      : Number(query.trim().length > 0) +
-        Number(enabledFilter !== "all") +
-        Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
-        Number(activeView === "maps" && sortKey !== "name") +
-        Number(activeView === "maps" && showHelperMaps) +
-        Number(activeView === "mods" && showOnlyUnreferencedMods);
+  const filterCount = showsSubMapFilters
+    ? Number(mapDetailControls.subMapQuery.trim().length > 0) +
+      Number(mapDetailControls.subMapSortKey !== "file") +
+      Number(mapDetailControls.subMapSortDescending) +
+      Number(!mapDetailControls.groupSubMapsByDifficulty)
+    : Number(query.trim().length > 0) +
+      Number(enabledFilter !== "all") +
+      Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
+      Number(activeView === "maps" && sortKey !== "name") +
+      Number(activeView === "maps" && showHelperMaps) +
+      Number(activeView === "mods" && showOnlyUnreferencedMods);
 
   return (
     <aside className="workspace-nav">
@@ -95,12 +94,16 @@ export function WorkspaceNav({
         <button className={activeView === "maps" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("maps")}>
           <Gamepad2 size={18} />
           <span>地图</span>
-          <strong>{totalMapCount}</strong>
+          <strong className="nav-count" title={`${enabledMapCount}/${totalMapCount} 地图启用`}>
+            {enabledMapCount}/{totalMapCount}
+          </strong>
         </button>
         <button className={activeView === "mods" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("mods")}>
           <Layers size={18} />
           <span>其他 Mod</span>
-          <strong>{totalModCount}</strong>
+          <strong className="nav-count" title={`${enabledModCount}/${totalModCount} Mod 启用`}>
+            {enabledModCount}/{totalModCount}
+          </strong>
         </button>
         <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
           <UserRound size={18} />

@@ -1,11 +1,9 @@
-import { AlertTriangle, CheckCircle2, DatabaseZap, FolderOpen, Map, Package, Play, RefreshCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, DatabaseZap, FolderOpen, Play, RefreshCcw } from "lucide-react";
 import type { ScanResult } from "../types";
 
 type AppToolbarProps = {
   canLaunch: boolean;
   celestePath: string;
-  enabledMapCount: number;
-  enabledModCount: number;
   loading: boolean;
   loadingMessage: string;
   scan: ScanResult;
@@ -19,8 +17,6 @@ type AppToolbarProps = {
 export function AppToolbar({
   canLaunch,
   celestePath,
-  enabledMapCount,
-  enabledModCount,
   loading,
   loadingMessage,
   scan,
@@ -50,8 +46,6 @@ export function AppToolbar({
       </label>
 
       <div className="toolbar-metrics" aria-label="当前扫描状态">
-        <MetricPill icon={<Map size={14} />} label="地图" value={`${enabledMapCount}/${scan.maps.length}`} />
-        <MetricPill icon={<Package size={14} />} label="Mod" value={`${enabledModCount}/${scan.otherMods.length}`} />
         <MetricPill icon={<CheckCircle2 size={14} />} label="完成" value={completedCount} />
         <MetricPill icon={<AlertTriangle size={14} />} label="警告" value={warningCount} tone={warningCount ? "warn" : "ok"} />
       </div>

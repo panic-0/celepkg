@@ -100,8 +100,6 @@ export function App() {
         loading={loading}
         loadingMessage={loadingMessage}
         canLaunch={Boolean(scan.gameExecutable)}
-        enabledMapCount={workspaceView.enabledMapCount}
-        enabledModCount={workspaceView.enabledModCount}
         scan={scan}
         onApplyAndLaunch={profileDraft.launchSelectedProfiles}
         onDirectLaunch={profileDraft.launchCurrentGame}

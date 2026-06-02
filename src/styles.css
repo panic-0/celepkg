@@ -357,6 +357,23 @@ h1 {
   font-size: 12px;
 }
 
+.nav-item .nav-count {
+  min-width: 48px;
+  border: 1px solid #d5dee7;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4f6172;
+  font-weight: 800;
+  padding: 1px 7px;
+  text-align: center;
+}
+
+.nav-item.active .nav-count {
+  border-color: #9bc7d8;
+  background: #ffffff;
+  color: #075b86;
+}
+
 .nav-summary {
   display: grid;
   gap: 6px;
