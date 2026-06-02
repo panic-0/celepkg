@@ -135,20 +135,36 @@ h1 {
 
 .toolbar-path {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 7px;
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
   min-width: 0;
   border: 1px solid #c7d0da;
   border-radius: 5px;
-  padding-left: 9px;
   background: #ffffff;
+  overflow: hidden;
 }
 
 .toolbar-path input {
   border: 0;
   min-height: 34px;
   box-shadow: none;
+}
+
+.toolbar-path-browse {
+  width: 36px;
+  min-height: 34px;
+  border: 0;
+  border-right: 1px solid #e0e6ec;
+  border-radius: 0;
+  background: #f8fafb;
+  color: #536576;
+  padding: 0;
+}
+
+.toolbar-path-browse:hover:not(:disabled) {
+  border-color: #c7d0da;
+  border-right-color: #b8c7d5;
+  background: #eef8fc;
 }
 
 .toolbar-metrics {

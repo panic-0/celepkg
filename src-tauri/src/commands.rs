@@ -3,21 +3,17 @@ use crate::domain::{
 };
 use crate::services;
 use crate::storage::{
-    load_state, resolve_input_path_from_state, resolve_required_celeste_path,
-    resolve_required_celeste_path_from_state, write_state,
+    load_state, normalize_configured_celeste_path, resolve_input_path_from_state,
+    resolve_required_celeste_path, resolve_required_celeste_path_from_state, write_state,
 };
 use std::path::Path;
 use std::process::Command;
 
 #[tauri::command]
 pub fn get_config() -> Result<ConfigResponse, String> {
-    let state = load_state()?;
-    Ok(ConfigResponse {
-        celeste_path: state.celeste_path.clone(),
-        auto_backup_enabled: state.auto_backup_enabled,
-        selected_save_files: state.selected_save_files.clone(),
-        profiles: state.profiles_state(),
-    })
+    let mut state = load_state()?;
+    let warnings = normalize_configured_celeste_path(&mut state)?;
+    Ok(config_response(&state, warnings))
 }
 
 #[tauri::command]
@@ -36,12 +32,7 @@ pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigRespon
     let mut state = load_state()?;
     state.auto_backup_enabled = auto_backup_enabled;
     write_state(&state)?;
-    Ok(ConfigResponse {
-        celeste_path: state.celeste_path.clone(),
-        auto_backup_enabled: state.auto_backup_enabled,
-        selected_save_files: state.selected_save_files.clone(),
-        profiles: state.profiles_state(),
-    })
+    Ok(config_response(&state, vec![]))
 }
 
 #[tauri::command]
@@ -52,12 +43,19 @@ pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse
     state.selected_save_files =
         crate::parsers::save_stats::normalize_selected_save_files(&available, &save_files);
     write_state(&state)?;
-    Ok(ConfigResponse {
-        celeste_path: state.celeste_path.clone(),
-        auto_backup_enabled: state.auto_backup_enabled,
-        selected_save_files: state.selected_save_files.clone(),
-        profiles: state.profiles_state(),
+    Ok(config_response(&state, vec![]))
+}
+
+#[tauri::command]
+pub async fn select_celeste_directory() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        Ok(rfd::FileDialog::new()
+            .set_title("选择 Celeste 安装目录")
+            .pick_folder()
+            .map(|path| path.to_string_lossy().to_string()))
     })
+    .await
+    .map_err(|error| format!("选择目录任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -284,4 +282,14 @@ fn open_directory(path: &Path) -> Result<(), String> {
         .spawn()
         .map(|_| ())
         .map_err(|error| format!("打开文件夹失败：{error}"))
+}
+
+fn config_response(state: &crate::storage::AppState, warnings: Vec<String>) -> ConfigResponse {
+    ConfigResponse {
+        celeste_path: state.celeste_path.clone(),
+        auto_backup_enabled: state.auto_backup_enabled,
+        selected_save_files: state.selected_save_files.clone(),
+        profiles: state.profiles_state(),
+        warnings,
+    }
 }

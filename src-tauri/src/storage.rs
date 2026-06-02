@@ -59,6 +59,41 @@ pub fn write_state(state: &AppState) -> Result<(), String> {
     write_json(&state_path(), state)
 }
 
+pub fn normalize_configured_celeste_path(state: &mut AppState) -> Result<Vec<String>, String> {
+    normalize_configured_celeste_path_at(state, &state_path())
+}
+
+fn normalize_configured_celeste_path_at(
+    state: &mut AppState,
+    state_file: &Path,
+) -> Result<Vec<String>, String> {
+    let configured = state.celeste_path.trim();
+    if configured.is_empty() {
+        return Ok(vec![]);
+    }
+    let path = PathBuf::from(configured);
+    if !path.exists() || !path.is_dir() {
+        let previous = state.celeste_path.clone();
+        state.celeste_path.clear();
+        write_json(state_file, state)?;
+        return Ok(vec![format!(
+            "配置中的 Celeste 路径不可用，已清空：{previous}"
+        )]);
+    }
+    if !path.is_absolute() {
+        return Ok(vec![
+            "配置中的 Celeste 路径不是绝对路径，请重新选择。".to_string()
+        ]);
+    }
+    if !looks_like_celeste_dir(&path) {
+        return Ok(vec![format!(
+            "配置中的路径存在，但看起来不是 Celeste 游戏目录：{}",
+            path.display()
+        )]);
+    }
+    Ok(vec![])
+}
+
 pub fn resolve_input_path_from_state(value: &str, state: &AppState) -> PathBuf {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -474,6 +509,61 @@ mod tests {
         assert_eq!(state.active_mod_profile_id, "default-mods");
         assert_eq!(state.profiles.len(), 2);
         assert_eq!(text, original);
+    }
+
+    #[test]
+    fn missing_configured_celeste_path_is_cleared_and_written() {
+        let root = temp_dir("missing-configured-celeste");
+        let file = root.join("state.json");
+        let missing = root.join("missing-celeste");
+        let mut state = default_state();
+        state.celeste_path = missing.to_string_lossy().to_string();
+
+        let warnings =
+            normalize_configured_celeste_path_at(&mut state, &file).expect("normalize path");
+        let written: AppState = read_json(&file).expect("written state");
+        let _ = fs::remove_dir_all(root);
+
+        assert!(warnings[0].contains("已清空"));
+        assert_eq!(state.celeste_path, "");
+        assert_eq!(written.celeste_path, "");
+    }
+
+    #[test]
+    fn plain_existing_configured_directory_is_kept_with_warning() {
+        let root = temp_dir("plain-configured-celeste");
+        let plain = root.join("plain");
+        fs::create_dir_all(&plain).expect("plain dir");
+        let file = root.join("state.json");
+        let original = "unchanged";
+        fs::write(&file, original).expect("write marker");
+        let mut state = default_state();
+        state.celeste_path = plain.to_string_lossy().to_string();
+
+        let warnings =
+            normalize_configured_celeste_path_at(&mut state, &file).expect("normalize path");
+        let text = fs::read_to_string(&file).expect("read marker");
+        let _ = fs::remove_dir_all(root);
+
+        assert!(warnings[0].contains("不是 Celeste 游戏目录"));
+        assert_eq!(state.celeste_path, plain.to_string_lossy());
+        assert_eq!(text, original);
+    }
+
+    #[test]
+    fn valid_configured_celeste_directory_has_no_warning() {
+        let root = temp_dir("valid-configured-celeste");
+        fs::create_dir_all(root.join("Mods")).expect("mods dir");
+        let file = root.join("state.json");
+        let mut state = default_state();
+        state.celeste_path = root.to_string_lossy().to_string();
+
+        let warnings =
+            normalize_configured_celeste_path_at(&mut state, &file).expect("normalize path");
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(warnings.is_empty());
+        assert_eq!(state.celeste_path, root.to_string_lossy());
     }
 
     fn temp_dir(label: &str) -> PathBuf {

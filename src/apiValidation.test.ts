@@ -34,13 +34,15 @@ describe("api validation", () => {
         celestePath: "D:/Celeste",
         autoBackupEnabled: true,
         selectedSaveFiles: ["0.celeste"],
-        profiles
+        profiles,
+        warnings: ["配置提示"]
       })
     ).toEqual({
       celestePath: "D:/Celeste",
       autoBackupEnabled: true,
       selectedSaveFiles: ["0.celeste"],
-      profiles
+      profiles,
+      warnings: ["配置提示"]
     });
   });
 
@@ -50,7 +52,8 @@ describe("api validation", () => {
         celestePath: "D:/Celeste",
         autoBackupEnabled: "yes",
         selectedSaveFiles: ["0.celeste"],
-        profiles
+        profiles,
+        warnings: []
       })
     ).toThrow("config.autoBackupEnabled");
   });

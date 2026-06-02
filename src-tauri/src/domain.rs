@@ -143,6 +143,7 @@ pub struct ConfigResponse {
     pub auto_backup_enabled: bool,
     pub selected_save_files: Vec<String>,
     pub profiles: ProfilesState,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

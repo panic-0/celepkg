@@ -94,6 +94,7 @@ export type ConfigResponse = {
   autoBackupEnabled: boolean;
   selectedSaveFiles: string[];
   profiles: ProfilesState;
+  warnings: string[];
 };
 
 export type BackupFileEntry = {

@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getConfig, rescanCeleste, scanCeleste, setAutoBackupEnabled, setCelestePath, setSelectedSaveFiles } from "../api";
+import {
+  getConfig,
+  rescanCeleste,
+  scanCeleste,
+  selectCelesteDirectory,
+  setAutoBackupEnabled,
+  setCelestePath,
+  setSelectedSaveFiles
+} from "../api";
 import type { ScanResult } from "../types";
 import { readError } from "../utils/format";
 
@@ -76,9 +84,18 @@ export function useCelePkgData() {
 
   const loadConfigAndRefresh = useCallback(async () => {
     const config = await getConfig();
+    const configMessage = config.warnings.join("；");
     setPathInput(config.celestePath);
     setAutoBackupEnabledState(config.autoBackupEnabled);
-    setScan((current) => ({ ...current, profiles: config.profiles, selectedSaveFiles: config.selectedSaveFiles }));
+    setMessage(configMessage);
+    setScan((current) => ({
+      ...(config.celestePath.trim() && !config.warnings.length ? current : emptyScan),
+      profiles: config.profiles,
+      selectedSaveFiles: config.selectedSaveFiles
+    }));
+    if (!config.celestePath.trim() || config.warnings.length) {
+      return undefined;
+    }
     return refreshPath(config.celestePath);
   }, [refreshPath]);
 
@@ -156,6 +173,27 @@ export function useCelePkgData() {
     }
   }, [celestePath, rescanPath, setLoading]);
 
+  const selectPathAndRefresh = useCallback(async () => {
+    setLoading(true);
+    setLoadingMessage("正在选择目录...");
+    setMessage("");
+    try {
+      const selectedPath = await selectCelesteDirectory();
+      if (!selectedPath) {
+        setLoading(false);
+        return undefined;
+      }
+      setPathInput(selectedPath);
+      setLoadingMessage("正在保存目录...");
+      const saved = await setCelestePath(selectedPath);
+      return await refreshPath(saved.celestePath);
+    } catch (error) {
+      setMessage(readError(error));
+      setLoading(false);
+      return undefined;
+    }
+  }, [refreshPath, setLoading]);
+
   useEffect(() => {
     loadConfigAndRefresh().catch((error) => setMessage(readError(error)));
   }, [loadConfigAndRefresh]);
@@ -171,6 +209,7 @@ export function useCelePkgData() {
     savePathAndRefresh,
     savePathAndRescan,
     scan,
+    selectPathAndRefresh,
     setLoading,
     setMessage,
     setPathInput,

@@ -9,6 +9,7 @@ type AppToolbarProps = {
   scan: ScanResult;
   onApplyAndLaunch: () => void;
   onDirectLaunch: () => void;
+  onPathBrowse: () => void;
   onPathChange: (path: string) => void;
   onRefresh: () => void;
   onRescan: () => void;
@@ -22,6 +23,7 @@ export function AppToolbar({
   scan,
   onApplyAndLaunch,
   onDirectLaunch,
+  onPathBrowse,
   onPathChange,
   onRefresh,
   onRescan
@@ -36,14 +38,16 @@ export function AppToolbar({
         <span>{loading ? loadingMessage || "正在处理" : scan.modsPath ? "已连接 Celeste" : "等待目录"}</span>
       </div>
 
-      <label className="toolbar-path">
-        <FolderOpen size={17} />
+      <div className="toolbar-path">
+        <button className="toolbar-path-browse" onClick={onPathBrowse} disabled={loading} title="选择 Celeste 安装目录">
+          <FolderOpen size={17} />
+        </button>
         <input
           value={celestePath}
           onChange={(event) => onPathChange(event.target.value)}
           placeholder="Celeste 安装目录，例如 D:/SteamLibrary/steamapps/common/Celeste"
         />
-      </label>
+      </div>
 
       <div className="toolbar-metrics" aria-label="当前扫描状态">
         <MetricPill icon={<CheckCircle2 size={14} />} label="完成" value={completedCount} />

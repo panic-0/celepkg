@@ -21,13 +21,19 @@ export function validateConfigResponse(value: unknown): ConfigResponse {
     celestePath: stringAt(object.celestePath, "config.celestePath"),
     autoBackupEnabled: booleanAt(object.autoBackupEnabled, "config.autoBackupEnabled"),
     selectedSaveFiles: stringArrayAt(object.selectedSaveFiles, "config.selectedSaveFiles"),
-    profiles: validateProfilesState(object.profiles, "config.profiles")
+    profiles: validateProfilesState(object.profiles, "config.profiles"),
+    warnings: stringArrayAt(object.warnings, "config.warnings")
   };
 }
 
 export function validateCelestePathResponse(value: unknown): { celestePath: string } {
   const object = objectAt(value, "celestePath response");
   return { celestePath: stringAt(object.celestePath, "celestePath response.celestePath") };
+}
+
+export function validateNullableString(value: unknown): string | null {
+  if (value === null) return null;
+  return stringAt(value, "nullable string");
 }
 
 export function validateScanResult(value: unknown): ScanResult {

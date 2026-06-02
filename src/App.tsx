@@ -30,6 +30,7 @@ export function App() {
     savePathAndRefresh,
     savePathAndRescan,
     scan,
+    selectPathAndRefresh,
     setLoading,
     setMessage,
     setPathInput,
@@ -103,6 +104,7 @@ export function App() {
         scan={scan}
         onApplyAndLaunch={profileDraft.launchSelectedProfiles}
         onDirectLaunch={profileDraft.launchCurrentGame}
+        onPathBrowse={selectPathAndRefresh}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
         onRescan={savePathAndRescan}

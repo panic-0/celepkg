@@ -5,6 +5,7 @@ import {
   validateCelestePathResponse,
   validateConfigResponse,
   validateLaunchResult,
+  validateNullableString,
   validateProfilesState,
   validateVoid,
   validateScanResult
@@ -21,6 +22,10 @@ export async function getConfig(): Promise<ConfigResponse> {
 
 export async function setCelestePath(celestePath: string): Promise<{ celestePath: string }> {
   return invokeChecked("set_celeste_path", validateCelestePathResponse, { celestePath });
+}
+
+export async function selectCelesteDirectory(): Promise<string | null> {
+  return invokeChecked("select_celeste_directory", validateNullableString);
 }
 
 export async function setAutoBackupEnabled(autoBackupEnabled: boolean): Promise<ConfigResponse> {
