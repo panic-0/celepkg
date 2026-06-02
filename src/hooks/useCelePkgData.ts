@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getConfig, scanCeleste, setAutoBackupEnabled, setCelestePath, setSelectedSaveFiles } from "../api";
+import { getConfig, rescanCeleste, scanCeleste, setAutoBackupEnabled, setCelestePath, setSelectedSaveFiles } from "../api";
 import type { ScanResult } from "../types";
 import { readError } from "../utils/format";
 
@@ -32,6 +32,23 @@ export function useCelePkgData() {
       const result = await scanCeleste(nextPath);
       setScan(result);
       setPathInput(result.celestePath);
+      return result;
+    } catch (error) {
+      setMessage(readError(error));
+      return undefined;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const rescanPath = useCallback(async (nextPath: string) => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const result = await rescanCeleste(nextPath);
+      setScan(result);
+      setPathInput(result.celestePath);
+      setMessage("已刷新缓存并重新扫描地图。");
       return result;
     } catch (error) {
       setMessage(readError(error));
@@ -103,6 +120,18 @@ export function useCelePkgData() {
     }
   }, [celestePath, refreshPath]);
 
+  const savePathAndRescan = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      await setCelestePath(celestePath);
+      await rescanPath(celestePath);
+    } catch (error) {
+      setMessage(readError(error));
+      setLoading(false);
+    }
+  }, [celestePath, rescanPath]);
+
   useEffect(() => {
     loadConfigAndRefresh().catch((error) => setMessage(readError(error)));
   }, [loadConfigAndRefresh]);
@@ -115,6 +144,7 @@ export function useCelePkgData() {
     message,
     refresh,
     savePathAndRefresh,
+    savePathAndRescan,
     scan,
     setLoading,
     setMessage,

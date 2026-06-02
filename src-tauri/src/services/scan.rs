@@ -75,6 +75,44 @@ pub fn full_scan_cached(
         }
     }
 
+    scan_and_write_cache(
+        celeste_path,
+        profiles,
+        protected_record_ids,
+        available_save_files,
+        selected_save_files,
+        signature,
+    )
+}
+
+pub fn full_scan_fresh(
+    celeste_path: &Path,
+    profiles: ProfilesState,
+    protected_record_ids: &[String],
+    selected_save_files: &[String],
+) -> ScanResult {
+    let available_save_files = list_save_files(celeste_path);
+    let selected_save_files =
+        normalize_selected_save_files(&available_save_files, selected_save_files);
+    let signature = build_scan_signature(celeste_path, &selected_save_files);
+    scan_and_write_cache(
+        celeste_path,
+        profiles,
+        protected_record_ids,
+        available_save_files,
+        selected_save_files,
+        signature,
+    )
+}
+
+fn scan_and_write_cache(
+    celeste_path: &Path,
+    profiles: ProfilesState,
+    protected_record_ids: &[String],
+    available_save_files: Vec<SaveFileInfo>,
+    selected_save_files: Vec<String>,
+    signature: ScanSignature,
+) -> ScanResult {
     let mut result = full_scan(
         celeste_path,
         profiles,
@@ -86,6 +124,7 @@ pub fn full_scan_cached(
         signature,
         result: result.clone(),
     };
+    let cache_path = scan_cache_path(celeste_path);
     let _ = write_json(&cache_path, &cache);
     result
 }
@@ -1265,6 +1304,36 @@ mod tests {
 
         assert_eq!(invalidated.profiles.active_map_profile_id, "three");
         assert!(!invalidated.maps[0].enabled);
+    }
+
+    #[test]
+    fn fresh_scan_bypasses_existing_cache() {
+        let root = temp_celeste_root("fresh-cache");
+        write_dir_map(&root, "FreshMap", "maps/cache/fresh");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let first = full_scan_cached(&root, empty_profiles(), &[], &[]);
+        assert_eq!(first.maps.len(), 1);
+
+        let signature = build_scan_signature(&root, &first.selected_save_files);
+        let cached = CachedScan {
+            signature,
+            result: ScanResult {
+                maps: vec![],
+                ..first.clone()
+            },
+        };
+        write_json(&cache_file, &cached).expect("write cache");
+
+        let cached_scan = full_scan_cached(&root, empty_profiles(), &[], &[]);
+        let fresh_scan = full_scan_fresh(&root, empty_profiles(), &[], &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert!(cached_scan.maps.is_empty());
+        assert_eq!(fresh_scan.maps.len(), 1);
     }
 
     #[test]

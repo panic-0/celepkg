@@ -35,6 +35,10 @@ export async function scanCeleste(celestePath: string): Promise<ScanResult> {
   return invokeChecked("scan_celeste", validateScanResult, { celestePath });
 }
 
+export async function rescanCeleste(celestePath: string): Promise<ScanResult> {
+  return invokeChecked("rescan_celeste", validateScanResult, { celestePath });
+}
+
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {
   return invokeChecked("save_profile", validateProfilesState, { profile });
 }

@@ -25,6 +25,7 @@ export function App() {
     message,
     refresh,
     savePathAndRefresh,
+    savePathAndRescan,
     scan,
     setLoading,
     setMessage,
@@ -99,6 +100,7 @@ export function App() {
         onLaunch={profileDraft.launchSelectedProfiles}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
+        onRescan={savePathAndRescan}
       />
 
       <section className={`workspace ${workspaceView.activeView === "profiles" || workspaceView.activeView === "backups" ? "management-view" : ""}`}>

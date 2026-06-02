@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, FolderOpen, Map, Package, Play, RefreshCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FolderOpen, Map, Package, Play, RefreshCcw, RefreshCw } from "lucide-react";
 import type { ScanResult } from "../types";
 
 type AppToolbarProps = {
@@ -11,6 +11,7 @@ type AppToolbarProps = {
   onLaunch: () => void;
   onPathChange: (path: string) => void;
   onRefresh: () => void;
+  onRescan: () => void;
 };
 
 export function AppToolbar({
@@ -22,7 +23,8 @@ export function AppToolbar({
   scan,
   onLaunch,
   onPathChange,
-  onRefresh
+  onRefresh,
+  onRescan
 }: AppToolbarProps) {
   const completedCount = scan.maps.filter((map) => map.completionStatus === "completed").length;
   const warningCount = [...scan.maps, ...scan.otherMods].filter((record) => record.warnings.length).length;
@@ -53,6 +55,9 @@ export function AppToolbar({
       <div className="toolbar-actions">
         <button className="icon-button" onClick={onRefresh} disabled={loading} title="保存路径并扫描">
           <RefreshCcw size={18} />
+        </button>
+        <button className="icon-button" onClick={onRescan} disabled={loading} title="刷新缓存并重新扫描地图">
+          <RefreshCw size={18} />
         </button>
         <button className="primary-button" onClick={onLaunch} disabled={loading || !canLaunch}>
           <Play size={18} />

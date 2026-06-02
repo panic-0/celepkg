@@ -13,6 +13,7 @@ pub fn run() {
             commands::set_auto_backup_enabled,
             commands::set_selected_save_files,
             commands::scan_celeste,
+            commands::rescan_celeste,
             commands::set_record_favorite,
             commands::set_record_protected,
             commands::save_profile,
