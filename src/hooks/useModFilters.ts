@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
 import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
-import type { EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
+import type { EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
 
 type ModFiltersOptions = {
@@ -14,6 +14,7 @@ type SavedModFilters = {
   enabledFilter: EnabledFilter;
   progressFilter: ProgressFilter;
   query: string;
+  referenceFilter: ReferenceFilter;
   showHelperMaps: boolean;
   showOnlyUnreferencedMods: boolean;
   sortKey: SortKey;
@@ -24,6 +25,7 @@ const defaultFilters: SavedModFilters = {
   enabledFilter: "all",
   progressFilter: "all",
   query: "",
+  referenceFilter: "all",
   showHelperMaps: false,
   showOnlyUnreferencedMods: false,
   sortKey: "name"
@@ -34,27 +36,28 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
   const [query, setQuery] = useState(savedFilters.query);
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>(savedFilters.enabledFilter);
   const [progressFilter, setProgressFilter] = useState<ProgressFilter>(savedFilters.progressFilter);
+  const [referenceFilter, setReferenceFilter] = useState<ReferenceFilter>(savedFilters.referenceFilter);
   const [sortKey, setSortKey] = useState<SortKey>(savedFilters.sortKey);
   const [showHelperMaps, setShowHelperMaps] = useState(savedFilters.showHelperMaps);
-  const [showOnlyUnreferencedMods, setShowOnlyUnreferencedMods] = useState(savedFilters.showOnlyUnreferencedMods);
 
   useEffect(() => {
     writeSavedFilters({
       enabledFilter,
       progressFilter,
       query,
+      referenceFilter,
       showHelperMaps,
-      showOnlyUnreferencedMods,
+      showOnlyUnreferencedMods: referenceFilter !== "all",
       sortKey
     });
-  }, [enabledFilter, progressFilter, query, showHelperMaps, showOnlyUnreferencedMods, sortKey]);
+  }, [enabledFilter, progressFilter, query, referenceFilter, showHelperMaps, sortKey]);
 
   const helperMapMods = useMemo(() => scan.otherMods.filter((modItem) => modItem.subMaps.length > 0), [scan.otherMods]);
   const visibleMapRecords = useMemo(
     () => (showHelperMaps ? [...scan.maps, ...helperMapMods] : scan.maps),
     [helperMapMods, scan.maps, showHelperMaps]
   );
-  const referencedModIds = useMemo(() => findReferencedModIds(scan), [scan]);
+  const { optionalReferencedModIds, referencedModIds } = useMemo(() => findReferencedModIds(scan), [scan]);
 
   const filteredMaps = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -84,7 +87,10 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
       if (enabledFilter === "enabled" && !draftEnabled) return false;
       if (enabledFilter === "disabled" && draftEnabled) return false;
       if (progressFilter === "warnings" && !modItem.warnings.length) return false;
-      if (showOnlyUnreferencedMods && referencedModIds.has(modItem.id) && !modItem.favorite) return false;
+      const isReferenced = referencedModIds.has(modItem.id);
+      const isOptionalReferenced = optionalReferencedModIds.has(modItem.id);
+      if (referenceFilter === "unreferenced" && isReferenced && !modItem.favorite) return false;
+      if (referenceFilter === "unreferencedAndOptional" && (isReferenced || isOptionalReferenced) && !modItem.favorite) return false;
       if (!normalizedQuery) return true;
       return [
         modItem.name,
@@ -98,7 +104,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
         .includes(normalizedQuery);
     });
     return [...mods].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-  }, [enabledFilter, enabledModDraft, progressFilter, query, referencedModIds, scan.otherMods, showOnlyUnreferencedMods]);
+  }, [enabledFilter, enabledModDraft, optionalReferencedModIds, progressFilter, query, referenceFilter, referencedModIds, scan.otherMods]);
 
   return {
     enabledFilter,
@@ -107,15 +113,15 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
     helperMapMods,
     progressFilter,
     query,
+    referenceFilter,
     referencedModIds,
     setEnabledFilter,
     setProgressFilter,
     setQuery,
+    setReferenceFilter,
     setShowHelperMaps,
-    setShowOnlyUnreferencedMods,
     setSortKey,
     showHelperMaps,
-    showOnlyUnreferencedMods,
     sortKey,
     visibleMapRecords
   };
@@ -130,6 +136,11 @@ function readSavedFilters(): SavedModFilters {
       enabledFilter: isEnabledFilter(value.enabledFilter) ? value.enabledFilter : defaultFilters.enabledFilter,
       progressFilter: isProgressFilter(value.progressFilter) ? value.progressFilter : defaultFilters.progressFilter,
       query: typeof value.query === "string" ? value.query : defaultFilters.query,
+      referenceFilter: isReferenceFilter(value.referenceFilter)
+        ? value.referenceFilter
+        : value.showOnlyUnreferencedMods === true
+          ? "unreferenced"
+          : defaultFilters.referenceFilter,
       showHelperMaps: value.showHelperMaps === true,
       showOnlyUnreferencedMods: value.showOnlyUnreferencedMods === true,
       sortKey: isSortKey(value.sortKey) ? value.sortKey : defaultFilters.sortKey
@@ -159,6 +170,10 @@ function isProgressFilter(value: unknown): value is ProgressFilter {
   return value === "all" || value === "completed" || value === "unfinished" || value === "withStats" || value === "warnings";
 }
 
+function isReferenceFilter(value: unknown): value is ReferenceFilter {
+  return value === "all" || value === "unreferenced" || value === "unreferencedAndOptional";
+}
+
 function isSortKey(value: unknown): value is SortKey {
   return value === "name" || value === "deaths" || value === "time" || value === "strawberries";
 }
@@ -166,13 +181,18 @@ function isSortKey(value: unknown): value is SortKey {
 function findReferencedModIds(scan: ScanResult) {
   const aliasToModId = buildModAliasMap(scan.otherMods);
   const referenced = new Set<string>();
+  const optionalReferenced = new Set<string>();
   for (const record of [...scan.maps, ...scan.otherMods]) {
     for (const dependency of record.dependencies) {
       const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
       if (modId && modId !== record.id) referenced.add(modId);
     }
+    for (const dependency of record.optionalDependencies) {
+      const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
+      if (modId && modId !== record.id) optionalReferenced.add(modId);
+    }
   }
-  return referenced;
+  return { optionalReferencedModIds: optionalReferenced, referencedModIds: referenced };
 }
 
 function mapSearchText(map: ModRecord) {

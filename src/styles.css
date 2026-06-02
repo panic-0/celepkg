@@ -484,6 +484,29 @@ h1 {
   padding: 6px 8px;
 }
 
+.filter-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 3px;
+  justify-content: center;
+}
+
+.filter-segmented button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.filter-segmented button.active {
+  border-color: #0f77ad;
+  background: #eef8fc;
+  color: #075b86;
+}
+
 .save-picker {
   display: grid;
   gap: 6px;

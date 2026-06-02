@@ -126,9 +126,8 @@ export function App() {
           modProfileName={workspaceView.modProfileName}
           progressFilter={filters.progressFilter}
           query={filters.query}
-          referencedModCount={filters.referencedModIds.size}
+          referenceFilter={filters.referenceFilter}
           showHelperMaps={filters.showHelperMaps}
-          showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
           sortKey={filters.sortKey}
           mainMode={workspaceView.mainMode}
           mapDetailTab={uiLayout.mapDetailTab}
@@ -139,8 +138,8 @@ export function App() {
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
+          onReferenceFilterChange={filters.setReferenceFilter}
           onShowHelperMapsChange={filters.setShowHelperMaps}
-          onShowOnlyUnreferencedModsChange={filters.setShowOnlyUnreferencedMods}
           onSortKeyChange={filters.setSortKey}
         />
 

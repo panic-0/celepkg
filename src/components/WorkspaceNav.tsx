@@ -14,7 +14,7 @@ import {
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import type { SubMapSortKey } from "../utils/subMapSorting";
-import type { ActiveView, EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
+import type { ActiveView, EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
 import { Select } from "./common";
 
 type WorkspaceNavProps = {
@@ -28,9 +28,8 @@ type WorkspaceNavProps = {
   modProfileName: string;
   progressFilter: ProgressFilter;
   query: string;
-  referencedModCount: number;
+  referenceFilter: ReferenceFilter;
   showHelperMaps: boolean;
-  showOnlyUnreferencedMods: boolean;
   sortKey: SortKey;
   mainMode: "list" | "detail";
   mapDetailControls: MapDetailControls;
@@ -41,8 +40,8 @@ type WorkspaceNavProps = {
   onEnabledFilterChange: (value: EnabledFilter) => void;
   onProgressFilterChange: (value: ProgressFilter) => void;
   onQueryChange: (value: string) => void;
+  onReferenceFilterChange: (value: ReferenceFilter) => void;
   onShowHelperMapsChange: (value: boolean) => void;
-  onShowOnlyUnreferencedModsChange: (value: boolean) => void;
   onSortKeyChange: (value: SortKey) => void;
 };
 
@@ -57,9 +56,8 @@ export function WorkspaceNav({
   modProfileName,
   progressFilter,
   query,
-  referencedModCount,
+  referenceFilter,
   showHelperMaps,
-  showOnlyUnreferencedMods,
   sortKey,
   mainMode,
   mapDetailControls,
@@ -70,8 +68,8 @@ export function WorkspaceNav({
   onEnabledFilterChange,
   onProgressFilterChange,
   onQueryChange,
+  onReferenceFilterChange,
   onShowHelperMapsChange,
-  onShowOnlyUnreferencedModsChange,
   onSortKeyChange
 }: WorkspaceNavProps) {
   const showsRecordFilters = activeView === "maps" || activeView === "mods";
@@ -86,7 +84,7 @@ export function WorkspaceNav({
       Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
       Number(activeView === "maps" && sortKey !== "name") +
       Number(activeView === "maps" && showHelperMaps) +
-      Number(activeView === "mods" && showOnlyUnreferencedMods);
+      Number(activeView === "mods" && referenceFilter !== "all");
 
   return (
     <aside className="workspace-nav">
@@ -191,15 +189,7 @@ export function WorkspaceNav({
                     <option value="all">全部 Mod</option>
                     <option value="warnings">有警告</option>
                   </Select>
-                  <button
-                    className={showOnlyUnreferencedMods ? "inline-toggle active" : "inline-toggle"}
-                    onClick={() => onShowOnlyUnreferencedModsChange(!showOnlyUnreferencedMods)}
-                    title="只显示没有被地图或其他 Mod 声明为依赖的 Mod"
-                  >
-                    {showOnlyUnreferencedMods ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                    不被依赖
-                    <small>{referencedModCount}</small>
-                  </button>
+                  <ReferenceFilterControl value={referenceFilter} onChange={onReferenceFilterChange} />
                 </>
               )}
             </div>
@@ -207,6 +197,30 @@ export function WorkspaceNav({
         </section>
       )}
     </aside>
+  );
+}
+
+function ReferenceFilterControl({ value, onChange }: { value: ReferenceFilter; onChange: (value: ReferenceFilter) => void }) {
+  return (
+    <div className="filter-segmented" aria-label="依赖显示选项">
+      <button className={value === "all" ? "active" : ""} onClick={() => onChange("all")} title="显示全部 Mod">
+        全部
+      </button>
+      <button
+        className={value === "unreferenced" ? "active" : ""}
+        onClick={() => onChange("unreferenced")}
+        title="只显示没有被地图或其他 Mod 声明为必需依赖的 Mod"
+      >
+        不被依赖
+      </button>
+      <button
+        className={value === "unreferencedAndOptional" ? "active" : ""}
+        onClick={() => onChange("unreferencedAndOptional")}
+        title="只显示没有被声明为必需依赖或可选依赖的 Mod"
+      >
+        不被依赖与可选依赖
+      </button>
+    </div>
   );
 }
 
