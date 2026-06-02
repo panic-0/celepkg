@@ -8,7 +8,7 @@ export function readError(error: unknown) {
 
 export function profileSummary(profile: Profile) {
   if (!profile.enabledMapIds && !profile.enabledModIds) {
-    return "跟随当前状态";
+    return "未初始化，编辑后自动保存";
   }
   if (profile.profileType === "maps") {
     return `${profile.enabledMapIds?.length ?? 0} 图 / ${profile.enabledModIds?.length ?? 0} 测试图 Mod`;

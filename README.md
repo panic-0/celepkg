@@ -1,6 +1,6 @@
 # CelePkg
 
-CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Tauri 2 + React 构建，用来扫描 Celeste 官方地图与 `Mods` 目录，管理地图和其他 Mod 的启用状态，保存 Profile，查看存档统计，并在修改游戏文件前自动备份。
+CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Tauri 2 + React 构建，用来扫描 Celeste 官方地图与 `Mods` 目录，管理地图和其他 Mod 的启用状态，编辑 Profile，查看存档统计，并在修改游戏文件前自动备份。
 
 ## 功能
 
@@ -11,7 +11,11 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
 - 草莓分母可切换：
   - 默认使用游戏概览分母。
   - 可切换为包含金莓、月莓、银莓、彩虹莓等特殊莓的全部草莓数。
-- 管理地图 Profile 和其他 Mod Profile，并可一键应用或启动游戏。
+- 管理地图 Profile 和其他 Mod Profile，编辑会自动保存到当前 Profile。
+- 支持新建空 Profile、复制当前 Profile，也支持从另一个同类 Profile 覆盖当前 Profile；覆盖时可选择只覆盖启用情况或覆盖全部内容。
+- 顶部支持“应用并启动”和“直接启动”：
+  - 应用并启动会先应用当前地图 / Mod Profile，再启动游戏。
+  - 直接启动不会改写 Profile 或 `blacklist.txt`。
 - 支持删除和重命名 Profile。
 - 支持收藏和保护条目：
   - 收藏状态写入 `Mods/favorites.txt`。
@@ -65,6 +69,7 @@ CelePkg 可能修改的游戏目录文件：
 - 使用前请确认 Celeste 路径指向包含 `Mods` 目录的游戏目录。
 - 官方地图只用于查看统计，不会被 CelePkg 禁用。
 - 应用 Profile 会重写 CelePkg 管理范围内的 blacklist 条目，但会保留非管理范围内容。
+- Profile 页面可以从当前游戏或另一个同类 Profile 覆盖当前 Profile。从当前游戏覆盖时只覆盖启用情况；从 Profile 覆盖时可选择只覆盖启用情况或覆盖全部内容。Favorite 和 Protected 不会被覆盖。
 - 修改前自动备份默认开启，建议保持开启。
 
 ## 开发说明

@@ -162,16 +162,20 @@ export function App() {
             scrollMemory={scrollMemory}
             onApplyProfile={profileDraft.applySelectedProfiles}
             onLaunchArgsChange={profileDraft.setLaunchArgs}
+            onMapProfileCopy={profileDraft.copyMapProfile}
+            onMapProfileCreateEmpty={profileDraft.createEmptyMapProfile}
             onMapProfileDelete={profileDraft.deleteMapProfile}
             onMapProfileNameChange={profileDraft.setMapProfileName}
+            onMapProfileOverwriteFromCurrent={profileDraft.overwriteMapProfileFromCurrent}
+            onMapProfileOverwriteFromProfile={profileDraft.overwriteMapProfileFromProfile}
             onMapProfileSelect={profileDraft.setMapProfileDraft}
+            onModProfileCopy={profileDraft.copyModProfile}
+            onModProfileCreateEmpty={profileDraft.createEmptyModProfile}
             onModProfileDelete={profileDraft.deleteModProfile}
             onModProfileNameChange={profileDraft.setModProfileName}
+            onModProfileOverwriteFromCurrent={profileDraft.overwriteModProfileFromCurrent}
+            onModProfileOverwriteFromProfile={profileDraft.overwriteModProfileFromProfile}
             onModProfileSelect={profileDraft.setModProfileDraft}
-            onSaveAsMapProfile={profileDraft.saveAsMapProfile}
-            onSaveAsModProfile={profileDraft.saveAsModProfile}
-            onSaveMapProfile={profileDraft.saveMapProfile}
-            onSaveModProfile={profileDraft.saveModProfile}
           />
         ) : workspaceView.activeView === "settings" ? (
           <SettingsManager

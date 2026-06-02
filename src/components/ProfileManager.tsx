@@ -1,5 +1,7 @@
-import { Check, Gamepad2, Layers, Save, Sparkles, ToggleRight, Trash2 } from "lucide-react";
+import { Copy, Gamepad2, Layers, Plus, RefreshCw, ToggleRight, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
+import type { ProfileOverwriteMode } from "../hooks/useProfileDraft";
 import type { Profile } from "../types";
 import { profileSummary } from "../utils/format";
 
@@ -26,10 +28,14 @@ type ProfileManagerProps = {
   onModProfileSelect: (profile: Profile) => void;
   onMapProfileDelete: (profile: Profile) => void;
   onModProfileDelete: (profile: Profile) => void;
-  onSaveAsMapProfile: () => void;
-  onSaveAsModProfile: () => void;
-  onSaveMapProfile: (applyAfterSave: boolean) => void;
-  onSaveModProfile: (applyAfterSave: boolean) => void;
+  onMapProfileCopy: () => void;
+  onMapProfileCreateEmpty: () => void;
+  onModProfileCopy: () => void;
+  onModProfileCreateEmpty: () => void;
+  onMapProfileOverwriteFromCurrent: () => void;
+  onMapProfileOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
+  onModProfileOverwriteFromCurrent: () => void;
+  onModProfileOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
 };
 
 export function ProfileManager({
@@ -55,10 +61,14 @@ export function ProfileManager({
   onModProfileSelect,
   onMapProfileDelete,
   onModProfileDelete,
-  onSaveAsMapProfile,
-  onSaveAsModProfile,
-  onSaveMapProfile,
-  onSaveModProfile
+  onMapProfileCopy,
+  onMapProfileCreateEmpty,
+  onModProfileCopy,
+  onModProfileCreateEmpty,
+  onMapProfileOverwriteFromCurrent,
+  onMapProfileOverwriteFromProfile,
+  onModProfileOverwriteFromCurrent,
+  onModProfileOverwriteFromProfile
 }: ProfileManagerProps) {
   const selectedMapProfile = mapProfiles.find((profile) => profile.id === selectedMapProfileId);
   const selectedModProfile = modProfiles.find((profile) => profile.id === selectedModProfileId);
@@ -98,12 +108,13 @@ export function ProfileManager({
           nameDraft={mapProfileName}
           nameLabel="地图 Profile 名称"
           summary={selectedMapProfile ? profileSummary(selectedMapProfile) : "请选择地图 Profile"}
+          onCopy={onMapProfileCopy}
+          onCreateEmpty={onMapProfileCreateEmpty}
           onNameChange={onMapProfileNameChange}
+          onOverwriteFromCurrent={onMapProfileOverwriteFromCurrent}
+          onOverwriteFromProfile={onMapProfileOverwriteFromProfile}
           onProfileDelete={onMapProfileDelete}
           onProfileSelect={onMapProfileSelect}
-          onSave={() => onSaveMapProfile(false)}
-          onSaveAndApply={() => onSaveMapProfile(true)}
-          onSaveAs={onSaveAsMapProfile}
           scrollKey="profiles:maps"
           scrollMemory={scrollMemory}
           loading={loading}
@@ -117,12 +128,13 @@ export function ProfileManager({
           nameDraft={modProfileName}
           nameLabel="Mod Profile 名称"
           summary={selectedModProfile ? profileSummary(selectedModProfile) : "请选择 Mod Profile"}
+          onCopy={onModProfileCopy}
+          onCreateEmpty={onModProfileCreateEmpty}
           onNameChange={onModProfileNameChange}
+          onOverwriteFromCurrent={onModProfileOverwriteFromCurrent}
+          onOverwriteFromProfile={onModProfileOverwriteFromProfile}
           onProfileDelete={onModProfileDelete}
           onProfileSelect={onModProfileSelect}
-          onSave={() => onSaveModProfile(false)}
-          onSaveAndApply={() => onSaveModProfile(true)}
-          onSaveAs={onSaveAsModProfile}
           scrollKey="profiles:mods"
           scrollMemory={scrollMemory}
           loading={loading}
@@ -150,12 +162,13 @@ function ProfileColumn({
   selectedProfileId,
   summary,
   title,
+  onCopy,
+  onCreateEmpty,
   onNameChange,
+  onOverwriteFromCurrent,
+  onOverwriteFromProfile,
   onProfileDelete,
   onProfileSelect,
-  onSave,
-  onSaveAndApply,
-  onSaveAs,
   scrollKey,
   scrollMemory
 }: {
@@ -167,17 +180,26 @@ function ProfileColumn({
   selectedProfileId: string;
   summary: string;
   title: string;
+  onCopy: () => void;
+  onCreateEmpty: () => void;
   onNameChange: (value: string) => void;
+  onOverwriteFromCurrent: () => void;
+  onOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
   onProfileDelete: (profile: Profile) => void;
   onProfileSelect: (profile: Profile) => void;
-  onSave: () => void;
-  onSaveAndApply: () => void;
-  onSaveAs: () => void;
   scrollKey: string;
   scrollMemory: ScrollMemory;
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
+  const sourceProfiles = useMemo(() => profiles.filter((profile) => profile.id !== selectedProfileId), [profiles, selectedProfileId]);
+  const [overwriteSourceId, setOverwriteSourceId] = useState("");
+  const [overwriteMode, setOverwriteMode] = useState<ProfileOverwriteMode>("enabled");
   const profileListRef = useScrollMemory<HTMLDivElement>(scrollKey, scrollMemory);
+
+  useEffect(() => {
+    if (sourceProfiles.some((profile) => profile.id === overwriteSourceId)) return;
+    setOverwriteSourceId(sourceProfiles[0]?.id ?? "");
+  }, [overwriteSourceId, sourceProfiles]);
 
   return (
     <aside className="profile-editor">
@@ -220,19 +242,75 @@ function ProfileColumn({
         <span>{nameLabel}</span>
         <input value={nameDraft} onChange={(event) => onNameChange(event.target.value)} />
       </label>
-      <div className="button-row">
-        <button onClick={onSave} disabled={loading || !selectedProfile}>
-          <Save size={16} />
-          保存
-        </button>
-        <button onClick={onSaveAndApply} disabled={loading || !selectedProfile}>
-          <Check size={16} />
-          保存并应用
+      <button className="wide-button" onClick={onCreateEmpty} disabled={loading}>
+        <Plus size={16} />
+        新建空 Profile
+      </button>
+      <button className="wide-button" onClick={onCopy} disabled={loading || !selectedProfile}>
+        <Copy size={16} />
+        复制当前 Profile
+      </button>
+      <div className="profile-overwrite-box">
+        <label className="field">
+          <span>覆盖来源</span>
+          <select
+            value={overwriteSourceId}
+            onChange={(event) => setOverwriteSourceId(event.target.value)}
+            disabled={!sourceProfiles.length}
+          >
+            {sourceProfiles.length ? (
+              sourceProfiles.map((profile) => (
+                <option value={profile.id} key={profile.id}>
+                  {profile.name}
+                </option>
+              ))
+            ) : (
+              <option value="">没有其他 Profile</option>
+            )}
+          </select>
+        </label>
+        <label className="field">
+          <span>覆盖范围</span>
+          <select value={overwriteMode} onChange={(event) => setOverwriteMode(event.target.value as ProfileOverwriteMode)}>
+            <option value="enabled">只覆盖启用情况</option>
+            <option value="all">覆盖全部内容</option>
+          </select>
+        </label>
+        <button
+          className="wide-button overwrite-button"
+          onClick={() => {
+            const sourceProfile = sourceProfiles.find((profile) => profile.id === overwriteSourceId);
+            if (!sourceProfile || !selectedProfile) return;
+            const confirmed =
+              overwriteMode === "all"
+                ? window.confirm(
+                    `用「${sourceProfile.name}」的全部内容覆盖「${selectedProfile.name}」？这会覆盖名称、启用情况和启动参数，但不会改变 Profile id。`
+                  )
+                : window.confirm(
+                    `只用「${sourceProfile.name}」的启用情况覆盖「${selectedProfile.name}」？名称、启动参数、Favorite 和 Protected 不会被覆盖。`
+                  );
+            if (confirmed) onOverwriteFromProfile(sourceProfile.id, overwriteMode);
+          }}
+          disabled={loading || !selectedProfile || !overwriteSourceId}
+        >
+          <RefreshCw size={16} />从 Profile 覆盖
         </button>
       </div>
-      <button className="wide-button" onClick={onSaveAs} disabled={loading}>
-        <Sparkles size={16} />
-        新建 Profile
+      <button
+        className="wide-button overwrite-button"
+        onClick={() => {
+          if (
+            window.confirm(
+              `只用当前游戏启用情况覆盖「${selectedProfile?.name || title}」？Profile 名称、启动参数、Favorite 和 Protected 不会被覆盖。`
+            )
+          ) {
+            onOverwriteFromCurrent();
+          }
+        }}
+        disabled={loading || !selectedProfile}
+      >
+        <RefreshCw size={16} />
+        从当前游戏覆盖启用情况
       </button>
     </aside>
   );

@@ -37,7 +37,8 @@ impl AppState {
 }
 
 pub fn load_state() -> AppState {
-    if let Some(state) = read_json(&state_path()) {
+    if let Some(mut state) = read_json(&state_path()) {
+        normalize_profiles(&mut state);
         return state;
     }
     let state = default_state();
@@ -75,7 +76,7 @@ fn default_state() -> AppState {
         profiles: vec![
             Profile {
                 id: "default-maps".to_string(),
-                name: "当前地图启用状态".to_string(),
+                name: "Main Profile".to_string(),
                 profile_type: ProfileType::Maps,
                 enabled_map_ids: None,
                 enabled_mod_ids: None,
@@ -85,7 +86,7 @@ fn default_state() -> AppState {
             },
             Profile {
                 id: "default-mods".to_string(),
-                name: "当前 Mod 启用状态".to_string(),
+                name: "Main Profile".to_string(),
                 profile_type: ProfileType::Mods,
                 enabled_map_ids: None,
                 enabled_mod_ids: None,
@@ -94,6 +95,80 @@ fn default_state() -> AppState {
                 updated_at: now,
             },
         ],
+    }
+}
+
+fn normalize_profiles(state: &mut AppState) {
+    let now = now_string();
+    if let Some(profile) = state
+        .profiles
+        .iter_mut()
+        .find(|profile| profile.id == "default-maps")
+    {
+        if profile.name == "当前地图启用状态" {
+            profile.name = "Main Profile".to_string();
+        }
+    }
+    if let Some(profile) = state
+        .profiles
+        .iter_mut()
+        .find(|profile| profile.id == "default-mods")
+    {
+        if profile.name == "当前 Mod 启用状态" {
+            profile.name = "Main Profile".to_string();
+        }
+    }
+    if !state
+        .profiles
+        .iter()
+        .any(|profile| profile.profile_type == ProfileType::Maps)
+    {
+        state.profiles.push(Profile {
+            id: "default-maps".to_string(),
+            name: "Main Profile".to_string(),
+            profile_type: ProfileType::Maps,
+            enabled_map_ids: None,
+            enabled_mod_ids: None,
+            launch_args: String::new(),
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        });
+    }
+    if !state
+        .profiles
+        .iter()
+        .any(|profile| profile.profile_type == ProfileType::Mods)
+    {
+        state.profiles.push(Profile {
+            id: "default-mods".to_string(),
+            name: "Main Profile".to_string(),
+            profile_type: ProfileType::Mods,
+            enabled_map_ids: None,
+            enabled_mod_ids: None,
+            launch_args: String::new(),
+            created_at: now.clone(),
+            updated_at: now,
+        });
+    }
+    if !state.profiles.iter().any(|profile| {
+        profile.id == state.active_map_profile_id && profile.profile_type == ProfileType::Maps
+    }) {
+        state.active_map_profile_id = state
+            .profiles
+            .iter()
+            .find(|profile| profile.profile_type == ProfileType::Maps)
+            .map(|profile| profile.id.clone())
+            .unwrap_or_else(|| "default-maps".to_string());
+    }
+    if !state.profiles.iter().any(|profile| {
+        profile.id == state.active_mod_profile_id && profile.profile_type == ProfileType::Mods
+    }) {
+        state.active_mod_profile_id = state
+            .profiles
+            .iter()
+            .find(|profile| profile.profile_type == ProfileType::Mods)
+            .map(|profile| profile.id.clone())
+            .unwrap_or_else(|| "default-mods".to_string());
     }
 }
 

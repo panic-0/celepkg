@@ -712,16 +712,35 @@ h1 {
   color: #657384;
 }
 
-.button-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-  margin-top: 8px;
-}
-
 .wide-button {
   width: 100%;
   margin-top: 8px;
+}
+
+.profile-overwrite-box {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  border: 1px solid #e1e8ef;
+  border-radius: 7px;
+  background: #fbfcfd;
+  padding: 9px;
+}
+
+.profile-overwrite-box .field {
+  margin-top: 0;
+}
+
+.overwrite-button {
+  border-color: #e5c083;
+  background: #fff8ed;
+  color: #8a4a12;
+}
+
+.overwrite-button:hover:not(:disabled) {
+  border-color: #c98224;
+  background: #fff1d8;
+  color: #733b0b;
 }
 
 .record-panel {
