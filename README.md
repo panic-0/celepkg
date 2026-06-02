@@ -25,7 +25,7 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
 
 ## 使用说明
 
-面向玩家的完整使用说明见 [USER_GUIDE.md](USER_GUIDE.md)。
+面向玩家的机制说明和典型用法示例见 [USER_GUIDE.md](USER_GUIDE.md)。
 
 ## 备份说明
 
