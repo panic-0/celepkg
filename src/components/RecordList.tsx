@@ -152,7 +152,7 @@ function MapTable({
       </colgroup>
       <thead>
         <tr>
-          <th className="col-actions">操作</th>
+          <th className="col-actions">状态/标记</th>
           <th>名称</th>
           <th className="num">小图</th>
           <th>完成</th>
@@ -177,16 +177,25 @@ function MapTable({
           return (
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <td className="action-cell">
-                <div className="action-group">
+                <div className="record-actions">
                   <ToggleButton disabled={map.readOnly} enabled={enabled} label="地图" onClick={() => onToggle(map)} />
-                  <FlagButton active={map.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(map)} />
-                  <FlagButton
-                    active={map.protected}
-                    disabled={map.readOnly}
-                    icon={map.protected ? <Lock size={16} /> : <Shield size={16} />}
-                    label="保护"
-                    onClick={() => onProtectedToggle(map)}
-                  />
+                  <div className="record-flag-actions" aria-label="地图标记">
+                    <FlagButton
+                      active={map.favorite}
+                      icon={<Star size={16} />}
+                      label="收藏"
+                      variant="favorite"
+                      onClick={() => onFavoriteToggle(map)}
+                    />
+                    <FlagButton
+                      active={map.protected}
+                      disabled={map.readOnly}
+                      icon={map.protected ? <Lock size={16} /> : <Shield size={16} />}
+                      label="保护"
+                      variant="protected"
+                      onClick={() => onProtectedToggle(map)}
+                    />
+                  </div>
                 </div>
               </td>
               <td className="name-cell">
@@ -255,7 +264,7 @@ function ModTable({
       </colgroup>
       <thead>
         <tr>
-          <th className="col-actions">操作</th>
+          <th className="col-actions">状态/标记</th>
           <th>名称</th>
           <th>类型</th>
           <th className="num">依赖</th>
@@ -269,15 +278,24 @@ function ModTable({
           return (
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
-                <div className="action-group">
+                <div className="record-actions">
                   <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem)} />
-                  <FlagButton active={modItem.favorite} icon={<Star size={16} />} label="收藏" onClick={() => onFavoriteToggle(modItem)} />
-                  <FlagButton
-                    active={modItem.protected}
-                    icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />}
-                    label="保护"
-                    onClick={() => onProtectedToggle(modItem)}
-                  />
+                  <div className="record-flag-actions" aria-label="Mod 标记">
+                    <FlagButton
+                      active={modItem.favorite}
+                      icon={<Star size={16} />}
+                      label="收藏"
+                      variant="favorite"
+                      onClick={() => onFavoriteToggle(modItem)}
+                    />
+                    <FlagButton
+                      active={modItem.protected}
+                      icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />}
+                      label="保护"
+                      variant="protected"
+                      onClick={() => onProtectedToggle(modItem)}
+                    />
+                  </div>
                 </div>
               </td>
               <td className="name-cell">
@@ -309,17 +327,19 @@ function FlagButton({
   disabled,
   icon,
   label,
+  variant,
   onClick
 }: {
   active: boolean;
   disabled?: boolean;
   icon: React.ReactNode;
   label: string;
+  variant: "favorite" | "protected";
   onClick: () => void;
 }) {
   return (
     <button
-      className={active ? "flag-button active" : "flag-button"}
+      className={active ? `flag-button ${variant} active` : `flag-button ${variant}`}
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
@@ -336,7 +356,7 @@ function FlagButton({
 function ToggleButton({ disabled, enabled, label, onClick }: { disabled?: boolean; enabled: boolean; label: string; onClick: () => void }) {
   return (
     <button
-      className={enabled ? "switch on" : "switch"}
+      className={enabled ? "record-toggle enabled" : "record-toggle disabled"}
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
