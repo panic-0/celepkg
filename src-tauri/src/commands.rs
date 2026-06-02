@@ -11,7 +11,7 @@ use std::process::Command;
 
 #[tauri::command]
 pub fn get_config() -> Result<ConfigResponse, String> {
-    let state = load_state();
+    let state = load_state()?;
     Ok(ConfigResponse {
         celeste_path: state.celeste_path.clone(),
         auto_backup_enabled: state.auto_backup_enabled,
@@ -22,7 +22,7 @@ pub fn get_config() -> Result<ConfigResponse, String> {
 
 #[tauri::command]
 pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
-    let mut state = load_state();
+    let mut state = load_state()?;
     let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
     state.celeste_path = path.to_string_lossy().to_string();
     write_state(&state)?;
@@ -33,7 +33,7 @@ pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
 
 #[tauri::command]
 pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigResponse, String> {
-    let mut state = load_state();
+    let mut state = load_state()?;
     state.auto_backup_enabled = auto_backup_enabled;
     write_state(&state)?;
     Ok(ConfigResponse {
@@ -46,7 +46,7 @@ pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigRespon
 
 #[tauri::command]
 pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
-    let mut state = load_state();
+    let mut state = load_state()?;
     let path = resolve_input_path_from_state("", &state);
     let available = services::scan::list_available_save_files(&path);
     state.selected_save_files =
@@ -63,7 +63,7 @@ pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse
 #[tauri::command]
 pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state();
+        let state = load_state()?;
         let path = resolve_input_path_from_state(&celeste_path, &state);
         Ok(services::scan::full_scan_cached(
             &path,
@@ -79,7 +79,7 @@ pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
 #[tauri::command]
 pub async fn rescan_celeste(celeste_path: String) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state();
+        let state = load_state()?;
         let path = resolve_input_path_from_state(&celeste_path, &state);
         Ok(services::scan::full_scan_fresh(
             &path,
@@ -99,7 +99,7 @@ pub async fn set_record_favorite(
     favorite: bool,
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state();
+        let state = load_state()?;
         let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
         let mut scan = services::scan::full_scan_cached(
             &path,
@@ -124,7 +124,7 @@ pub async fn set_record_protected(
     protected: bool,
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut state = load_state();
+        let mut state = load_state()?;
         let path = resolve_input_path_from_state(&celeste_path, &state);
         let mut scan = services::scan::full_scan_cached(
             &path,

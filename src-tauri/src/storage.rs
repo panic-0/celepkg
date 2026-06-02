@@ -8,8 +8,11 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
+    #[serde(default)]
     pub celeste_path: String,
+    #[serde(default = "default_active_map_profile_id")]
     pub active_map_profile_id: String,
+    #[serde(default = "default_active_mod_profile_id")]
     pub active_mod_profile_id: String,
     #[serde(default = "default_auto_backup_enabled")]
     pub auto_backup_enabled: bool,
@@ -17,6 +20,7 @@ pub struct AppState {
     pub selected_save_files: Vec<String>,
     #[serde(default)]
     pub protected_record_ids: Vec<String>,
+    #[serde(default)]
     pub profiles: Vec<Profile>,
 }
 
@@ -36,14 +40,19 @@ impl AppState {
     }
 }
 
-pub fn load_state() -> AppState {
-    if let Some(mut state) = read_json(&state_path()) {
+pub fn load_state() -> Result<AppState, String> {
+    load_state_from_path(&state_path())
+}
+
+fn load_state_from_path(file: &Path) -> Result<AppState, String> {
+    if file.exists() {
+        let mut state = read_state_json(file)?;
         normalize_profiles(&mut state);
-        return state;
+        return Ok(state);
     }
     let state = default_state();
-    let _ = write_state(&state);
-    state
+    write_json(file, &state)?;
+    Ok(state)
 }
 
 pub fn write_state(state: &AppState) -> Result<(), String> {
@@ -60,7 +69,7 @@ pub fn resolve_input_path_from_state(value: &str, state: &AppState) -> PathBuf {
 }
 
 pub fn resolve_required_celeste_path(value: &str) -> Result<PathBuf, String> {
-    let state = load_state();
+    let state = load_state()?;
     resolve_required_celeste_path_from_state(value, &state)
 }
 
@@ -129,6 +138,14 @@ fn default_state() -> AppState {
             },
         ],
     }
+}
+
+fn default_active_map_profile_id() -> String {
+    "default-maps".to_string()
+}
+
+fn default_active_mod_profile_id() -> String {
+    "default-mods".to_string()
 }
 
 fn normalize_profiles(state: &mut AppState) {
@@ -233,6 +250,21 @@ pub fn scan_cache_path(celeste_path: &Path) -> PathBuf {
 pub fn read_json<T: for<'de> Deserialize<'de>>(file: &Path) -> Option<T> {
     let text = fs::read_to_string(file).ok()?;
     serde_json::from_str(&text).ok()
+}
+
+fn read_state_json(file: &Path) -> Result<AppState, String> {
+    let text = fs::read_to_string(file).map_err(|error| {
+        format!(
+            "读取配置失败：{}：{error}。不会覆盖原配置或 Profile，请修复或删除该文件后重试。",
+            file.display()
+        )
+    })?;
+    serde_json::from_str(&text).map_err(|error| {
+        format!(
+            "解析配置失败：{}：{error}。不会覆盖原配置或 Profile，请修复或删除该文件后重试。",
+            file.display()
+        )
+    })
 }
 
 pub fn write_json<T: Serialize>(file: &Path, value: &T) -> Result<(), String> {
@@ -376,6 +408,72 @@ mod tests {
         assert_eq!(loaded.active_map_profile_id, state.active_map_profile_id);
         assert_eq!(loaded.active_mod_profile_id, state.active_mod_profile_id);
         assert_eq!(loaded.profiles.len(), state.profiles.len());
+    }
+
+    #[test]
+    fn missing_state_json_creates_default_state() {
+        let root = temp_dir("missing-state");
+        let file = root.join("state.json");
+
+        let state = load_state_from_path(&file).expect("default state");
+        let loaded: AppState = read_json(&file).expect("written state");
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(state.active_map_profile_id, "default-maps");
+        assert_eq!(state.active_mod_profile_id, "default-mods");
+        assert_eq!(loaded.profiles.len(), 2);
+    }
+
+    #[test]
+    fn invalid_state_json_errors_without_overwriting_file() {
+        let root = temp_dir("invalid-state");
+        fs::create_dir_all(&root).expect("state dir");
+        let file = root.join("state.json");
+        let original = "{ invalid json";
+        fs::write(&file, original).expect("write invalid state");
+
+        let error = load_state_from_path(&file).expect_err("invalid state should fail");
+        let text = fs::read_to_string(&file).expect("read state");
+        let _ = fs::remove_dir_all(root);
+
+        assert!(error.contains("解析配置失败"));
+        assert!(error.contains("不会覆盖原配置或 Profile"));
+        assert_eq!(text, original);
+    }
+
+    #[test]
+    fn invalid_state_shape_errors_without_overwriting_file() {
+        let root = temp_dir("invalid-state-shape");
+        fs::create_dir_all(&root).expect("state dir");
+        let file = root.join("state.json");
+        let original = r#"{"profiles":"not an array"}"#;
+        fs::write(&file, original).expect("write invalid state");
+
+        let error = load_state_from_path(&file).expect_err("invalid state shape should fail");
+        let text = fs::read_to_string(&file).expect("read state");
+        let _ = fs::remove_dir_all(root);
+
+        assert!(error.contains("解析配置失败"));
+        assert_eq!(text, original);
+    }
+
+    #[test]
+    fn old_state_without_profiles_or_active_ids_is_migrated_in_memory() {
+        let root = temp_dir("old-state");
+        fs::create_dir_all(&root).expect("state dir");
+        let file = root.join("state.json");
+        let original = r#"{"celestePath":"C:\\Games\\Celeste"}"#;
+        fs::write(&file, original).expect("write old state");
+
+        let state = load_state_from_path(&file).expect("old state should migrate");
+        let text = fs::read_to_string(&file).expect("read state");
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(state.celeste_path, r"C:\Games\Celeste");
+        assert_eq!(state.active_map_profile_id, "default-maps");
+        assert_eq!(state.active_mod_profile_id, "default-mods");
+        assert_eq!(state.profiles.len(), 2);
+        assert_eq!(text, original);
     }
 
     fn temp_dir(label: &str) -> PathBuf {

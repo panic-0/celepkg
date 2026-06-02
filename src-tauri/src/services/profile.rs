@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
-    let mut state = load_state();
+    let mut state = load_state()?;
     let mut data = state.profiles_state();
     let now = now_string();
     let profile_type = profile.profile_type;
@@ -61,7 +61,7 @@ pub fn delete_profile(profile_id: String) -> Result<ProfilesState, String> {
     if profile_id == "default-maps" || profile_id == "default-mods" {
         return Err("默认 Profile 不能删除".to_string());
     }
-    let mut state = load_state();
+    let mut state = load_state()?;
     let mut data = state.profiles_state();
     let Some(profile) = data
         .profiles
@@ -99,7 +99,7 @@ pub fn apply_profile(
     mod_profile_id: String,
 ) -> Result<ScanResult, String> {
     let applied = apply_profile_to_blacklist(celeste_path, map_profile_id, mod_profile_id)?;
-    let state = load_state();
+    let state = load_state()?;
     Ok(full_scan_cached(
         &applied.path,
         applied.profiles,
@@ -133,7 +133,7 @@ pub fn launch_profile(
 }
 
 pub fn launch_game(celeste_path: String, launch_args: String) -> Result<LaunchResult, String> {
-    let state = load_state();
+    let state = load_state()?;
     let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
     let executable = resolve_game_executable(&path);
     if executable.is_empty() {
@@ -164,7 +164,7 @@ fn apply_profile_to_blacklist(
     map_profile_id: String,
     mod_profile_id: String,
 ) -> Result<AppliedProfile, String> {
-    let mut state = load_state();
+    let mut state = load_state()?;
     let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
     let mut profiles = state.profiles_state();
     let map_profile = profiles
