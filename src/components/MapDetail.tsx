@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState, type MutableRefObject } from "r
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
+import type { StrawberryDenominator } from "../viewTypes";
 import {
   ALL_SUB_MAP_FOLDER,
   collectSubMapFolderOptions,
@@ -26,11 +27,21 @@ type MapDetailProps = {
   map?: ModRecord;
   mapDetailMemory: MutableRefObject<Record<string, MapDetailMemoryState>>;
   scrollMemory: ScrollMemory;
+  strawberryDenominator: StrawberryDenominator;
   onBack: () => void;
   onTabChange: (tab: MapDetailTab) => void;
 };
 
-export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrollMemory, onBack, onTabChange }: MapDetailProps) {
+export function MapDetail({
+  activeTab,
+  draftEnabled,
+  map,
+  mapDetailMemory,
+  scrollMemory,
+  strawberryDenominator,
+  onBack,
+  onTabChange
+}: MapDetailProps) {
   const [selectedSubMapId, setSelectedSubMapId] = useState("");
   const [subMapPath, setSubMapPath] = useState(ALL_SUB_MAP_FOLDER);
   const [subMapQuery, setSubMapQuery] = useState("");
@@ -151,7 +162,11 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
             <DetailStat
               icon={<CircleDot size={18} />}
               label="草莓"
-              value={formatStrawberries(map.stats?.strawberries, map.strawberryCount, map.stats?.strawberriesKnown ?? true)}
+              value={formatStrawberries(
+                map.stats?.strawberries,
+                strawberryTotal(map, strawberryDenominator),
+                map.stats?.strawberriesKnown ?? true
+              )}
             />
             <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
           </div>
@@ -215,7 +230,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                   </thead>
                   <tbody>
                     {subMapFolderOptions.map((folder) => {
-                      const summary = summarizeSubMapFolder(map.subMaps, folder.path);
+                      const summary = summarizeSubMapFolder(map.subMaps, folder.path, strawberryDenominator);
                       return (
                         <tr className="folder-row" key={folder.path} onClick={() => updateSubMapPath(folder.path)}>
                           <td title={folder.path}>
@@ -248,7 +263,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                           <td className="num">
                             {formatStrawberries(
                               subMap.stats?.strawberries,
-                              subMap.strawberryCount,
+                              strawberryTotal(subMap, strawberryDenominator),
                               subMap.stats?.strawberriesKnown ?? true
                             )}
                           </td>
@@ -265,7 +280,7 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
                                   label="草莓"
                                   value={formatStrawberries(
                                     subMap.stats?.strawberries,
-                                    subMap.strawberryCount,
+                                    strawberryTotal(subMap, strawberryDenominator),
                                     subMap.stats?.strawberriesKnown ?? true
                                   )}
                                 />
@@ -333,10 +348,10 @@ export function MapDetail({ activeTab, draftEnabled, map, mapDetailMemory, scrol
   );
 }
 
-function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string) {
+function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDenominator: StrawberryDenominator) {
   const members = subMaps.filter((subMap) => subMapMatchesFolder(subMap, path));
   const statsMembers = members.filter((subMap) => subMap.stats);
-  const totalStrawberries = members.reduce((sum, subMap) => sum + subMap.strawberryCount, 0);
+  const totalStrawberries = members.reduce((sum, subMap) => sum + strawberryTotal(subMap, strawberryDenominator), 0);
   const collectedStrawberries = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.strawberries ?? 0), 0);
   const strawberriesKnown = statsMembers.every((subMap) => subMap.stats?.strawberriesKnown ?? true);
   const deaths = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.deaths ?? 0), 0);
@@ -354,6 +369,10 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string) {
     strawberries: formatStrawberries(statsMembers.length ? collectedStrawberries : undefined, totalStrawberries, strawberriesKnown),
     time: statsMembers.length ? formatTime(timePlayed) : "-"
   };
+}
+
+function strawberryTotal(record: ModRecord | SubMapInfo, strawberryDenominator: StrawberryDenominator) {
+  return strawberryDenominator === "total" ? record.strawberryTotalCount : record.strawberryCount;
 }
 
 function buildSubMapBreadcrumbs(activePath: string, rootPath: string) {

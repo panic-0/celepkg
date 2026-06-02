@@ -2,7 +2,7 @@ import { CircleDot, Clock, FolderOpen, Lock, Shield, Skull, Star, ToggleLeft, To
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
-import type { ActiveView } from "../viewTypes";
+import type { ActiveView, StrawberryDenominator } from "../viewTypes";
 
 type RecordView = Extract<ActiveView, "maps" | "mods">;
 
@@ -13,6 +13,7 @@ type RecordListProps = {
   selectedMap?: ModRecord;
   selectedMod?: ModRecord;
   showWarningColumn: boolean;
+  strawberryDenominator: StrawberryDenominator;
   scrollMemory: ScrollMemory;
   visibleMapCount: number;
   modCount: number;
@@ -35,6 +36,7 @@ export function RecordList({
   selectedMap,
   selectedMod,
   showWarningColumn,
+  strawberryDenominator,
   scrollMemory,
   visibleMapCount,
   modCount,
@@ -81,6 +83,7 @@ export function RecordList({
             onFavoriteToggle={onFavoriteToggle}
             onProtectedToggle={onProtectedToggle}
             showWarningColumn={showWarningColumn}
+            strawberryDenominator={strawberryDenominator}
             isEnabled={isMapEnabled}
           />
         ) : (
@@ -114,6 +117,7 @@ function MapTable({
   onFavoriteToggle,
   onProtectedToggle,
   showWarningColumn,
+  strawberryDenominator,
   isEnabled
 }: {
   maps: ModRecord[];
@@ -123,6 +127,7 @@ function MapTable({
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
   showWarningColumn: boolean;
+  strawberryDenominator: StrawberryDenominator;
   isEnabled: (record: ModRecord) => boolean;
 }) {
   return (
@@ -199,7 +204,11 @@ function MapTable({
               <td className="num">{map.stats?.deaths ?? "-"}</td>
               <td className="num">{formatTime(map.stats?.timePlayed)}</td>
               <td className="num">
-                {formatStrawberries(map.stats?.strawberries, map.strawberryCount, map.stats?.strawberriesKnown ?? true)}
+                {formatStrawberries(
+                  map.stats?.strawberries,
+                  strawberryDenominator === "total" ? map.strawberryTotalCount : map.strawberryCount,
+                  map.stats?.strawberriesKnown ?? true
+                )}
               </td>
               {showWarningColumn && <td>{map.warnings.length ? <span className="warning-pill">{map.warnings.length}</span> : "-"}</td>}
             </tr>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { StrawberryDenominator } from "../viewTypes";
 
 export type MapDetailTab = "overview" | "submaps" | "dependencies" | "saves";
 export type ModDetailTab = "overview" | "dependencies" | "files";
@@ -7,13 +8,15 @@ type UiLayoutState = {
   mapDetailTab: MapDetailTab;
   modDetailTab: ModDetailTab;
   showWarningColumn: boolean;
+  strawberryDenominator: StrawberryDenominator;
 };
 
 const STORAGE_KEY = "celepkg.ui.layout";
 const defaultLayout: UiLayoutState = {
   mapDetailTab: "overview",
   modDetailTab: "overview",
-  showWarningColumn: false
+  showWarningColumn: false,
+  strawberryDenominator: "visible"
 };
 
 export function useUiLayout() {
@@ -27,7 +30,9 @@ export function useUiLayout() {
     ...layout,
     setMapDetailTab: (mapDetailTab: MapDetailTab) => setLayout((current) => ({ ...current, mapDetailTab })),
     setModDetailTab: (modDetailTab: ModDetailTab) => setLayout((current) => ({ ...current, modDetailTab })),
-    setShowWarningColumn: (showWarningColumn: boolean) => setLayout((current) => ({ ...current, showWarningColumn }))
+    setShowWarningColumn: (showWarningColumn: boolean) => setLayout((current) => ({ ...current, showWarningColumn })),
+    setStrawberryDenominator: (strawberryDenominator: StrawberryDenominator) =>
+      setLayout((current) => ({ ...current, strawberryDenominator }))
   };
 }
 
@@ -39,7 +44,10 @@ function readLayout(): UiLayoutState {
     return {
       mapDetailTab: isMapTab(value.mapDetailTab) ? value.mapDetailTab : defaultLayout.mapDetailTab,
       modDetailTab: isModTab(value.modDetailTab) ? value.modDetailTab : defaultLayout.modDetailTab,
-      showWarningColumn: value.showWarningColumn === true
+      showWarningColumn: value.showWarningColumn === true,
+      strawberryDenominator: isStrawberryDenominator(value.strawberryDenominator)
+        ? value.strawberryDenominator
+        : defaultLayout.strawberryDenominator
     };
   } catch {
     return defaultLayout;
@@ -60,4 +68,8 @@ function isMapTab(value: unknown): value is MapDetailTab {
 
 function isModTab(value: unknown): value is ModDetailTab {
   return value === "overview" || value === "dependencies" || value === "files";
+}
+
+function isStrawberryDenominator(value: unknown): value is StrawberryDenominator {
+  return value === "visible" || value === "total";
 }

@@ -5,6 +5,7 @@ import { MapDetail, type MapDetailMemoryState } from "./components/MapDetail";
 import { ModDetail } from "./components/ModDetail";
 import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
+import { SettingsManager } from "./components/SettingsManager";
 import { AppToolbar } from "./components/AppToolbar";
 import { WorkspaceNav } from "./components/WorkspaceNav";
 import { useBackups } from "./hooks/useBackups";
@@ -103,7 +104,13 @@ export function App() {
         onRescan={savePathAndRescan}
       />
 
-      <section className={`workspace ${workspaceView.activeView === "profiles" || workspaceView.activeView === "backups" ? "management-view" : ""}`}>
+      <section
+        className={`workspace ${
+          workspaceView.activeView === "profiles" || workspaceView.activeView === "settings" || workspaceView.activeView === "backups"
+            ? "management-view"
+            : ""
+        }`}
+      >
         <WorkspaceNav
           activeView={workspaceView.activeView}
           dependencyModCount={profileDraft.dependencyModDraft.size}
@@ -116,11 +123,8 @@ export function App() {
           progressFilter={filters.progressFilter}
           query={filters.query}
           referencedModCount={filters.referencedModIds.size}
-          saveFiles={scan.availableSaveFiles}
-          selectedSaveFiles={scan.selectedSaveFiles}
           showHelperMaps={filters.showHelperMaps}
           showOnlyUnreferencedMods={filters.showOnlyUnreferencedMods}
-          showWarningColumn={uiLayout.showWarningColumn}
           sortKey={filters.sortKey}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
@@ -128,10 +132,8 @@ export function App() {
           onEnabledFilterChange={filters.setEnabledFilter}
           onProgressFilterChange={filters.setProgressFilter}
           onQueryChange={filters.setQuery}
-          onSelectedSaveFilesChange={updateSelectedSaveFiles}
           onShowHelperMapsChange={filters.setShowHelperMaps}
           onShowOnlyUnreferencedModsChange={filters.setShowOnlyUnreferencedMods}
-          onShowWarningColumnChange={uiLayout.setShowWarningColumn}
           onSortKeyChange={filters.setSortKey}
         />
 
@@ -165,6 +167,17 @@ export function App() {
             onSaveMapProfile={profileDraft.saveMapProfile}
             onSaveModProfile={profileDraft.saveModProfile}
           />
+        ) : workspaceView.activeView === "settings" ? (
+          <SettingsManager
+            loading={loading}
+            saveFiles={scan.availableSaveFiles}
+            selectedSaveFiles={scan.selectedSaveFiles}
+            showWarningColumn={uiLayout.showWarningColumn}
+            strawberryDenominator={uiLayout.strawberryDenominator}
+            onSelectedSaveFilesChange={updateSelectedSaveFiles}
+            onShowWarningColumnChange={uiLayout.setShowWarningColumn}
+            onStrawberryDenominatorChange={uiLayout.setStrawberryDenominator}
+          />
         ) : workspaceView.activeView === "backups" ? (
           <BackupManager
             autoBackupEnabled={autoBackupEnabled}
@@ -183,6 +196,7 @@ export function App() {
             activeTab={uiLayout.mapDetailTab}
             map={workspaceView.selectedMap}
             mapDetailMemory={mapDetailMemory}
+            strawberryDenominator={uiLayout.strawberryDenominator}
             draftEnabled={
               workspaceView.selectedMap
                 ? isDraftEnabled(workspaceView.selectedMap, profileDraft.enabledMapDraft, profileDraft.enabledModDraft)
@@ -209,6 +223,7 @@ export function App() {
             selectedMap={workspaceView.selectedMap}
             selectedMod={workspaceView.selectedMod}
             showWarningColumn={uiLayout.showWarningColumn}
+            strawberryDenominator={uiLayout.strawberryDenominator}
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
             scrollMemory={scrollMemory}
