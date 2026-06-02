@@ -346,7 +346,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
                 id: stable_id(&format!("vanilla::{sid}")),
                 sid,
                 mode_index: Some(file.mode_index),
-                display_name: file.side_name.clone(),
+                display_name: official_sub_map_display_name(&file.area_name, file.mode_index),
                 chapter: format!("Celeste/{}", file.area_name),
                 file_path: format!("Content/Maps/{}", file.file_name),
                 strawberry_count,
@@ -399,7 +399,7 @@ fn official_map_file_info(path: &Path) -> Option<OfficialMapFile> {
     let stem = path.file_stem()?.to_string_lossy().to_string();
     if stem.eq_ignore_ascii_case("LostLevels") {
         return Some(OfficialMapFile {
-            area_name: "Farewell".to_string(),
+            area_name: official_area_name(10, "Farewell"),
             area_sort: 10,
             side_sort: 0,
             side_name: "Farewell".to_string(),
@@ -447,19 +447,29 @@ fn split_leading_digits(value: &str) -> Option<(&str, &str)> {
 
 fn official_area_name(number: u16, fallback: &str) -> String {
     match number {
-        0 => "Prologue",
-        1 => "Forsaken City",
-        2 => "Old Site",
-        3 => "Celestial Resort",
-        4 => "Golden Ridge",
-        5 => "Mirror Temple",
-        6 => "Reflection",
-        7 => "The Summit",
-        8 => "Epilogue",
-        9 => "Core",
+        0 => "序幕",
+        1 => "1 - 被遗弃的城市",
+        2 => "2 - 旧址",
+        3 => "3 - 天空度假村",
+        4 => "4 - 黄金山脊",
+        5 => "5 - 镜之寺",
+        6 => "6 - 倒影",
+        7 => "7 - 山顶",
+        8 => "尾声",
+        9 => "8 - 核心",
+        10 => "9 - 再见",
         _ => fallback,
     }
     .to_string()
+}
+
+fn official_sub_map_display_name(area_name: &str, mode_index: u8) -> String {
+    match mode_index {
+        0 => area_name.to_string(),
+        1 => format!("{area_name} B-Side"),
+        2 => format!("{area_name} C-Side"),
+        _ => area_name.to_string(),
+    }
 }
 
 pub fn write_profile_blacklist(
@@ -1303,7 +1313,11 @@ mod tests {
         assert_eq!(official.relative_path, "Celeste/");
         assert_eq!(official.sub_maps.len(), 3);
         assert_eq!(official.sub_maps[1].sid, "Celeste/1-ForsakenCity/B-Side");
-        assert_eq!(official.sub_maps[1].display_name, "B-Side");
+        assert_eq!(
+            official.sub_maps[1].display_name,
+            "1 - 被遗弃的城市 B-Side"
+        );
+        assert_eq!(official.sub_maps[1].chapter, "Celeste/1 - 被遗弃的城市");
         assert_eq!(
             official.sub_maps[1]
                 .stats
@@ -1315,6 +1329,36 @@ mod tests {
             official.sub_maps[1].completion_status,
             CompletionStatus::Unfinished
         );
+    }
+
+    #[test]
+    fn official_area_names_use_chinese_game_chapter_numbers() {
+        let cases = [
+            ("0-Intro.bin", "序幕", "序幕"),
+            (
+                "1-ForsakenCity.bin",
+                "1 - 被遗弃的城市",
+                "1 - 被遗弃的城市",
+            ),
+            ("8-Epilogue.bin", "尾声", "尾声"),
+            ("9-Core.bin", "8 - 核心", "8 - 核心"),
+            ("LostLevels.bin", "9 - 再见", "9 - 再见"),
+            (
+                "1H-ForsakenCity.bin",
+                "1 - 被遗弃的城市",
+                "1 - 被遗弃的城市 B-Side",
+            ),
+        ];
+
+        for (file_name, area_name, display_name) in cases {
+            let file =
+                official_map_file_info(std::path::Path::new(file_name)).expect("official file");
+            assert_eq!(file.area_name, area_name);
+            assert_eq!(
+                official_sub_map_display_name(&file.area_name, file.mode_index),
+                display_name
+            );
+        }
     }
 
     fn record(id: &str, relative_path: &str, kind: ModKind) -> ModRecord {
