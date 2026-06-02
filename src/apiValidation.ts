@@ -146,7 +146,9 @@ function validateModRecord(value: unknown, path: string): ModRecord {
     strawberryCount: numberAt(object.strawberryCount, `${path}.strawberryCount`),
     strawberryTotalCount: numberAt(object.strawberryTotalCount, `${path}.strawberryTotalCount`),
     completionStatus: oneOfAt(object.completionStatus, ["completed", "unfinished", "unknown", "notApplicable"], `${path}.completionStatus`),
-    dependencies: arrayAt(object.dependencies, `${path}.dependencies`).map((item, index) => validateDependency(item, `${path}.dependencies[${index}]`)),
+    dependencies: arrayAt(object.dependencies, `${path}.dependencies`).map((item, index) =>
+      validateDependency(item, `${path}.dependencies[${index}]`)
+    ),
     optionalDependencies: arrayAt(object.optionalDependencies, `${path}.optionalDependencies`).map((item, index) =>
       validateDependency(item, `${path}.optionalDependencies[${index}]`)
     ),
@@ -162,7 +164,9 @@ function validateModMetadata(value: unknown, path: string): ModMetadata {
     version: stringAt(object.version, `${path}.version`),
     author: stringAt(object.author, `${path}.author`),
     description: stringAt(object.description, `${path}.description`),
-    dependencies: arrayAt(object.dependencies, `${path}.dependencies`).map((item, index) => validateDependency(item, `${path}.dependencies[${index}]`)),
+    dependencies: arrayAt(object.dependencies, `${path}.dependencies`).map((item, index) =>
+      validateDependency(item, `${path}.dependencies[${index}]`)
+    ),
     optionalDependencies: arrayAt(object.optionalDependencies, `${path}.optionalDependencies`).map((item, index) =>
       validateDependency(item, `${path}.optionalDependencies[${index}]`)
     )

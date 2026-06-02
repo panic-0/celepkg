@@ -57,7 +57,10 @@ function compareBySortKey(left: SubMapInfo, right: SubMapInfo, options: SubMapSo
     case "time":
       return compareOptionalNumber(left.stats?.timePlayed, right.stats?.timePlayed);
     case "strawberries":
-      return compareOptionalNumber(strawberrySortValue(left, options.strawberryDenominator), strawberrySortValue(right, options.strawberryDenominator));
+      return compareOptionalNumber(
+        strawberrySortValue(left, options.strawberryDenominator),
+        strawberrySortValue(right, options.strawberryDenominator)
+      );
     case "file":
     default:
       return naturalTextCompare(left.filePath || left.sid, right.filePath || right.sid);

@@ -36,14 +36,8 @@ export function useWorkspaceView({
     () => visibleMapRecords.find((map) => map.id === selectedMapId) ?? visibleMapRecords[0],
     [visibleMapRecords, selectedMapId]
   );
-  const selectedMod = useMemo(
-    () => otherMods.find((modItem) => modItem.id === selectedModId) ?? otherMods[0],
-    [otherMods, selectedModId]
-  );
-  const enabledMapCount = useMemo(
-    () => maps.filter((map) => enabledMapDraft.has(map.id)).length,
-    [enabledMapDraft, maps]
-  );
+  const selectedMod = useMemo(() => otherMods.find((modItem) => modItem.id === selectedModId) ?? otherMods[0], [otherMods, selectedModId]);
+  const enabledMapCount = useMemo(() => maps.filter((map) => enabledMapDraft.has(map.id)).length, [enabledMapDraft, maps]);
   const enabledModCount = useMemo(
     () => otherMods.filter((modItem) => enabledModDraft.has(modItem.id)).length,
     [enabledModDraft, otherMods]

@@ -152,15 +152,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     setSelectedMapProfileId(nextId);
     setScan((value) => ({ ...value, profiles }));
     return nextId;
-  }, [
-    enabledMapDraft,
-    enabledMapModDraft,
-    enqueueProfileSave,
-    launchArgs,
-    selectedMapProfile,
-    selectedMapProfileId,
-    setScan
-  ]);
+  }, [enabledMapDraft, enabledMapModDraft, enqueueProfileSave, launchArgs, selectedMapProfile, selectedMapProfileId, setScan]);
 
   const persistModProfile = useCallback(async () => {
     const current = selectedModProfile;
