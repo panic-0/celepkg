@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { applyProfile, deleteProfile, launchProfile, saveProfile } from "../api";
+import { applyProfile, deleteProfile, launchGame, saveProfile } from "../api";
 import type { Profile, ScanResult } from "../types";
 import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import { readError } from "../utils/format";
@@ -241,7 +241,14 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const modId = modDirty ? await persistModProfile() : selectedModProfileId;
       const applied = await applyProfile(celestePath, mapId, modId);
       setScan(applied);
-      const result = await launchProfile(celestePath, mapId, modId);
+      const result = await launchGame(celestePath, launchArgs);
+      setMessage(`已启动：${result.executable}`);
+    });
+  }
+
+  async function launchCurrentGame() {
+    await runProfileTask(async () => {
+      const result = await launchGame(celestePath, launchArgs);
       setMessage(`已启动：${result.executable}`);
     });
   }
@@ -291,6 +298,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     enabledMapModDraft,
     enabledModDraft,
     launchArgs,
+    launchCurrentGame,
     launchSelectedProfiles,
     mapProfileName,
     mapProfiles,

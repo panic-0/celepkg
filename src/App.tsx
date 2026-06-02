@@ -103,7 +103,8 @@ export function App() {
         enabledMapCount={workspaceView.enabledMapCount}
         enabledModCount={workspaceView.enabledModCount}
         scan={scan}
-        onLaunch={profileDraft.launchSelectedProfiles}
+        onApplyAndLaunch={profileDraft.launchSelectedProfiles}
+        onDirectLaunch={profileDraft.launchCurrentGame}
         onPathChange={setPathInput}
         onRefresh={savePathAndRefresh}
         onRescan={savePathAndRescan}
@@ -162,7 +163,6 @@ export function App() {
             totalModCount={scan.otherMods.length}
             scrollMemory={scrollMemory}
             onApplyProfile={profileDraft.applySelectedProfiles}
-            onLaunch={profileDraft.launchSelectedProfiles}
             onLaunchArgsChange={profileDraft.setLaunchArgs}
             onMapProfileDelete={profileDraft.deleteMapProfile}
             onMapProfileNameChange={profileDraft.setMapProfileName}

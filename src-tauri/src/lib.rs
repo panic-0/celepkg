@@ -20,6 +20,7 @@ pub fn run() {
             commands::delete_profile,
             commands::apply_profile,
             commands::launch_profile,
+            commands::launch_game,
             commands::create_backup,
             commands::list_backups,
             commands::restore_backup,

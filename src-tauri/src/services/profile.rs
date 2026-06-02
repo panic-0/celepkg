@@ -132,6 +132,26 @@ pub fn launch_profile(
     })
 }
 
+pub fn launch_game(celeste_path: String, launch_args: String) -> Result<LaunchResult, String> {
+    let state = load_state();
+    let path = resolve_input_path_from_state(&celeste_path, &state);
+    let executable = resolve_game_executable(&path);
+    if executable.is_empty() {
+        return Err("没有找到 Celeste 可执行文件".to_string());
+    }
+    Command::new(&executable)
+        .args(split_launch_args(&launch_args))
+        .current_dir(&path)
+        .spawn()
+        .map_err(|error| format!("启动失败：{error}"))?;
+    Ok(LaunchResult {
+        launched: true,
+        executable,
+        map_profile_id: String::new(),
+        mod_profile_id: String::new(),
+    })
+}
+
 struct AppliedProfile {
     path: PathBuf,
     map_profile: Profile,

@@ -9,7 +9,8 @@ type AppToolbarProps = {
   loading: boolean;
   loadingMessage: string;
   scan: ScanResult;
-  onLaunch: () => void;
+  onApplyAndLaunch: () => void;
+  onDirectLaunch: () => void;
   onPathChange: (path: string) => void;
   onRefresh: () => void;
   onRescan: () => void;
@@ -23,7 +24,8 @@ export function AppToolbar({
   loading,
   loadingMessage,
   scan,
-  onLaunch,
+  onApplyAndLaunch,
+  onDirectLaunch,
   onPathChange,
   onRefresh,
   onRescan
@@ -62,9 +64,13 @@ export function AppToolbar({
           <DatabaseZap size={17} />
           重扫缓存
         </button>
-        <button className="primary-button" onClick={onLaunch} disabled={loading || !canLaunch}>
+        <button className="primary-button" onClick={onApplyAndLaunch} disabled={loading || !canLaunch} title="应用当前 Profile 并启动">
           <Play size={18} />
-          启动
+          应用并启动
+        </button>
+        <button onClick={onDirectLaunch} disabled={loading || !canLaunch} title="不应用 Profile，直接启动 Celeste">
+          <Play size={18} />
+          直接启动
         </button>
       </div>
     </header>

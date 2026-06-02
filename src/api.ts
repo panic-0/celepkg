@@ -59,6 +59,13 @@ export async function launchProfile(
   return invokeChecked("launch_profile", validateLaunchResult, { celestePath, mapProfileId, modProfileId });
 }
 
+export async function launchGame(
+  celestePath: string,
+  launchArgs: string
+): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+  return invokeChecked("launch_game", validateLaunchResult, { celestePath, launchArgs });
+}
+
 export async function setRecordFavorite(celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {
   return invokeChecked("set_record_favorite", validateScanResult, { celestePath, recordId, favorite });
 }

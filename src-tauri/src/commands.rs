@@ -183,6 +183,18 @@ pub async fn launch_profile(
 }
 
 #[tauri::command]
+pub async fn launch_game(
+    celeste_path: String,
+    launch_args: String,
+) -> Result<LaunchResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        services::profile::launch_game(celeste_path, launch_args)
+    })
+    .await
+    .map_err(|error| format!("启动任务失败：{error}"))?
+}
+
+#[tauri::command]
 pub async fn create_backup(celeste_path: String, kind: String) -> Result<BackupInfo, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve_input_path(&celeste_path);

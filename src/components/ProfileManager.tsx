@@ -1,4 +1,4 @@
-import { Check, Gamepad2, Layers, Play, Save, Sparkles, ToggleRight, Trash2 } from "lucide-react";
+import { Check, Gamepad2, Layers, Save, Sparkles, ToggleRight, Trash2 } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { Profile } from "../types";
 import { profileSummary } from "../utils/format";
@@ -19,7 +19,6 @@ type ProfileManagerProps = {
   totalMapCount: number;
   totalModCount: number;
   onApplyProfile: () => void;
-  onLaunch: () => void;
   onLaunchArgsChange: (value: string) => void;
   onMapProfileNameChange: (value: string) => void;
   onMapProfileSelect: (profile: Profile) => void;
@@ -49,7 +48,6 @@ export function ProfileManager({
   totalMapCount,
   totalModCount,
   onApplyProfile,
-  onLaunch,
   onLaunchArgsChange,
   onMapProfileNameChange,
   onMapProfileSelect,
@@ -73,13 +71,9 @@ export function ProfileManager({
           <p>{`启用 ${enabledMapCount}/${totalMapCount} 图，${enabledModCount}/${totalModCount} Mod，其中 ${dependencyModCount} 个由依赖推导`}</p>
         </div>
         <div className="profile-header-actions">
-          <button onClick={onLaunch} disabled={loading || !selectedMapProfile || !selectedModProfile}>
-            <Play size={16} />
-            启动
-          </button>
           <button onClick={onApplyProfile} disabled={loading || !selectedMapProfile || !selectedModProfile}>
             <ToggleRight size={16} />
-            应用
+            应用当前
           </button>
         </div>
       </div>
