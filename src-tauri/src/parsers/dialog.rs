@@ -41,11 +41,15 @@ pub fn read_dialog_titles(mut files: Vec<(String, String)>) -> HashMap<String, S
 
 pub fn dialog_title_for_sid(sid: &str, titles: &HashMap<String, String>) -> Option<String> {
     for key in dialog_key_candidates(sid) {
-        if let Some(value) = titles.get(&normalize_dialog_key(&key)) {
+        if let Some(value) = dialog_title_for_key(&key, titles) {
             return Some(value.clone());
         }
     }
     None
+}
+
+pub fn dialog_title_for_key(key: &str, titles: &HashMap<String, String>) -> Option<String> {
+    titles.get(&normalize_dialog_key(key)).cloned()
 }
 
 fn clean_dialog_value(value: &str) -> String {

@@ -2,7 +2,9 @@ use crate::domain::{
     CompletionStatus, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult,
     SubMapInfo,
 };
-use crate::parsers::dialog::{dialog_title_for_sid, is_dialog_file, read_dialog_titles};
+use crate::parsers::dialog::{
+    dialog_title_for_key, dialog_title_for_sid, is_dialog_file, read_dialog_titles,
+};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
 use crate::parsers::map_bin::count_strawberries;
 use crate::parsers::save_stats::{
@@ -20,7 +22,7 @@ use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 6;
+const SCAN_CACHE_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -128,6 +130,7 @@ fn build_scan_signature(celeste_path: &Path, selected_save_files: &[String]) -> 
         "Content/Maps",
         &mut files,
     );
+    collect_official_dialog_stamps(celeste_path, &mut files);
     collect_tree_stamps(celeste_path, &celeste_path.join("Mods"), "Mods", &mut files);
     collect_save_stamps(celeste_path, &mut files);
     collect_file_stamp(&celeste_path.join("Celeste.exe"), "Celeste.exe", &mut files);
@@ -185,6 +188,29 @@ fn collect_save_stamps(celeste_path: &Path, files: &mut Vec<FileStamp>) {
             }
             let relative = path.strip_prefix(celeste_path).unwrap_or(&path);
             collect_file_stamp(&path, &normalize_slash(&relative.to_string_lossy()), files);
+        }
+    }
+}
+
+fn collect_official_dialog_stamps(celeste_path: &Path, files: &mut Vec<FileStamp>) {
+    collect_tree_stamps(
+        celeste_path,
+        &celeste_path.join("Content").join("Dialog"),
+        "Content/Dialog",
+        files,
+    );
+    let content_path = celeste_path.join("Content");
+    if let Ok(entries) = fs::read_dir(&content_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if file_name.starts_with("Content.Dialog.") && file_name.ends_with(".txt") {
+                let relative = path.strip_prefix(celeste_path).unwrap_or(&path);
+                collect_file_stamp(&path, &normalize_slash(&relative.to_string_lossy()), files);
+            }
         }
     }
 }
@@ -312,6 +338,7 @@ struct OfficialMapFile {
 
 fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<ModRecord> {
     let maps_path = celeste_path.join("Content").join("Maps");
+    let dialog_titles = read_official_dialog_titles(celeste_path);
     let mut files = vec![];
     if let Ok(entries) = fs::read_dir(&maps_path) {
         for entry in entries.flatten() {
@@ -324,7 +351,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
             {
                 continue;
             }
-            let Some(info) = official_map_file_info(&path) else {
+            let Some(info) = official_map_file_info(&path, &dialog_titles) else {
                 continue;
             };
             files.push(info);
@@ -394,12 +421,15 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
     vec![record]
 }
 
-fn official_map_file_info(path: &Path) -> Option<OfficialMapFile> {
+fn official_map_file_info(
+    path: &Path,
+    titles: &HashMap<String, String>,
+) -> Option<OfficialMapFile> {
     let file_name = path.file_name()?.to_string_lossy().to_string();
     let stem = path.file_stem()?.to_string_lossy().to_string();
     if stem.eq_ignore_ascii_case("LostLevels") {
         return Some(OfficialMapFile {
-            area_name: official_area_name(10, "Farewell"),
+            area_name: official_area_name(10, "Farewell", titles),
             area_sort: 10,
             side_sort: 0,
             side_name: "Farewell".to_string(),
@@ -422,7 +452,7 @@ fn official_map_file_info(path: &Path) -> Option<OfficialMapFile> {
         return None;
     };
     Some(OfficialMapFile {
-        area_name: official_area_name(number, &base_stem),
+        area_name: official_area_name(number, &base_stem, titles),
         area_sort: number,
         side_sort,
         side_name,
@@ -445,22 +475,76 @@ fn split_leading_digits(value: &str) -> Option<(&str, &str)> {
     }
 }
 
-fn official_area_name(number: u16, fallback: &str) -> String {
+fn read_official_dialog_titles(celeste_path: &Path) -> HashMap<String, String> {
+    let mut dialog_texts = vec![];
+    for dialog_path in [
+        celeste_path.join("Content").join("Dialog"),
+        celeste_path.join("Content"),
+    ] {
+        if let Ok(entries) = fs::read_dir(&dialog_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file()
+                    || !path
+                        .extension()
+                        .map(|ext| ext.to_string_lossy().eq_ignore_ascii_case("txt"))
+                        .unwrap_or(false)
+                {
+                    continue;
+                }
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                if dialog_path.ends_with("Content") && !file_name.starts_with("Content.Dialog.") {
+                    continue;
+                }
+                if let Ok(text) = fs::read_to_string(&path) {
+                    let relative = path
+                        .strip_prefix(celeste_path)
+                        .unwrap_or(&path)
+                        .to_string_lossy()
+                        .to_string();
+                    dialog_texts.push((relative, text));
+                }
+            }
+        }
+    }
+    read_dialog_titles(dialog_texts)
+}
+
+fn official_area_key(number: u16) -> String {
+    format!("area_{number}")
+}
+
+fn official_area_name(number: u16, fallback: &str, titles: &HashMap<String, String>) -> String {
+    let title = dialog_title_for_key(&official_area_key(number), titles)
+        .unwrap_or_else(|| official_area_fallback_name(number, fallback));
+    official_numbered_area_name(number, &title)
+}
+
+fn official_area_fallback_name(number: u16, fallback: &str) -> String {
     match number {
-        0 => "序幕",
-        1 => "1 - 被遗弃的城市",
-        2 => "2 - 旧址",
-        3 => "3 - 天空度假村",
-        4 => "4 - 黄金山脊",
-        5 => "5 - 镜之寺",
-        6 => "6 - 倒影",
-        7 => "7 - 山顶",
-        8 => "尾声",
-        9 => "8 - 核心",
-        10 => "9 - 再见",
+        0 => "Prologue",
+        1 => "Forsaken City",
+        2 => "Old Site",
+        3 => "Celestial Resort",
+        4 => "Golden Ridge",
+        5 => "Mirror Temple",
+        6 => "Reflection",
+        7 => "The Summit",
+        8 => "Epilogue",
+        9 => "Core",
+        10 => "Farewell",
         _ => fallback,
     }
     .to_string()
+}
+
+fn official_numbered_area_name(number: u16, title: &str) -> String {
+    match number {
+        1..=7 => format!("{number} - {title}"),
+        9 => format!("8 - {title}"),
+        10 => format!("9 - {title}"),
+        _ => title.to_string(),
+    }
 }
 
 fn official_sub_map_display_name(area_name: &str, mode_index: u8) -> String {
@@ -1283,6 +1367,10 @@ mod tests {
         let content_maps = root.join("Content").join("Maps");
         fs::create_dir_all(&content_maps).expect("content maps dir");
         fs::create_dir_all(root.join("Mods")).expect("mods dir");
+        write_official_dialog(
+            &root,
+            "area_1=被遗弃的城市\narea_9=核心\narea_10=再见\n",
+        );
         fs::write(content_maps.join("1-ForsakenCity.bin"), "").expect("a side");
         fs::write(content_maps.join("1H-ForsakenCity.bin"), "").expect("b side");
         fs::write(content_maps.join("1X-ForsakenCity.bin"), "").expect("c side");
@@ -1332,9 +1420,20 @@ mod tests {
     }
 
     #[test]
-    fn official_area_names_use_chinese_game_chapter_numbers() {
+    fn official_area_names_use_builtin_dialog_titles() {
+        let titles = read_dialog_titles(vec![(
+            "Content/Dialog/ChineseSimplified.txt".to_string(),
+            [
+                "area_0=序章",
+                "area_1=被遗弃的城市",
+                "area_8=尾声",
+                "area_9=核心",
+                "area_10=再见",
+            ]
+            .join("\n"),
+        )]);
         let cases = [
-            ("0-Intro.bin", "序幕", "序幕"),
+            ("0-Intro.bin", "序章", "序章"),
             (
                 "1-ForsakenCity.bin",
                 "1 - 被遗弃的城市",
@@ -1352,13 +1451,20 @@ mod tests {
 
         for (file_name, area_name, display_name) in cases {
             let file =
-                official_map_file_info(std::path::Path::new(file_name)).expect("official file");
+                official_map_file_info(std::path::Path::new(file_name), &titles)
+                    .expect("official file");
             assert_eq!(file.area_name, area_name);
             assert_eq!(
                 official_sub_map_display_name(&file.area_name, file.mode_index),
                 display_name
             );
         }
+    }
+
+    fn write_official_dialog(root: &Path, text: &str) {
+        let dialog_path = root.join("Content").join("Dialog");
+        fs::create_dir_all(&dialog_path).expect("dialog dir");
+        fs::write(dialog_path.join("ChineseSimplified.txt"), text).expect("dialog");
     }
 
     fn record(id: &str, relative_path: &str, kind: ModKind) -> ModRecord {
