@@ -644,15 +644,31 @@ h1 {
   color: #697786;
 }
 
-.profile-delete-button {
-  width: 26px;
+.profile-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.profile-action-button {
+  width: 28px;
   min-height: 42px;
   padding: 0;
   border-radius: 5px;
   color: #8a96a3;
 }
 
-.profile-delete-button:hover {
+.profile-action-button:hover:not(:disabled) {
+  background: #eef8fc;
+  color: #0f77ad;
+}
+
+.profile-action-button.overwrite:hover:not(:disabled) {
+  background: #fff8ed;
+  color: #8a4a12;
+}
+
+.profile-action-button.danger:hover:not(:disabled) {
   background: #fff1f1;
   color: #b42318;
 }
@@ -717,17 +733,33 @@ h1 {
   margin-top: 8px;
 }
 
-.profile-overwrite-box {
+.profile-name-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  align-items: end;
+}
+
+.profile-name-row .field {
+  margin-top: 10px;
+}
+
+.profile-create-button {
+  min-height: 34px;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.profile-overwrite-mode {
+  display: grid;
   margin-top: 8px;
   border: 1px solid #e1e8ef;
   border-radius: 7px;
   background: #fbfcfd;
-  padding: 9px;
+  padding: 8px 9px;
 }
 
-.profile-overwrite-box .field {
+.profile-overwrite-mode .field {
   margin-top: 0;
 }
 

@@ -1,5 +1,5 @@
 import { Copy, Gamepad2, Layers, Plus, RefreshCw, ToggleRight, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ProfileOverwriteMode } from "../hooks/useProfileDraft";
 import type { Profile } from "../types";
@@ -28,9 +28,9 @@ type ProfileManagerProps = {
   onModProfileSelect: (profile: Profile) => void;
   onMapProfileDelete: (profile: Profile) => void;
   onModProfileDelete: (profile: Profile) => void;
-  onMapProfileCopy: () => void;
+  onMapProfileCopy: (profile: Profile) => void;
   onMapProfileCreateEmpty: () => void;
-  onModProfileCopy: () => void;
+  onModProfileCopy: (profile: Profile) => void;
   onModProfileCreateEmpty: () => void;
   onMapProfileOverwriteFromCurrent: () => void;
   onMapProfileOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
@@ -106,7 +106,7 @@ export function ProfileManager({
           profiles={mapProfiles}
           selectedProfileId={selectedMapProfileId}
           nameDraft={mapProfileName}
-          nameLabel="地图 Profile 名称"
+          nameLabel="新建地图 Profile 名称"
           summary={selectedMapProfile ? profileSummary(selectedMapProfile) : "请选择地图 Profile"}
           onCopy={onMapProfileCopy}
           onCreateEmpty={onMapProfileCreateEmpty}
@@ -126,7 +126,7 @@ export function ProfileManager({
           profiles={modProfiles}
           selectedProfileId={selectedModProfileId}
           nameDraft={modProfileName}
-          nameLabel="Mod Profile 名称"
+          nameLabel="新建 Mod Profile 名称"
           summary={selectedModProfile ? profileSummary(selectedModProfile) : "请选择 Mod Profile"}
           onCopy={onModProfileCopy}
           onCreateEmpty={onModProfileCreateEmpty}
@@ -180,7 +180,7 @@ function ProfileColumn({
   selectedProfileId: string;
   summary: string;
   title: string;
-  onCopy: () => void;
+  onCopy: (profile: Profile) => void;
   onCreateEmpty: () => void;
   onNameChange: (value: string) => void;
   onOverwriteFromCurrent: () => void;
@@ -191,15 +191,8 @@ function ProfileColumn({
   scrollMemory: ScrollMemory;
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
-  const sourceProfiles = useMemo(() => profiles.filter((profile) => profile.id !== selectedProfileId), [profiles, selectedProfileId]);
-  const [overwriteSourceId, setOverwriteSourceId] = useState("");
   const [overwriteMode, setOverwriteMode] = useState<ProfileOverwriteMode>("enabled");
   const profileListRef = useScrollMemory<HTMLDivElement>(scrollKey, scrollMemory);
-
-  useEffect(() => {
-    if (sourceProfiles.some((profile) => profile.id === overwriteSourceId)) return;
-    setOverwriteSourceId(sourceProfiles[0]?.id ?? "");
-  }, [overwriteSourceId, sourceProfiles]);
 
   return (
     <aside className="profile-editor">
@@ -219,17 +212,50 @@ function ProfileColumn({
                 <span>{profile.name}</span>
                 <small>{profileSummary(profile)}</small>
               </button>
-              <button
-                className="profile-delete-button"
-                disabled={loading || isDefaultProfile(profile)}
-                title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (window.confirm(`删除 Profile「${profile.name}」？`)) onProfileDelete(profile);
-                }}
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="profile-row-actions">
+                <button
+                  className="profile-action-button"
+                  disabled={loading}
+                  title="复制 Profile"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onCopy(profile);
+                  }}
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  className="profile-action-button overwrite"
+                  disabled={loading || !selectedProfile || profile.id === selectedProfileId}
+                  title={profile.id === selectedProfileId ? "不能从当前 Profile 覆盖自己" : "从此 Profile 覆盖当前 Profile"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!selectedProfile || profile.id === selectedProfileId) return;
+                    const confirmed =
+                      overwriteMode === "all"
+                        ? window.confirm(
+                            `用「${profile.name}」的全部内容覆盖「${selectedProfile.name}」？这会覆盖名称、启用情况和启动参数，但不会改变 Profile id。`
+                          )
+                        : window.confirm(
+                            `只用「${profile.name}」的启用情况覆盖「${selectedProfile.name}」？名称、启动参数、Favorite 和 Protected 不会被覆盖。`
+                          );
+                    if (confirmed) onOverwriteFromProfile(profile.id, overwriteMode);
+                  }}
+                >
+                  <RefreshCw size={14} />
+                </button>
+                <button
+                  className="profile-action-button danger"
+                  disabled={loading || isDefaultProfile(profile)}
+                  title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (window.confirm(`删除 Profile「${profile.name}」？`)) onProfileDelete(profile);
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
           ))
         ) : (
@@ -238,37 +264,17 @@ function ProfileColumn({
           </div>
         )}
       </div>
-      <label className="field">
-        <span>{nameLabel}</span>
-        <input value={nameDraft} onChange={(event) => onNameChange(event.target.value)} />
-      </label>
-      <button className="wide-button" onClick={onCreateEmpty} disabled={loading}>
-        <Plus size={16} />
-        新建空 Profile
-      </button>
-      <button className="wide-button" onClick={onCopy} disabled={loading || !selectedProfile}>
-        <Copy size={16} />
-        复制当前 Profile
-      </button>
-      <div className="profile-overwrite-box">
+      <div className="profile-name-row">
         <label className="field">
-          <span>覆盖来源</span>
-          <select
-            value={overwriteSourceId}
-            onChange={(event) => setOverwriteSourceId(event.target.value)}
-            disabled={!sourceProfiles.length}
-          >
-            {sourceProfiles.length ? (
-              sourceProfiles.map((profile) => (
-                <option value={profile.id} key={profile.id}>
-                  {profile.name}
-                </option>
-              ))
-            ) : (
-              <option value="">没有其他 Profile</option>
-            )}
-          </select>
+          <span>{nameLabel}</span>
+          <input value={nameDraft} onChange={(event) => onNameChange(event.target.value)} placeholder="留空自动命名" />
         </label>
+        <button className="profile-create-button" onClick={onCreateEmpty} disabled={loading}>
+          <Plus size={16} />
+          新建空 Profile
+        </button>
+      </div>
+      <div className="profile-overwrite-mode">
         <label className="field">
           <span>覆盖范围</span>
           <select value={overwriteMode} onChange={(event) => setOverwriteMode(event.target.value as ProfileOverwriteMode)}>
@@ -276,25 +282,6 @@ function ProfileColumn({
             <option value="all">覆盖全部内容</option>
           </select>
         </label>
-        <button
-          className="wide-button overwrite-button"
-          onClick={() => {
-            const sourceProfile = sourceProfiles.find((profile) => profile.id === overwriteSourceId);
-            if (!sourceProfile || !selectedProfile) return;
-            const confirmed =
-              overwriteMode === "all"
-                ? window.confirm(
-                    `用「${sourceProfile.name}」的全部内容覆盖「${selectedProfile.name}」？这会覆盖名称、启用情况和启动参数，但不会改变 Profile id。`
-                  )
-                : window.confirm(
-                    `只用「${sourceProfile.name}」的启用情况覆盖「${selectedProfile.name}」？名称、启动参数、Favorite 和 Protected 不会被覆盖。`
-                  );
-            if (confirmed) onOverwriteFromProfile(sourceProfile.id, overwriteMode);
-          }}
-          disabled={loading || !selectedProfile || !overwriteSourceId}
-        >
-          <RefreshCw size={16} />从 Profile 覆盖
-        </button>
       </div>
       <button
         className="wide-button overwrite-button"

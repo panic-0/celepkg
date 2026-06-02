@@ -26,7 +26,7 @@ Protected 是“不要让 Profile 自动改这个条目”。它适合常驻 Hel
 
 Profile 不会删除或移动 Mod 文件。应用 Profile 时，CelePkg 通过改 `blacklist.txt` 控制启用状态。
 
-地图 Profile 和 Mod Profile 分开编辑。每一类都需要选中一个当前 Profile；初始默认是 `Main Profile`。在地图 / Mod 列表中切换启用状态、批量启用 / 禁用，或在 Profile 页面改名称和启动参数时，都会直接保存到当前 Profile，不需要再点“保存”。
+地图 Profile 和 Mod Profile 分开编辑。每一类都需要选中一个当前 Profile；初始默认是 `Main Profile`。在地图 / Mod 列表中切换启用状态、批量启用 / 禁用，或在 Profile 页面修改启动参数时，都会直接保存到当前 Profile，不需要再点“保存”。
 
 写入位置：
 
@@ -38,14 +38,14 @@ Profile 不会删除或移动 Mod 文件。应用 Profile 时，CelePkg 通过�
 
 Profile 页面里的“覆盖启用情况”是反向操作：读取当前 `blacklist.txt` 对应的实际启用情况，并覆写到当前选中的 Profile。它只覆盖启用列表，不会覆盖 Profile 名称、启动参数、Favorite 或 Protected。这个操作会要求确认，适合你先在游戏目录里手动调整好启用状态，再让 CelePkg 记住它。
 
-也可以从另一个同类 Profile 覆盖当前 Profile。比如你想让 `P2` 先变成 `P1` 的配置，可以在 `P2` 被选中时选择来源 `P1`：
+也可以从另一个同类 Profile 覆盖当前 Profile。比如你想让 `P2` 先变成 `P1` 的配置，可以先选中 `P2`，选择覆盖范围，再点 `P1` 行右侧的覆盖按钮：
 
 - 只覆盖启用情况：只复制地图 / Mod 启用列表，`P2` 的名称和启动参数不变。
 - 覆盖全部内容：复制名称、启用情况和启动参数，但 `P2` 的 Profile id 和创建时间不变。
 
-“复制当前 Profile”会完整复制当前正在编辑的 Profile，生成一个新 Profile 并自动选中。新名称会使用 `原名 Copy`，重名时会自动递增。
+Profile 列表每一行右侧都有复制按钮。它会完整复制对应的 Profile，生成一个新 Profile 并自动选中。新名称会使用 `原名 Copy`，重名时会自动递增。
 
-“新建空 Profile”会生成一个空配置并自动选中。地图 Profile 中官方只读地图仍会保持启用；用户地图、地图侧 Mod 和启动参数为空。Mod Profile 的启用列表为空。
+名称输入框只用于新建 Profile，不会跟随当前 Profile 名称变化。输入名称后点击右侧“新建空 Profile”会生成一个空配置并自动选中；留空时会自动命名。地图 Profile 中官方只读地图仍会保持启用；用户地图、地图侧 Mod 和启动参数为空。Mod Profile 的启用列表为空。
 
 ## 地图 Profile / Mod Profile
 

@@ -12,11 +12,11 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
   - 默认使用游戏概览分母。
   - 可切换为包含金莓、月莓、银莓、彩虹莓等特殊莓的全部草莓数。
 - 管理地图 Profile 和其他 Mod Profile，编辑会自动保存到当前 Profile。
-- 支持新建空 Profile、复制当前 Profile，也支持从另一个同类 Profile 覆盖当前 Profile；覆盖时可选择只覆盖启用情况或覆盖全部内容。
+- 支持新建空 Profile、复制任意 Profile，也支持从另一个同类 Profile 覆盖当前 Profile；覆盖时可选择只覆盖启用情况或覆盖全部内容。
 - 顶部支持“应用并启动”和“直接启动”：
   - 应用并启动会先应用当前地图 / Mod Profile，再启动游戏。
   - 直接启动不会改写 Profile 或 `blacklist.txt`。
-- 支持删除和重命名 Profile。
+- 支持删除 Profile，并可为新建 Profile 指定名称。
 - 支持收藏和保护条目：
   - 收藏状态写入 `Mods/favorites.txt`。
   - Profile 应用会写入 `Mods/blacklist.txt`。

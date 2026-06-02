@@ -20,8 +20,8 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   const [enabledExplicitModDraft, setEnabledExplicitModDraft] = useState<Set<string>>(new Set());
   const [selectedMapProfileId, setSelectedMapProfileId] = useState("default-maps");
   const [selectedModProfileId, setSelectedModProfileId] = useState("default-mods");
-  const [mapProfileName, setMapProfileName] = useState("Main Profile");
-  const [modProfileName, setModProfileName] = useState("Main Profile");
+  const [mapProfileName, setMapProfileName] = useState("");
+  const [modProfileName, setModProfileName] = useState("");
   const [launchArgs, setLaunchArgs] = useState("");
   const [mapDirty, setMapDirty] = useState(false);
   const [modDirty, setModDirty] = useState(false);
@@ -59,7 +59,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     (profile: Profile | undefined) => {
       mapAutoSaveReadyRef.current = false;
       setSelectedMapProfileId(profile?.id ?? "default-maps");
-      setMapProfileName(profile?.name ?? "Main Profile");
       setLaunchArgs(profile?.launchArgs ?? "");
       const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
       const mapIds = [
@@ -93,7 +92,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     (profile: Profile | undefined) => {
       modAutoSaveReadyRef.current = false;
       setSelectedModProfileId(profile?.id ?? "default-mods");
-      setModProfileName(profile?.name ?? "Main Profile");
       const modIds = profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
       setEnabledExplicitModDraft(new Set(modIds));
       setModDirty(false);
@@ -141,7 +139,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     const profiles = await enqueueProfileSave(() =>
       saveProfile({
         id: current.id,
-        name: mapProfileName || current.name || "Main Profile",
+        name: current.name || "Main Profile",
         profileType: "maps",
         enabledMapIds: [...enabledMapDraft],
         enabledModIds: [...enabledMapModDraft],
@@ -159,7 +157,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     enabledMapModDraft,
     enqueueProfileSave,
     launchArgs,
-    mapProfileName,
     selectedMapProfile,
     selectedMapProfileId,
     setScan
@@ -171,7 +168,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     const profiles = await enqueueProfileSave(() =>
       saveProfile({
         id: current.id,
-        name: modProfileName || current.name || "Main Profile",
+        name: current.name || "Main Profile",
         profileType: "mods",
         enabledModIds: [...enabledExplicitModDraft],
         createdAt: current.createdAt
@@ -182,7 +179,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     setSelectedModProfileId(nextId);
     setScan((value) => ({ ...value, profiles }));
     return nextId;
-  }, [enabledExplicitModDraft, enqueueProfileSave, modProfileName, selectedModProfile, selectedModProfileId, setScan]);
+  }, [enabledExplicitModDraft, enqueueProfileSave, selectedModProfile, selectedModProfileId, setScan]);
 
   useEffect(() => {
     if (!initializedRef.current || !selectedMapProfile) return;
@@ -196,7 +193,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       void persistMapProfile().catch((error) => setMessage(readError(error)));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, mapProfileName, persistMapProfile, selectedMapProfile, setMessage]);
+  }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, persistMapProfile, selectedMapProfile, setMessage]);
 
   useEffect(() => {
     if (!initializedRef.current || !selectedModProfile) return;
@@ -210,7 +207,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       void persistModProfile().catch((error) => setMessage(readError(error)));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabledExplicitModDraft, modDirty, modProfileName, persistModProfile, selectedModProfile, setMessage]);
+  }, [enabledExplicitModDraft, modDirty, persistModProfile, selectedModProfile, setMessage]);
 
   function setMapProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
@@ -243,27 +240,28 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   }
 
   function updateMapProfileName(value: string) {
-    setMapDirty(true);
     setMapProfileName(value);
   }
 
   function updateModProfileName(value: string) {
-    setModDirty(true);
     setModProfileName(value);
   }
 
-  async function copyMapProfile() {
+  async function copyMapProfile(sourceProfile = selectedMapProfile) {
     await runProfileTask(async () => {
       mapAutoSaveReadyRef.current = false;
-      const source = selectedMapProfile;
+      const source = sourceProfile;
       if (!source) return;
       if (mapDirty) await persistMapProfile();
-      const sourceName = mapProfileName || source.name || "Main Profile";
-      const sourceLaunchArgs = launchArgs;
-      const content = {
-        enabledMapIds: [...enabledMapDraft],
-        enabledModIds: [...enabledMapModDraft]
-      };
+      const isSelectedSource = source.id === selectedMapProfileId;
+      const sourceName = source.name || "Main Profile";
+      const sourceLaunchArgs = isSelectedSource ? launchArgs : source.launchArgs;
+      const content = isSelectedSource
+        ? {
+            enabledMapIds: [...enabledMapDraft],
+            enabledModIds: [...enabledMapModDraft]
+          }
+        : resolveMapProfileContent(source, scan);
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
           name: nextCopyName(sourceName, mapProfiles),
@@ -277,7 +275,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       mapAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
       setSelectedMapProfileId(profiles.activeMapProfileId);
-      setMapProfileName(profiles.profiles.find((profile) => profile.id === profiles.activeMapProfileId)?.name ?? mapProfileName);
       setLaunchArgs(sourceLaunchArgs);
       setEnabledMapDraft(new Set(content.enabledMapIds));
       setEnabledMapModDraft(new Set(content.enabledModIds));
@@ -285,16 +282,19 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     });
   }
 
-  async function copyModProfile() {
+  async function copyModProfile(sourceProfile = selectedModProfile) {
     await runProfileTask(async () => {
       modAutoSaveReadyRef.current = false;
-      const source = selectedModProfile;
+      const source = sourceProfile;
       if (!source) return;
       if (modDirty) await persistModProfile();
-      const sourceName = modProfileName || source.name || "Main Profile";
-      const content = {
-        enabledModIds: [...enabledExplicitModDraft]
-      };
+      const isSelectedSource = source.id === selectedModProfileId;
+      const sourceName = source.name || "Main Profile";
+      const content = isSelectedSource
+        ? {
+            enabledModIds: [...enabledExplicitModDraft]
+          }
+        : resolveModProfileContent(source, scan);
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
           name: nextCopyName(sourceName, modProfiles),
@@ -306,7 +306,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       modAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
       setSelectedModProfileId(profiles.activeModProfileId);
-      setModProfileName(profiles.profiles.find((profile) => profile.id === profiles.activeModProfileId)?.name ?? modProfileName);
       setEnabledExplicitModDraft(new Set(content.enabledModIds));
       setMessage("Mod Profile 已复制。");
     });
@@ -316,9 +315,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
     await runProfileTask(async () => {
       mapAutoSaveReadyRef.current = false;
       const enabledMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
+      const nextName = mapProfileName.trim() || nextNewProfileName("New Map Profile", mapProfiles);
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
-          name: nextNewProfileName("New Map Profile", mapProfiles),
+          name: nextName,
           profileType: "maps",
           enabledMapIds,
           enabledModIds: [],
@@ -329,7 +329,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       mapAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
       setSelectedMapProfileId(profiles.activeMapProfileId);
-      setMapProfileName(profiles.profiles.find((profile) => profile.id === profiles.activeMapProfileId)?.name ?? "New Map Profile");
+      setMapProfileName("");
       setLaunchArgs("");
       setEnabledMapDraft(new Set(enabledMapIds));
       setEnabledMapModDraft(new Set());
@@ -340,9 +340,10 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
   async function createEmptyModProfile() {
     await runProfileTask(async () => {
       modAutoSaveReadyRef.current = false;
+      const nextName = modProfileName.trim() || nextNewProfileName("New Mod Profile", modProfiles);
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
-          name: nextNewProfileName("New Mod Profile", modProfiles),
+          name: nextName,
           profileType: "mods",
           enabledModIds: []
         })
@@ -351,7 +352,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       modAutoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
       setSelectedModProfileId(profiles.activeModProfileId);
-      setModProfileName(profiles.profiles.find((profile) => profile.id === profiles.activeModProfileId)?.name ?? "New Mod Profile");
+      setModProfileName("");
       setEnabledExplicitModDraft(new Set());
       setMessage("已新建空 Mod Profile。");
     });
@@ -362,9 +363,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
       setMapDirty(false);
       setScan((value) => ({ ...value, profiles }));
-      const nextProfile = profiles.profiles.find((item) => item.id === profiles.activeMapProfileId);
       setSelectedMapProfileId(profiles.activeMapProfileId);
-      setMapProfileName(nextProfile?.name ?? "Main Profile");
       setMessage("地图 Profile 已删除。");
     });
   }
@@ -374,9 +373,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
       setModDirty(false);
       setScan((value) => ({ ...value, profiles }));
-      const nextProfile = profiles.profiles.find((item) => item.id === profiles.activeModProfileId);
       setSelectedModProfileId(profiles.activeModProfileId);
-      setModProfileName(nextProfile?.name ?? "Main Profile");
       setMessage("Mod Profile 已删除。");
     });
   }
@@ -420,7 +417,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
           id: current.id,
-          name: mapProfileName || current.name || "Main Profile",
+          name: current.name || "Main Profile",
           profileType: "maps",
           enabledMapIds: mapIds,
           enabledModIds: modIds,
@@ -446,7 +443,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
           id: current.id,
-          name: modProfileName || current.name || "Main Profile",
+          name: current.name || "Main Profile",
           profileType: "mods",
           enabledModIds: modIds,
           createdAt: current.createdAt
@@ -466,7 +463,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const source = mapProfiles.find((profile) => profile.id === sourceProfileId);
       if (!current || !source || current.id === source.id) return;
       const content = resolveMapProfileContent(source, scan);
-      const nextName = mode === "all" ? source.name : mapProfileName || current.name || "Main Profile";
+      const nextName = mode === "all" ? source.name : current.name || "Main Profile";
       const nextLaunchArgs = mode === "all" ? source.launchArgs : launchArgs;
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
@@ -479,7 +476,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
           createdAt: current.createdAt
         })
       );
-      setMapProfileName(nextName);
       setLaunchArgs(nextLaunchArgs);
       setEnabledMapDraft(new Set(content.enabledMapIds));
       setEnabledMapModDraft(new Set(content.enabledModIds));
@@ -497,7 +493,7 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
       const source = modProfiles.find((profile) => profile.id === sourceProfileId);
       if (!current || !source || current.id === source.id) return;
       const content = resolveModProfileContent(source, scan);
-      const nextName = mode === "all" ? source.name : modProfileName || current.name || "Main Profile";
+      const nextName = mode === "all" ? source.name : current.name || "Main Profile";
       const profiles = await enqueueProfileSave(() =>
         saveProfile({
           id: current.id,
@@ -507,7 +503,6 @@ export function useProfileDraft({ celestePath, scan, setLoading, setMessage, set
           createdAt: current.createdAt
         })
       );
-      setModProfileName(nextName);
       setEnabledExplicitModDraft(new Set(content.enabledModIds));
       setModDirty(false);
       modAutoSaveReadyRef.current = true;
