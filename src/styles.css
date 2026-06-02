@@ -232,12 +232,38 @@ h1 {
 }
 
 .workspace {
+  position: relative;
   min-height: 0;
   min-width: 0;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 8px;
   padding: 8px;
+}
+
+.workspace-loading {
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border-radius: 7px;
+  background: rgba(247, 250, 252, 0.76);
+  color: #17435d;
+  text-align: center;
+  backdrop-filter: blur(1px);
+}
+
+.workspace-loading strong {
+  max-width: min(420px, calc(100% - 32px));
+  padding: 8px 12px;
+  border: 1px solid #b7d7e4;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(38, 58, 80, 0.13);
+  overflow-wrap: anywhere;
 }
 
 .workspace-nav,
@@ -1594,6 +1620,16 @@ h1 {
 
 .table-empty {
   min-width: 360px;
+}
+
+.spin-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .message-bar {

@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useRef } from "react";
 import { BackupManager } from "./components/BackupManager";
 import { MapDetail, type MapDetailMemoryState } from "./components/MapDetail";
@@ -23,6 +23,7 @@ export function App() {
     autoBackupEnabled,
     celestePath,
     loading,
+    loadingMessage,
     message,
     refresh,
     savePathAndRefresh,
@@ -88,12 +89,14 @@ export function App() {
     toggleMapMod: profileDraft.toggleMapMod,
     toggleMod: profileDraft.toggleMod
   });
+  const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
 
   return (
     <main className="app-shell">
       <AppToolbar
         celestePath={celestePath}
         loading={loading}
+        loadingMessage={loadingMessage}
         canLaunch={Boolean(scan.gameExecutable)}
         enabledMapCount={workspaceView.enabledMapCount}
         enabledModCount={workspaceView.enabledModCount}
@@ -227,6 +230,8 @@ export function App() {
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
             scrollMemory={scrollMemory}
+            loading={loading && !showWorkspaceLoading}
+            loadingMessage={loadingMessage}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onMapSelect={workspaceView.selectMap}
@@ -239,6 +244,13 @@ export function App() {
             isModEnabled={recordActions.isModEnabled}
           />
         )}
+
+        {showWorkspaceLoading && (
+          <div className="workspace-loading" role="status" aria-live="polite">
+            <LoaderCircle className="spin-icon" size={34} />
+            <strong>{loadingMessage}</strong>
+          </div>
+        )}
       </section>
 
       {(message || scan.warnings.length > 0) && (
@@ -249,4 +261,8 @@ export function App() {
       )}
     </main>
   );
+}
+
+function isWorkspaceLoadingMessage(message: string) {
+  return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
 }

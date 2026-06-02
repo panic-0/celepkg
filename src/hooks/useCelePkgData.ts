@@ -21,12 +21,19 @@ export function useCelePkgData() {
   const [celestePath, setPathInput] = useState("");
   const [scan, setScan] = useState<ScanResult>(emptyScan);
   const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoadingState] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [message, setMessage] = useState("");
   const selectedSaveRequestRef = useRef(0);
 
+  const setLoading = useCallback((nextLoading: boolean) => {
+    setLoadingState(nextLoading);
+    if (!nextLoading) setLoadingMessage("");
+  }, []);
+
   const refreshPath = useCallback(async (nextPath: string) => {
     setLoading(true);
+    setLoadingMessage("正在读取扫描缓存并扫描地图...");
     setMessage("");
     try {
       const result = await scanCeleste(nextPath);
@@ -39,10 +46,11 @@ export function useCelePkgData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading]);
 
   const rescanPath = useCallback(async (nextPath: string) => {
     setLoading(true);
+    setLoadingMessage("正在刷新缓存并重新扫描地图...");
     setMessage("");
     try {
       const result = await rescanCeleste(nextPath);
@@ -56,7 +64,7 @@ export function useCelePkgData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading]);
 
   const refresh = useCallback((nextPath = celestePath) => refreshPath(nextPath), [celestePath, refreshPath]);
 
@@ -70,6 +78,7 @@ export function useCelePkgData() {
 
   const updateAutoBackupEnabled = useCallback(async (enabled: boolean) => {
     setLoading(true);
+    setLoadingMessage("正在更新备份设置...");
     setMessage("");
     try {
       const config = await setAutoBackupEnabled(enabled);
@@ -81,13 +90,14 @@ export function useCelePkgData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading]);
 
   const updateSelectedSaveFiles = useCallback(async (saveFiles: string[]) => {
     const requestId = selectedSaveRequestRef.current + 1;
     selectedSaveRequestRef.current = requestId;
     setScan((current) => ({ ...current, selectedSaveFiles: saveFiles }));
     setLoading(true);
+    setLoadingMessage("正在更新存档统计...");
     setMessage("");
     try {
       const config = await setSelectedSaveFiles(saveFiles);
@@ -106,10 +116,11 @@ export function useCelePkgData() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [setLoading]);
 
   const savePathAndRefresh = useCallback(async () => {
     setLoading(true);
+    setLoadingMessage("正在保存目录...");
     setMessage("");
     try {
       await setCelestePath(celestePath);
@@ -118,10 +129,11 @@ export function useCelePkgData() {
       setMessage(readError(error));
       setLoading(false);
     }
-  }, [celestePath, refreshPath]);
+  }, [celestePath, refreshPath, setLoading]);
 
   const savePathAndRescan = useCallback(async () => {
     setLoading(true);
+    setLoadingMessage("正在保存目录...");
     setMessage("");
     try {
       await setCelestePath(celestePath);
@@ -130,7 +142,7 @@ export function useCelePkgData() {
       setMessage(readError(error));
       setLoading(false);
     }
-  }, [celestePath, rescanPath]);
+  }, [celestePath, rescanPath, setLoading]);
 
   useEffect(() => {
     loadConfigAndRefresh().catch((error) => setMessage(readError(error)));
@@ -140,6 +152,7 @@ export function useCelePkgData() {
     autoBackupEnabled,
     celestePath,
     loading,
+    loadingMessage,
     loadConfigAndRefresh,
     message,
     refresh,

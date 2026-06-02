@@ -1,4 +1,4 @@
-import { CircleDot, Clock, FolderOpen, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
+import { CircleDot, Clock, FolderOpen, LoaderCircle, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
@@ -15,6 +15,8 @@ type RecordListProps = {
   showWarningColumn: boolean;
   strawberryDenominator: StrawberryDenominator;
   scrollMemory: ScrollMemory;
+  loading: boolean;
+  loadingMessage: string;
   visibleMapCount: number;
   modCount: number;
   onDisableAll: () => void;
@@ -38,6 +40,8 @@ export function RecordList({
   showWarningColumn,
   strawberryDenominator,
   scrollMemory,
+  loading,
+  loadingMessage,
   visibleMapCount,
   modCount,
   onDisableAll,
@@ -98,14 +102,18 @@ export function RecordList({
             isEnabled={isModEnabled}
           />
         )}
-        {!hasRecords && (
-          <div className="empty-state table-empty">
-            <FolderOpen size={28} />
-            <p>{activeView === "maps" ? "没有找到符合条件的地图。" : "没有找到符合条件的 Mod。"}</p>
-          </div>
-        )}
+        {!hasRecords && <RecordListEmpty activeView={activeView} loading={loading} loadingMessage={loadingMessage} />}
       </div>
     </section>
+  );
+}
+
+function RecordListEmpty({ activeView, loading, loadingMessage }: { activeView: RecordView; loading: boolean; loadingMessage: string }) {
+  return (
+    <div className="empty-state table-empty">
+      {loading ? <LoaderCircle className="spin-icon" size={28} /> : <FolderOpen size={28} />}
+      <p>{loading ? loadingMessage || "正在加载..." : activeView === "maps" ? "没有找到符合条件的地图。" : "没有找到符合条件的 Mod。"}</p>
+    </div>
   );
 }
 

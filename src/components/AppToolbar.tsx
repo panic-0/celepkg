@@ -7,6 +7,7 @@ type AppToolbarProps = {
   enabledMapCount: number;
   enabledModCount: number;
   loading: boolean;
+  loadingMessage: string;
   scan: ScanResult;
   onLaunch: () => void;
   onPathChange: (path: string) => void;
@@ -20,6 +21,7 @@ export function AppToolbar({
   enabledMapCount,
   enabledModCount,
   loading,
+  loadingMessage,
   scan,
   onLaunch,
   onPathChange,
@@ -33,7 +35,7 @@ export function AppToolbar({
     <header className="app-toolbar">
       <div className="brand-block">
         <strong>CelePkg</strong>
-        <span>{loading ? "正在处理" : scan.modsPath ? "已连接 Celeste" : "等待目录"}</span>
+        <span>{loading ? loadingMessage || "正在处理" : scan.modsPath ? "已连接 Celeste" : "等待目录"}</span>
       </div>
 
       <label className="toolbar-path">
