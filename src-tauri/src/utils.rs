@@ -23,6 +23,37 @@ pub fn normalize_slash(value: &str) -> String {
         .to_string()
 }
 
+pub fn normalize_dependency_name(value: &str) -> String {
+    let mut normalized = value.replace('\\', "/").replace(['_', '-'], " ");
+    normalized = normalized.trim().to_string();
+    if normalized.to_ascii_lowercase().ends_with(".zip") {
+        normalized.truncate(normalized.len() - 4);
+    }
+    normalized
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
 pub fn path_basename(value: &str) -> String {
     value.rsplit('/').next().unwrap_or(value).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_dependency_names_like_the_frontend() {
+        assert_eq!(
+            normalize_dependency_name("  Some_Mod-Name.ZIP  "),
+            "some mod name"
+        );
+        assert_eq!(
+            normalize_dependency_name("Mods\\Helper Pack"),
+            "mods/helper pack"
+        );
+        assert_eq!(normalize_dependency_name(" \t\n "), "");
+    }
 }

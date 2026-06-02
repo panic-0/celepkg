@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
-import { normalizeDependencyName } from "../utils/dependencies";
+import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
 
@@ -164,20 +164,7 @@ function isSortKey(value: unknown): value is SortKey {
 }
 
 function findReferencedModIds(scan: ScanResult) {
-  const aliasToModId = new Map<string, string>();
-  for (const modItem of scan.otherMods) {
-    for (const alias of [
-      modItem.id,
-      modItem.name,
-      modItem.metadata.name,
-      modItem.fileName,
-      modItem.fileName.replace(/\.zip$/i, ""),
-      modItem.relativePath
-    ]) {
-      const normalized = normalizeDependencyName(alias);
-      if (normalized) aliasToModId.set(normalized, modItem.id);
-    }
-  }
+  const aliasToModId = buildModAliasMap(scan.otherMods);
   const referenced = new Set<string>();
   for (const record of [...scan.maps, ...scan.otherMods]) {
     for (const dependency of record.dependencies) {

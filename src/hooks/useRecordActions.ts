@@ -1,7 +1,7 @@
 import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { setRecordFavorite, setRecordProtected } from "../api";
 import type { ModRecord, ScanResult } from "../types";
-import { normalizeDependencyName } from "../utils/dependencies";
+import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import { isDraftEnabled, readError } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
 
@@ -186,20 +186,7 @@ export function useRecordActions({
 }
 
 function findDependentNamesByModId(scan: ScanResult, enabledMapDraft: Set<string>, enabledModDraft: Set<string>) {
-  const aliasToModId = new Map<string, string>();
-  for (const modItem of scan.otherMods) {
-    for (const alias of [
-      modItem.id,
-      modItem.name,
-      modItem.metadata.name,
-      modItem.fileName,
-      modItem.fileName.replace(/\.zip$/i, ""),
-      modItem.relativePath
-    ]) {
-      const normalized = normalizeDependencyName(alias);
-      if (normalized) aliasToModId.set(normalized, modItem.id);
-    }
-  }
+  const aliasToModId = buildModAliasMap(scan.otherMods);
 
   const dependentNames = new Map<string, Set<string>>();
   const enabledItems = [

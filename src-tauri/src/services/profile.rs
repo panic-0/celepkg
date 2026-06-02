@@ -2,7 +2,7 @@ use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesSt
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
 use crate::storage::{load_state, resolve_input_path, write_state};
-use crate::utils::{normalize_slash, now_string, stable_id};
+use crate::utils::{normalize_dependency_name, now_string, stable_id};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::process::Command;
@@ -266,16 +266,6 @@ fn resolve_dependency_id(name: &str, alias_to_mod_id: &HashMap<String, String>) 
     alias_to_mod_id
         .get(&normalize_dependency_name(name))
         .cloned()
-}
-
-fn normalize_dependency_name(value: &str) -> String {
-    normalize_slash(value)
-        .trim_end_matches(".zip")
-        .replace(['_', '-'], " ")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
 }
 
 impl ProfileType {

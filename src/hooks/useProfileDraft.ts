@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, deleteProfile, launchProfile, saveProfile } from "../api";
 import type { Profile, ScanResult } from "../types";
-import { normalizeDependencyName } from "../utils/dependencies";
+import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import { readError } from "../utils/format";
 
 type ProfileDraftOptions = {
@@ -324,20 +324,7 @@ function toggleSetValue(current: Set<string>, id: string) {
 }
 
 function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {
-  const aliasToModId = new Map<string, string>();
-  for (const modItem of scan.otherMods) {
-    for (const alias of [
-      modItem.id,
-      modItem.name,
-      modItem.metadata.name,
-      modItem.fileName,
-      modItem.fileName.replace(/\.zip$/i, ""),
-      modItem.relativePath
-    ]) {
-      const normalized = normalizeDependencyName(alias);
-      if (normalized) aliasToModId.set(normalized, modItem.id);
-    }
-  }
+  const aliasToModId = buildModAliasMap(scan.otherMods);
   const modById = new Map(scan.otherMods.map((modItem) => [modItem.id, modItem]));
   const inferred = new Set<string>();
   const queue: string[] = [];

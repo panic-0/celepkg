@@ -28,7 +28,7 @@ pub fn parse_metadata(text: &str) -> ModMetadata {
 }
 
 pub fn is_builtin_dependency(name: &str) -> bool {
-    let normalized = normalize_dependency_name(name);
+    let normalized = normalize_builtin_dependency_name(name);
     normalized.starts_with("everest")
         || matches!(
             normalized.as_str(),
@@ -91,7 +91,9 @@ fn normalize_dependency(value: &Value) -> Option<Dependency> {
     }
 }
 
-fn normalize_dependency_name(name: &str) -> String {
+fn normalize_builtin_dependency_name(name: &str) -> String {
+    // Built-in dependency names are matched loosely so punctuation variants such as
+    // ".NET Framework" and "net-framework" resolve to the same key.
     name.chars()
         .filter(|ch| ch.is_ascii_alphanumeric())
         .collect::<String>()
