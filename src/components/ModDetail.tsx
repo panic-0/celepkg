@@ -62,8 +62,8 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
       </div>
 
       {activeTab === "overview" && (
-        <div className="detail-tab-panel compact" ref={detailPanelRef}>
-          <section className="detail-section flush compact-card">
+        <div className="detail-tab-panel overview-panel" ref={detailPanelRef}>
+          <section className="detail-section flush overview-card">
             <h3>Mod 信息</h3>
             <div className="overview-metrics">
               <Metric label="类型" value={modItem.isArchive ? "zip" : "文件夹"} />
@@ -83,7 +83,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
       )}
 
       {activeTab === "dependencies" && (
-        <div className="detail-tab-panel" ref={detailPanelRef}>
+        <div className="detail-tab-panel detail-split-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>依赖</h3>
             {modItem.dependencies.length ? (
@@ -125,7 +125,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
       )}
 
       {activeTab === "files" && (
-        <div className="detail-tab-panel" ref={detailPanelRef}>
+        <div className="detail-tab-panel detail-split-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>文件</h3>
             <LongValue label="文件" value={modItem.relativePath} />

@@ -134,30 +134,38 @@ export function MapDetail({
       </div>
 
       {activeTab === "overview" && (
-        <div className="detail-tab-panel" ref={detailPanelRef}>
-          <div className="stat-grid">
-            <DetailStat icon={<Skull size={18} />} label="死亡" value={map.stats?.deaths ?? "-"} />
-            <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
-            <DetailStat
-              icon={<CircleDot size={18} />}
-              label="草莓"
-              value={formatStrawberries(
-                map.stats?.strawberries,
-                strawberryTotal(map, strawberryDenominator),
-                map.stats?.strawberriesKnown ?? true
-              )}
-            />
-            <DetailStat icon={<Heart size={18} />} label="心/磁带" value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"} />
+        <div className="detail-tab-panel overview-panel" ref={detailPanelRef}>
+          <div className="detail-overview-grid">
+            <div className="stat-grid overview-card">
+              <DetailStat icon={<Skull size={18} />} label="死亡" value={map.stats?.deaths ?? "-"} />
+              <DetailStat icon={<Clock size={18} />} label="用时" value={formatTime(map.stats?.timePlayed)} />
+              <DetailStat
+                icon={<CircleDot size={18} />}
+                label="草莓"
+                value={formatStrawberries(
+                  map.stats?.strawberries,
+                  strawberryTotal(map, strawberryDenominator),
+                  map.stats?.strawberriesKnown ?? true
+                )}
+              />
+              <DetailStat
+                icon={<Heart size={18} />}
+                label="心/磁带"
+                value={map.stats ? `${map.stats.hearts}/${map.stats.cassettes}` : "-"}
+              />
+            </div>
+            <section className="detail-section flush overview-card">
+              <h3>地图信息</h3>
+              <div className="overview-info-grid">
+                <Info label="完成" value={formatCompletionStatus(map.completionStatus)} />
+                <Info label="作者" value={map.metadata.author || "未知"} />
+                <Info label="版本" value={map.metadata.version || "未知"} />
+                <Info label="类型" value={map.readOnly ? "Celeste 官方地图" : map.isArchive ? "zip 地图包" : "文件夹地图包"} />
+                <Info label="小图" value={`${map.subMaps.length} 张`} />
+              </div>
+              <Info label="描述" value={map.metadata.description || "无"} />
+            </section>
           </div>
-          <section className="detail-section">
-            <h3>地图信息</h3>
-            <Info label="完成" value={formatCompletionStatus(map.completionStatus)} />
-            <Info label="作者" value={map.metadata.author || "未知"} />
-            <Info label="版本" value={map.metadata.version || "未知"} />
-            <Info label="类型" value={map.readOnly ? "Celeste 官方地图" : map.isArchive ? "zip 地图包" : "文件夹地图包"} />
-            <Info label="小图" value={`${map.subMaps.length} 张`} />
-            <Info label="描述" value={map.metadata.description || "无"} />
-          </section>
         </div>
       )}
 
@@ -276,7 +284,7 @@ export function MapDetail({
       )}
 
       {activeTab === "dependencies" && (
-        <div className="detail-tab-panel" ref={detailPanelRef}>
+        <div className="detail-tab-panel detail-split-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
             <h3>文件</h3>
             <LongValue label="文件" value={map.relativePath} />
