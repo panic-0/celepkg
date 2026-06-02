@@ -25,7 +25,13 @@ pub fn is_strawberry_entity(name: &str) -> bool {
         .to_lowercase();
     matches!(
         normalized.as_str(),
-        "strawberry" | "goldenberry" | "moonberry" | "silverberry" | "memorialtextcontroller"
+        "strawberry"
+            | "goldenberry"
+            | "moonberry"
+            | "silverberry"
+            | "memorialtextcontroller"
+            | "returnberry"
+            | "strawberrywithreturn"
     )
 }
 
@@ -151,6 +157,8 @@ mod tests {
         assert!(is_strawberry_entity("moonBerry"));
         assert!(is_strawberry_entity("CollabUtils2/SilverBerry"));
         assert!(is_strawberry_entity("memorialTextController"));
+        assert!(is_strawberry_entity("SorbetHelper/ReturnBerry"));
+        assert!(is_strawberry_entity("LunaticHelper/StrawberryWithReturn"));
     }
 
     #[test]
@@ -160,10 +168,12 @@ mod tests {
             "goldenBerry",
             "moonBerry",
             "memorialTextController",
+            "SorbetHelper/ReturnBerry",
+            "LunaticHelper/StrawberryWithReturn",
             "spinner",
         ]);
 
-        assert_eq!(count_strawberries(&bytes), Some(4));
+        assert_eq!(count_strawberries(&bytes), Some(6));
     }
 
     fn fake_map_bin(entity_names: &[&str]) -> Vec<u8> {
