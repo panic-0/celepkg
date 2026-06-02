@@ -32,6 +32,10 @@ pub fn is_strawberry_entity(name: &str) -> bool {
             | "memorialtextcontroller"
             | "returnberry"
             | "strawberrywithreturn"
+            | "rainbowberry"
+            | "multiroomstrawberry"
+            | "explodingstrawberry"
+            | "nonpoppingstrawberry"
     )
 }
 
@@ -159,6 +163,10 @@ mod tests {
         assert!(is_strawberry_entity("memorialTextController"));
         assert!(is_strawberry_entity("SorbetHelper/ReturnBerry"));
         assert!(is_strawberry_entity("LunaticHelper/StrawberryWithReturn"));
+        assert!(is_strawberry_entity("CollabUtils2/RainbowBerry"));
+        assert!(is_strawberry_entity("MaxHelpingHand/MultiRoomStrawberry"));
+        assert!(is_strawberry_entity("SJ2021/ExplodingStrawberry"));
+        assert!(is_strawberry_entity("MaxHelpingHand/NonPoppingStrawberry"));
     }
 
     #[test]
@@ -170,10 +178,14 @@ mod tests {
             "memorialTextController",
             "SorbetHelper/ReturnBerry",
             "LunaticHelper/StrawberryWithReturn",
+            "CollabUtils2/RainbowBerry",
+            "MaxHelpingHand/MultiRoomStrawberry",
+            "SJ2021/ExplodingStrawberry",
+            "MaxHelpingHand/NonPoppingStrawberry",
             "spinner",
         ]);
 
-        assert_eq!(count_strawberries(&bytes), Some(6));
+        assert_eq!(count_strawberries(&bytes), Some(10));
     }
 
     fn fake_map_bin(entity_names: &[&str]) -> Vec<u8> {
