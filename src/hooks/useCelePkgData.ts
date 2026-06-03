@@ -42,7 +42,7 @@ export function useCelePkgData() {
     () => activeModCatalogSources(modCatalogSourceOrder, modCatalogSourceEnabledCount),
     [modCatalogSourceEnabledCount, modCatalogSourceOrder]
   );
-  const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(true);
+  const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(false);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loading, setLoadingState] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");

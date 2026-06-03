@@ -32,7 +32,7 @@ let autoBackupCleanupEnabled = true;
 let autoBackupRetentionCount = 20;
 let modCatalogSourceOrder: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
 let modCatalogSourceEnabledCount = 2;
-let autoCheckModUpdatesOnStartup = true;
+let autoCheckModUpdatesOnStartup = false;
 let selectedSaveFiles = ["0.celeste", "1.celeste"];
 let backupSequence = 4;
 
