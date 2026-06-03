@@ -64,7 +64,7 @@ pub fn list_save_files(celeste_path: &Path) -> Vec<SaveFileInfo> {
                 .collect()
         })
         .unwrap_or_default();
-    saves.sort_by(|left, right| save_sort_key(&left.name).cmp(&save_sort_key(&right.name)));
+    saves.sort_by_key(|save| save_sort_key(&save.name));
     saves
 }
 

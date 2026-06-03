@@ -1,7 +1,8 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 pub fn read_dialog_titles(mut files: Vec<(String, String)>) -> HashMap<String, String> {
-    files.sort_by(|a, b| dialog_language_score(&b.0).cmp(&dialog_language_score(&a.0)));
+    files.sort_by_key(|file| Reverse(dialog_language_score(&file.0)));
     let mut titles = HashMap::new();
     for (_, text) in files {
         let mut pending_key: Option<String> = None;
