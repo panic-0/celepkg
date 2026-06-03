@@ -1,16 +1,22 @@
 use crate::domain::{Dependency, ModMetadata};
 use serde_yaml::Value;
+use std::borrow::Cow;
 
 pub fn parse_metadata(text: &str) -> ModMetadata {
+    parse_metadata_checked(text).unwrap_or_default()
+}
+
+pub fn parse_metadata_checked(text: &str) -> Result<ModMetadata, serde_yaml::Error> {
+    let text = normalize_metadata_text(text);
     if text.trim().is_empty() {
-        return ModMetadata::default();
+        return Ok(ModMetadata::default());
     }
-    let value: Value = serde_yaml::from_str(text).unwrap_or(Value::Null);
+    let value: Value = serde_yaml::from_str(&text)?;
     let root = value
         .as_sequence()
         .and_then(|seq| seq.first())
         .unwrap_or(&value);
-    ModMetadata {
+    Ok(ModMetadata {
         name: yaml_string(root, &["Name", "name"]),
         version: yaml_string(root, &["Version", "version"]),
         author: yaml_string(root, &["Author", "author", "Authors", "authors"]),
@@ -24,6 +30,15 @@ pub fn parse_metadata(text: &str) -> ModMetadata {
                 "optional_dependencies",
             ],
         ),
+    })
+}
+
+fn normalize_metadata_text(text: &str) -> Cow<'_, str> {
+    let text = text.trim_start_matches('\u{feff}');
+    if text.contains('\r') {
+        Cow::Owned(text.replace("\r\n", "\n").replace('\r', "\n"))
+    } else {
+        Cow::Borrowed(text)
     }
 }
 
@@ -109,5 +124,18 @@ mod tests {
         assert!(is_builtin_dependency("EverestCore"));
         assert!(is_builtin_dependency("Everest 1.4980.0"));
         assert!(is_builtin_dependency(".NET Framework"));
+    }
+
+    #[test]
+    fn parses_metadata_with_bom_and_crlf() {
+        let metadata = parse_metadata_checked(
+            "\u{feff}- Name: ExtendedCameraDynamics\r\n  Version: 1.2.0\r\n  Dependencies:\r\n    - Name: Everest\r\n      Version: 1.5577.0\r\n",
+        )
+        .unwrap();
+
+        assert_eq!(metadata.name, "ExtendedCameraDynamics");
+        assert_eq!(metadata.version, "1.2.0");
+        assert_eq!(metadata.dependencies[0].name, "Everest");
+        assert_eq!(metadata.dependencies[0].version, "1.5577.0");
     }
 }

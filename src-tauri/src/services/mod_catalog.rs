@@ -476,9 +476,9 @@ fn read_zip_metadata(path: &Path) -> Result<ModMetadata, String> {
             let mut text = String::new();
             file.read_to_string(&mut text)
                 .map_err(|error| format!("读取 everest.yaml 失败：{error}"))?;
-            serde_yaml::from_str::<serde_yaml::Value>(&text)
+            let metadata = crate::parsers::everest::parse_metadata_checked(&text)
                 .map_err(|error| format!("解析 everest.yaml 失败：{error}"))?;
-            return Ok(crate::parsers::everest::parse_metadata(&text));
+            return Ok(metadata);
         }
     }
     Err("Mod 压缩包缺少 everest.yaml".to_string())
@@ -1141,6 +1141,24 @@ Helper:
         assert!(read_zip_metadata(&not_zip)
             .unwrap_err()
             .contains("读取 Mod 压缩包失败"));
+    }
+
+    #[test]
+    fn read_zip_metadata_accepts_bom_prefixed_everest_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip = dir.path().join("BomList.zip");
+        write_zip(
+            &zip,
+            &[(
+                "everest.yaml",
+                "\u{feff}- Name: ExtendedCameraDynamics\r\n  Version: 1.2.0\r\n",
+            )],
+        );
+
+        let metadata = read_zip_metadata(&zip).unwrap();
+
+        assert_eq!(metadata.name, "ExtendedCameraDynamics");
+        assert_eq!(metadata.version, "1.2.0");
     }
 
     #[test]
