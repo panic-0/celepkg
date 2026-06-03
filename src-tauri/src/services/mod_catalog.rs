@@ -207,9 +207,10 @@ fn download_entry(
     if entry.download_url.trim().is_empty() {
         return Err("目录条目没有下载地址".to_string());
     }
-    let download_dir = celeste_path.join(".celepkg").join("downloads");
-    fs::create_dir_all(&download_dir).map_err(|error| format!("创建下载目录失败：{error}"))?;
-    let temp_path = download_dir.join(format!("{}.zip.download", stable_id(&entry.id)));
+    let temp_path = staging_download_path(celeste_path, entry, reporter.operation_id);
+    if let Some(download_dir) = temp_path.parent() {
+        fs::create_dir_all(download_dir).map_err(|error| format!("创建下载目录失败：{error}"))?;
+    }
     let client = reqwest::blocking::Client::builder()
         .user_agent("celepkg/0.2")
         .build()
@@ -244,6 +245,23 @@ fn download_entry(
         "下载 Mod 失败：{}",
         last_error.unwrap_or_else(|| "没有可用下载地址".to_string())
     ))
+}
+
+fn staging_download_path(
+    celeste_path: &Path,
+    entry: &ModCatalogEntry,
+    operation_id: &str,
+) -> PathBuf {
+    let key = if operation_id.trim().is_empty() {
+        entry.id.clone()
+    } else {
+        format!("{}-{operation_id}", entry.id)
+    };
+    celeste_path
+        .join(".celepkg")
+        .join("downloads")
+        .join("staging")
+        .join(format!("{}.zip.download", stable_id(&key)))
 }
 
 fn download_url_to_file(
@@ -881,20 +899,7 @@ Helper:
     #[test]
     fn fresh_install_path_sanitizes_file_name_and_rejects_existing_zip() {
         let dir = tempfile::tempdir().unwrap();
-        let entry = ModCatalogEntry {
-            source: ModCatalogSourceKind::Wegfan,
-            id: "entry".to_string(),
-            name: "Bad:/Name?".to_string(),
-            version: String::new(),
-            download_url: String::new(),
-            page_url: String::new(),
-            game_banana_type: String::new(),
-            game_banana_id: None,
-            game_banana_file_id: None,
-            size: None,
-            last_update: None,
-            xx_hash: vec![],
-        };
+        let entry = test_catalog_entry("entry", "Bad:/Name?");
         let path = fresh_install_path(dir.path(), &entry).unwrap();
         assert_eq!(
             path.file_name().unwrap().to_string_lossy(),
@@ -902,6 +907,46 @@ Helper:
         );
         fs::write(&path, b"already here").unwrap();
         assert!(fresh_install_path(dir.path(), &entry).is_err());
+    }
+
+    #[test]
+    fn staging_download_path_lives_outside_mods_and_uses_operation_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = test_catalog_entry("helper", "Helper");
+
+        let first = staging_download_path(dir.path(), &entry, "install-1");
+        let second = staging_download_path(dir.path(), &entry, "install-2");
+
+        assert!(first.starts_with(
+            dir.path()
+                .join(".celepkg")
+                .join("downloads")
+                .join("staging")
+        ));
+        assert_ne!(first, second);
+        assert!(!first.starts_with(dir.path().join("Mods")));
+        assert_eq!(first.extension().unwrap().to_string_lossy(), "download");
+    }
+
+    #[test]
+    fn fresh_install_moves_staged_zip_into_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let staged = dir
+            .path()
+            .join(".celepkg")
+            .join("downloads")
+            .join("staging")
+            .join("Helper.zip.download");
+        fs::create_dir_all(staged.parent().unwrap()).unwrap();
+        fs::write(&staged, b"new zip").unwrap();
+        let destination = dir.path().join("Mods").join("Helper.zip");
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+
+        let replaced = install_downloaded_zip(&staged, &destination, false).unwrap();
+
+        assert!(replaced.is_none());
+        assert!(!staged.exists());
+        assert_eq!(fs::read(&destination).unwrap(), b"new zip");
     }
 
     #[test]
@@ -913,6 +958,23 @@ Helper:
         let error = install_downloaded_zip(&missing_temp, &destination, true).unwrap_err();
         assert!(error.contains("旧文件已恢复"));
         assert_eq!(fs::read(&destination).unwrap(), b"old");
+    }
+
+    fn test_catalog_entry(id: &str, name: &str) -> ModCatalogEntry {
+        ModCatalogEntry {
+            source: ModCatalogSourceKind::Wegfan,
+            id: id.to_string(),
+            name: name.to_string(),
+            version: String::new(),
+            download_url: String::new(),
+            page_url: String::new(),
+            game_banana_type: String::new(),
+            game_banana_id: None,
+            game_banana_file_id: None,
+            size: None,
+            last_update: None,
+            xx_hash: vec![],
+        }
     }
 
     fn test_record(path: &Path, metadata_name: &str, version: &str) -> ModRecord {
