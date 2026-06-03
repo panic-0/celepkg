@@ -208,6 +208,9 @@ export type ModDownloadProgress = {
   phase: "downloading" | "verifying" | "installing" | "done" | "error";
   downloaded: number;
   total: number | null;
+  speedBytesPerSec: number;
+  taskIndex: number;
+  taskTotal: number;
   url: string;
 };
 

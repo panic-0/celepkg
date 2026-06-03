@@ -24,6 +24,7 @@ pub fn run() {
             commands::preview_mod_update_metadata,
             commands::install_mod,
             commands::update_mod,
+            commands::cancel_mod_download,
             commands::set_record_favorite,
             commands::set_record_protected,
             commands::save_profile,

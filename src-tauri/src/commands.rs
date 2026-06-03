@@ -8,9 +8,17 @@ use crate::storage::{
     load_state, normalize_configured_celeste_path, resolve_input_path_from_state,
     resolve_required_celeste_path, resolve_required_celeste_path_from_state, write_state,
 };
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, LazyLock, Mutex,
+};
 use tauri::Emitter;
+
+static MOD_DOWNLOAD_CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[tauri::command]
 pub fn get_config() -> Result<ConfigResponse, String> {
@@ -199,6 +207,8 @@ pub async fn install_mod(
     celeste_path: String,
     entry: crate::domain::ModCatalogEntry,
     operation_id: String,
+    task_index: usize,
+    task_total: usize,
 ) -> Result<ModInstallResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
@@ -207,6 +217,7 @@ pub async fn install_mod(
         let emit_progress = move |progress: ModDownloadProgress| {
             let _ = app_for_progress.emit("mod-download-progress", progress);
         };
+        let cancel_flag = register_mod_download(&operation_id);
         let result = services::mod_catalog::download_and_install(
             &path,
             entry,
@@ -217,8 +228,12 @@ pub async fn install_mod(
             services::mod_catalog::ModDownloadReporter {
                 operation_id: &operation_id,
                 progress: Some(&emit_progress),
+                cancel_token: Some(&cancel_flag),
+                task_index,
+                task_total,
             },
         );
+        unregister_mod_download(&operation_id);
         if result.is_err() {
             let _ = app.emit(
                 "mod-download-progress",
@@ -228,6 +243,9 @@ pub async fn install_mod(
                     phase: "error".to_string(),
                     downloaded: 0,
                     total: None,
+                    speed_bytes_per_sec: 0.0,
+                    task_index,
+                    task_total,
                     url: String::new(),
                 },
             );
@@ -245,6 +263,8 @@ pub async fn update_mod(
     entry: crate::domain::ModCatalogEntry,
     installed_path: String,
     operation_id: String,
+    task_index: usize,
+    task_total: usize,
 ) -> Result<ModInstallResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
@@ -253,6 +273,7 @@ pub async fn update_mod(
         let emit_progress = move |progress: ModDownloadProgress| {
             let _ = app_for_progress.emit("mod-download-progress", progress);
         };
+        let cancel_flag = register_mod_download(&operation_id);
         let result = services::mod_catalog::download_and_install(
             &path,
             entry,
@@ -263,8 +284,12 @@ pub async fn update_mod(
             services::mod_catalog::ModDownloadReporter {
                 operation_id: &operation_id,
                 progress: Some(&emit_progress),
+                cancel_token: Some(&cancel_flag),
+                task_index,
+                task_total,
             },
         );
+        unregister_mod_download(&operation_id);
         if result.is_err() {
             let _ = app.emit(
                 "mod-download-progress",
@@ -274,6 +299,9 @@ pub async fn update_mod(
                     phase: "error".to_string(),
                     downloaded: 0,
                     total: None,
+                    speed_bytes_per_sec: 0.0,
+                    task_index,
+                    task_total,
                     url: String::new(),
                 },
             );
@@ -282,6 +310,32 @@ pub async fn update_mod(
     })
     .await
     .map_err(|error| format!("更新 Mod 任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub fn cancel_mod_download(operation_id: String) -> Result<bool, String> {
+    let flags = MOD_DOWNLOAD_CANCEL_FLAGS
+        .lock()
+        .map_err(|_| "取消下载状态不可用".to_string())?;
+    let Some(flag) = flags.get(&operation_id) else {
+        return Ok(false);
+    };
+    flag.store(true, Ordering::Relaxed);
+    Ok(true)
+}
+
+fn register_mod_download(operation_id: &str) -> Arc<AtomicBool> {
+    let flag = Arc::new(AtomicBool::new(false));
+    if let Ok(mut flags) = MOD_DOWNLOAD_CANCEL_FLAGS.lock() {
+        flags.insert(operation_id.to_string(), Arc::clone(&flag));
+    }
+    flag
+}
+
+fn unregister_mod_download(operation_id: &str) {
+    if let Ok(mut flags) = MOD_DOWNLOAD_CANCEL_FLAGS.lock() {
+        flags.remove(operation_id);
+    }
 }
 
 #[tauri::command]

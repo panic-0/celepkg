@@ -1,6 +1,14 @@
 import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { checkModUpdates, createOperationId, installMod, previewModUpdateMetadata, searchModCatalog, updateMod } from "./api";
+import {
+  cancelModDownload,
+  checkModUpdates,
+  createOperationId,
+  installMod,
+  previewModUpdateMetadata,
+  searchModCatalog,
+  updateMod
+} from "./api";
 import { BackupManager } from "./components/BackupManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
@@ -226,7 +234,9 @@ export function App() {
         const updated = await performModUpdate(
           candidate,
           `${index + 1}/${candidates.length}`,
-          `正在更新 Mod (${index + 1}/${candidates.length})...`
+          `正在更新 Mod (${index + 1}/${candidates.length})...`,
+          index + 1,
+          candidates.length
         );
         if (updated) updatedCount += 1;
       }
@@ -252,12 +262,18 @@ export function App() {
     );
   }
 
-  async function performModUpdate(candidate: ModUpdateCandidate, batchLabel = "", message = `正在更新 ${candidate.installed.name}...`) {
+  async function performModUpdate(
+    candidate: ModUpdateCandidate,
+    batchLabel = "",
+    message = `正在更新 ${candidate.installed.name}...`,
+    taskIndex = 1,
+    taskTotal = 1
+  ) {
     const operationId = createOperationId("mod-update");
     try {
-      startModDownloadProgress(candidate, operationId, batchLabel);
+      startModDownloadProgress(candidate, operationId, batchLabel, taskIndex, taskTotal);
       setLoading(true, message);
-      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId);
+      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId, taskIndex, taskTotal);
       clearMockDownloadTimer();
       setScan(result.scan);
       removeUpdatedCandidate(candidate);
@@ -399,7 +415,7 @@ export function App() {
     });
   }
 
-  function startModDownloadProgress(candidate: ModUpdateCandidate, operationId: string, batchLabel = "") {
+  function startModDownloadProgress(candidate: ModUpdateCandidate, operationId: string, batchLabel = "", taskIndex = 1, taskTotal = 1) {
     clearMockDownloadTimer();
     clearProgressClearTimer();
     activeDownloadOperationId.current = operationId;
@@ -410,6 +426,9 @@ export function App() {
       phase: "downloading",
       downloaded: 0,
       total: candidate.entry.size,
+      speedBytesPerSec: 0,
+      taskIndex,
+      taskTotal,
       url: candidate.entry.downloadUrl
     };
     setModDownloadProgress(initialProgress);
@@ -427,6 +446,9 @@ export function App() {
       phase: "downloading",
       downloaded: 0,
       total: entry.size,
+      speedBytesPerSec: 0,
+      taskIndex: 1,
+      taskTotal: 1,
       url: entry.downloadUrl
     };
     setModDownloadProgress(initialProgress);
@@ -480,11 +502,25 @@ export function App() {
       downloaded = Math.min(total, downloaded + step);
       setModDownloadProgress((current) => {
         if (!current || current.operationId !== initialProgress.operationId || current.phase !== "downloading") return current;
-        if (downloaded >= total) return { ...current, phase: "verifying", downloaded: total, total };
-        return { ...current, downloaded, total };
+        const speedBytesPerSec = step / 0.075;
+        if (downloaded >= total) return { ...current, phase: "verifying", downloaded: total, total, speedBytesPerSec: 0 };
+        return { ...current, downloaded, total, speedBytesPerSec };
       });
       if (downloaded >= total) clearMockDownloadTimer();
     }, 75);
+  }
+
+  async function cancelActiveModDownload() {
+    const operationId = activeDownloadOperationId.current;
+    if (!operationId) return;
+    clearMockDownloadTimer();
+    setModDownloadProgress((current) => (current && current.operationId === operationId ? { ...current, phase: "error" } : current));
+    try {
+      await cancelModDownload(operationId);
+      notifier.showInfo("已请求取消当前下载");
+    } catch (error) {
+      notifier.showError(readError(error));
+    }
   }
 
   function removeUpdatedCandidate(candidate: ModUpdateCandidate) {
@@ -679,6 +715,7 @@ export function App() {
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}
+            onCancelModDownload={cancelActiveModDownload}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={workspaceView.selectMod}
@@ -933,6 +970,9 @@ function toModDownloadProgress(value: unknown): ModDownloadProgress | null {
     phase: object.phase as ModDownloadProgress["phase"],
     downloaded: object.downloaded,
     total: typeof object.total === "number" ? object.total : null,
+    speedBytesPerSec: typeof object.speedBytesPerSec === "number" ? object.speedBytesPerSec : 0,
+    taskIndex: typeof object.taskIndex === "number" ? object.taskIndex : 1,
+    taskTotal: typeof object.taskTotal === "number" ? object.taskTotal : 1,
     url: typeof object.url === "string" ? object.url : ""
   };
 }

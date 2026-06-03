@@ -1109,6 +1109,7 @@ button.profile {
 
 .record-download-progress-slot.active {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .record-download-progress-copy {
@@ -1135,6 +1136,24 @@ button.profile {
 .record-download-progress-copy small {
   color: #7b8794;
   font-size: 11px;
+}
+
+.record-download-cancel-button {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #d5dee8;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6a7785;
+}
+
+.record-download-cancel-button:hover {
+  border-color: #b9c6d4;
+  color: #203040;
 }
 
 .record-download-bar {

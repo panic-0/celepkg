@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use xxhash_rust::xxh64::Xxh64;
 use zip::ZipArchive;
@@ -22,6 +23,9 @@ const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
 pub struct ModDownloadReporter<'a> {
     pub operation_id: &'a str,
     pub progress: Option<&'a (dyn Fn(ModDownloadProgress) + Send + Sync)>,
+    pub cancel_token: Option<&'a AtomicBool>,
+    pub task_index: usize,
+    pub task_total: usize,
 }
 
 pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
@@ -147,6 +151,9 @@ pub fn preview_update_metadata(
         ModDownloadReporter {
             operation_id: "",
             progress: None,
+            cancel_token: None,
+            task_index: 1,
+            task_total: 1,
         },
     )?;
     let metadata = read_zip_metadata(&temp_path);
@@ -170,7 +177,7 @@ pub fn download_and_install(
         None => fresh_install_path(&mods_dir, &entry)?,
     };
     let (temp_path, hash) = download_entry(celeste_path, &entry, reporter)?;
-    emit_download_progress(reporter, &entry.name, "installing", 0, None, "");
+    emit_download_progress(reporter, &entry.name, "installing", 0, None, 0.0, "");
 
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建安装目录失败：{error}"))?;
@@ -189,7 +196,7 @@ pub fn download_and_install(
         record.protected = record.read_only || protected_record_ids.contains(&record.id);
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
-    emit_download_progress(reporter, &entry.name, "done", 1, Some(1), "");
+    emit_download_progress(reporter, &entry.name, "done", 1, Some(1), 0.0, "");
     Ok(ModInstallResult {
         entry,
         destination_path: destination.to_string_lossy().to_string(),
@@ -217,10 +224,11 @@ fn download_entry(
         .map_err(|error| format!("初始化下载客户端失败：{error}"))?;
     let mut last_error = None;
     for url in mirror_urls(&entry.download_url) {
+        ensure_download_not_cancelled(reporter)?;
         let _ = fs::remove_file(&temp_path);
         match download_url_to_file(&client, &url, &temp_path, entry, reporter) {
             Ok(()) => {
-                emit_download_progress(reporter, &entry.name, "verifying", 0, None, &url);
+                emit_download_progress(reporter, &entry.name, "verifying", 0, None, 0.0, &url);
                 let hash = xxh64_file(&temp_path)?;
                 if entry.xx_hash.is_empty()
                     || entry
@@ -275,6 +283,7 @@ fn download_url_to_file(
     entry: &ModCatalogEntry,
     reporter: ModDownloadReporter<'_>,
 ) -> Result<(), String> {
+    ensure_download_not_cancelled(reporter)?;
     let mut response = client
         .get(url)
         .send()
@@ -282,13 +291,15 @@ fn download_url_to_file(
         .error_for_status()
         .map_err(|error| format!("服务器返回错误：{error}"))?;
     let total = response.content_length().or(entry.size);
-    emit_download_progress(reporter, &entry.name, "downloading", 0, total, url);
+    emit_download_progress(reporter, &entry.name, "downloading", 0, total, 0.0, url);
     let mut file =
         File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
     let mut downloaded = 0;
     let mut last_emit = Instant::now();
+    let started = Instant::now();
     let mut buffer = [0u8; 64 * 1024];
     loop {
+        ensure_download_not_cancelled(reporter)?;
         let read = response
             .read(&mut buffer)
             .map_err(|error| format!("读取下载内容失败：{error}"))?;
@@ -301,12 +312,42 @@ fn download_url_to_file(
         let should_emit = last_emit.elapsed() >= Duration::from_millis(120)
             || total.is_some_and(|total| downloaded >= total);
         if should_emit {
-            emit_download_progress(reporter, &entry.name, "downloading", downloaded, total, url);
+            emit_download_progress(
+                reporter,
+                &entry.name,
+                "downloading",
+                downloaded,
+                total,
+                download_speed(downloaded, started),
+                url,
+            );
             last_emit = Instant::now();
         }
     }
-    emit_download_progress(reporter, &entry.name, "downloading", downloaded, total, url);
+    emit_download_progress(
+        reporter,
+        &entry.name,
+        "downloading",
+        downloaded,
+        total,
+        download_speed(downloaded, started),
+        url,
+    );
     Ok(())
+}
+
+fn ensure_download_not_cancelled(reporter: ModDownloadReporter<'_>) -> Result<(), String> {
+    if reporter
+        .cancel_token
+        .is_some_and(|token| token.load(Ordering::Relaxed))
+    {
+        return Err("下载已取消".to_string());
+    }
+    Ok(())
+}
+
+fn download_speed(downloaded: u64, started: Instant) -> f64 {
+    downloaded as f64 / started.elapsed().as_secs_f64().max(0.001)
 }
 
 fn emit_download_progress(
@@ -315,6 +356,7 @@ fn emit_download_progress(
     phase: &str,
     downloaded: u64,
     total: Option<u64>,
+    speed_bytes_per_sec: f64,
     url: &str,
 ) {
     if let Some(progress) = reporter.progress {
@@ -324,6 +366,9 @@ fn emit_download_progress(
             phase: phase.to_string(),
             downloaded,
             total,
+            speed_bytes_per_sec,
+            task_index: reporter.task_index.max(1),
+            task_total: reporter.task_total.max(1),
             url: url.to_string(),
         });
     }
@@ -784,6 +829,7 @@ mod tests {
     use crate::domain::{CompletionStatus, ModKind, ModMetadata};
     use std::fs;
     use std::io::Write;
+    use std::sync::Mutex;
     use zip::write::SimpleFileOptions;
 
     #[test]
@@ -988,6 +1034,59 @@ Helper:
         assert!(read_zip_metadata(&not_zip)
             .unwrap_err()
             .contains("读取 Mod 压缩包失败"));
+    }
+
+    #[test]
+    fn download_url_to_file_stops_before_request_when_cancelled() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = test_catalog_entry("helper", "Helper");
+        let client = reqwest::blocking::Client::new();
+        let cancel = AtomicBool::new(true);
+
+        let error = download_url_to_file(
+            &client,
+            "http://127.0.0.1:1/never-requested.zip",
+            &dir.path().join("Helper.zip.download"),
+            &entry,
+            ModDownloadReporter {
+                operation_id: "cancel-test",
+                progress: None,
+                cancel_token: Some(&cancel),
+                task_index: 1,
+                task_total: 3,
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "下载已取消");
+    }
+
+    #[test]
+    fn progress_event_includes_speed_and_task_position() {
+        let events = Mutex::new(Vec::new());
+        let emit = |progress: ModDownloadProgress| events.lock().unwrap().push(progress);
+
+        emit_download_progress(
+            ModDownloadReporter {
+                operation_id: "progress-test",
+                progress: Some(&emit),
+                cancel_token: None,
+                task_index: 2,
+                task_total: 4,
+            },
+            "Helper",
+            "downloading",
+            512,
+            Some(1024),
+            2048.0,
+            "https://example.test/helper.zip",
+        );
+
+        let events = events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].speed_bytes_per_sec, 2048.0);
+        assert_eq!(events[0].task_index, 2);
+        assert_eq!(events[0].task_total, 4);
     }
 
     #[test]

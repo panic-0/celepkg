@@ -311,5 +311,8 @@ pub struct ModDownloadProgress {
     pub phase: String,
     pub downloaded: u64,
     pub total: Option<u64>,
+    pub speed_bytes_per_sec: f64,
+    pub task_index: usize,
+    pub task_total: usize,
     pub url: String,
 }

@@ -319,6 +319,11 @@ export const mockApi = {
     return clone(scan);
   },
 
+  async cancelModDownload(operationId: string): Promise<boolean> {
+    void operationId;
+    return true;
+  },
+
   async createBackup(celestePath: string, kind: "manual" | "auto" = "manual"): Promise<BackupInfo> {
     backupSequence += 1;
     const createdAt = `${1770050400000000000 + backupSequence * 1_000_000_000}`;

@@ -107,20 +107,29 @@ export async function previewModUpdateMetadata(celestePath: string, entry: ModCa
 export async function installMod(
   celestePath: string,
   entry: ModCatalogEntry,
-  operationId = createOperationId("install")
+  operationId = createOperationId("install"),
+  taskIndex = 1,
+  taskTotal = 1
 ): Promise<ModInstallResult> {
   if (isMockMode()) return mockApi.installMod(celestePath, entry);
-  return invokeChecked("install_mod", validateModInstallResult, { celestePath, entry, operationId });
+  return invokeChecked("install_mod", validateModInstallResult, { celestePath, entry, operationId, taskIndex, taskTotal });
 }
 
 export async function updateMod(
   celestePath: string,
   entry: ModCatalogEntry,
   installedPath: string,
-  operationId = createOperationId("update")
+  operationId = createOperationId("update"),
+  taskIndex = 1,
+  taskTotal = 1
 ): Promise<ModInstallResult> {
   if (isMockMode()) return mockApi.updateMod(celestePath, entry, installedPath);
-  return invokeChecked("update_mod", validateModInstallResult, { celestePath, entry, installedPath, operationId });
+  return invokeChecked("update_mod", validateModInstallResult, { celestePath, entry, installedPath, operationId, taskIndex, taskTotal });
+}
+
+export async function cancelModDownload(operationId: string): Promise<boolean> {
+  if (isMockMode()) return mockApi.cancelModDownload(operationId);
+  return invokeChecked("cancel_mod_download", validateBoolean, { operationId });
 }
 
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {
@@ -202,4 +211,9 @@ export async function openBackupLocation(backupPath: string): Promise<void> {
 
 export function createOperationId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function validateBoolean(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("API 返回数据格式异常：boolean 命令应返回布尔值。");
+  return value;
 }

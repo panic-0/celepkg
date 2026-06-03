@@ -10,7 +10,8 @@ import {
   Skull,
   Star,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  X
 } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModDownloadProgress, ModRecord, ModUpdateCandidate } from "../types";
@@ -39,6 +40,7 @@ type RecordListProps = {
   onDisableAll: () => void;
   onEnableAll: () => void;
   onCheckModUpdates: () => void;
+  onCancelModDownload: () => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
@@ -72,6 +74,7 @@ export function RecordList({
   onDisableAll,
   onEnableAll,
   onCheckModUpdates,
+  onCancelModDownload,
   onMapSelect,
   onMapToggle,
   onModSelect,
@@ -125,7 +128,7 @@ export function RecordList({
           <span>{formatUpdateAllLabel(modUpdateCount)}</span>
         </button>
       </div>
-      <DownloadProgressStrip batchLabel={modDownloadBatchLabel} progress={modDownloadProgress} />
+      <DownloadProgressStrip batchLabel={modDownloadBatchLabel} progress={modDownloadProgress} onCancel={onCancelModDownload} />
 
       <div className="record-table-scroll" ref={tableScrollRef}>
         {activeView === "maps" ? (
@@ -162,7 +165,15 @@ export function RecordList({
   );
 }
 
-function DownloadProgressStrip({ batchLabel, progress }: { batchLabel: string; progress: ModDownloadProgress | null }) {
+function DownloadProgressStrip({
+  batchLabel,
+  progress,
+  onCancel
+}: {
+  batchLabel: string;
+  progress: ModDownloadProgress | null;
+  onCancel: () => void;
+}) {
   const percent =
     progress?.total && progress.total > 0 ? Math.max(0, Math.min(100, Math.round((progress.downloaded / progress.total) * 100))) : null;
   const active = Boolean(progress);
@@ -172,12 +183,11 @@ function DownloadProgressStrip({ batchLabel, progress }: { batchLabel: string; p
         <>
           <div className="record-download-progress-copy">
             <span>{formatDownloadProgressText(progress, percent, batchLabel)}</span>
+            {progress.phase === "downloading" && <small>{formatDownloadProgressMeta(progress, percent)}</small>}
             {progress.phase === "downloading" && (
-              <small>
-                {percent === null
-                  ? formatBytes(progress.downloaded)
-                  : `${formatBytes(progress.downloaded)} / ${formatBytes(progress.total ?? 0)}`}
-              </small>
+              <button className="record-download-cancel-button" onClick={onCancel} title="取消下载" type="button">
+                <X size={13} />
+              </button>
             )}
           </div>
           <div
@@ -192,13 +202,21 @@ function DownloadProgressStrip({ batchLabel, progress }: { batchLabel: string; p
 }
 
 function formatDownloadProgressText(progress: ModDownloadProgress, percent: number | null, batchLabel: string) {
-  const batch = batchLabel ? ` ${batchLabel}` : "";
+  const task = progress.taskTotal > 1 ? ` (${progress.taskIndex}/${progress.taskTotal})` : "";
+  const batch = task || (batchLabel ? ` ${batchLabel}` : "");
   const modName = progress.modName || "Mod";
   if (progress.phase === "verifying") return `正在校验 ${modName}${batch}`;
   if (progress.phase === "installing") return `正在安装 ${modName}${batch}`;
   if (progress.phase === "done") return `已更新 ${modName}${batch}`;
   if (progress.phase === "error") return `更新失败 ${modName}${batch}`;
   return `正在下载 ${modName}${batch}${percent === null ? "" : ` ${percent}%`}`;
+}
+
+function formatDownloadProgressMeta(progress: ModDownloadProgress, percent: number | null) {
+  const bytes =
+    percent === null ? formatBytes(progress.downloaded) : `${formatBytes(progress.downloaded)} / ${formatBytes(progress.total ?? 0)}`;
+  const speed = progress.speedBytesPerSec > 0 ? ` · ${formatBytes(progress.speedBytesPerSec)}/s` : "";
+  return `${bytes}${speed}`;
 }
 
 function formatBytes(value: number) {
