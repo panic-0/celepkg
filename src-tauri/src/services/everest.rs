@@ -85,6 +85,7 @@ pub fn install_release(
         &download_url,
     );
     validate_everest_zip(staging_guard.path())?;
+    ensure_install_targets_available(celeste_path)?;
     emit_progress(reporter, "Everest", "installing", 0, None, 0.0, "");
     extract_everest_zip(staging_guard.path(), celeste_path, reporter)?;
     run_mini_installer(celeste_path, reporter)?;
@@ -276,6 +277,53 @@ fn validate_everest_zip(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_install_targets_available(celeste_path: &Path) -> Result<(), String> {
+    for file_name in ["Celeste.exe", "Celeste.dll"] {
+        let path = celeste_path.join(file_name);
+        if path.exists() {
+            ensure_file_writable_for_install(&path)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_file_writable_for_install(path: &Path) -> Result<(), String> {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    match fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .share_mode(0)
+        .open(path)
+    {
+        Ok(_) => Ok(()),
+        Err(error) if matches!(error.raw_os_error(), Some(32 | 33)) => Err(format!(
+            "Celeste 似乎仍在运行，安装 Everest 前请先关闭游戏后重试。被占用文件：{}",
+            path.display()
+        )),
+        Err(error) => Err(format!(
+            "无法写入关键游戏文件：{}（{error}）。请关闭 Celeste、检查目录权限后重试。",
+            path.display()
+        )),
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_file_writable_for_install(path: &Path) -> Result<(), String> {
+    fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .map(|_| ())
+        .map_err(|error| {
+            format!(
+                "无法写入关键游戏文件：{}（{error}）。请关闭 Celeste、检查目录权限后重试。",
+                path.display()
+            )
+        })
+}
+
 fn extract_everest_zip(
     path: &Path,
     celeste_path: &Path,
@@ -419,5 +467,56 @@ fn emit_progress(
             task_total: reporter.task_total.max(1),
             url: url.to_string(),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_celeste_root(label: &str) -> PathBuf {
+        let stamp = time::OffsetDateTime::now_utc()
+            .unix_timestamp_nanos()
+            .to_string();
+        let root = std::env::temp_dir().join(format!(
+            "celepkg-everest-{label}-{}-{stamp}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).expect("create temp celeste root");
+        root
+    }
+
+    #[test]
+    fn install_target_preflight_accepts_writable_game_files() {
+        let root = temp_celeste_root("writable");
+        fs::write(root.join("Celeste.exe"), b"game").expect("write celeste exe");
+        fs::write(root.join("Celeste.dll"), b"core").expect("write celeste dll");
+
+        ensure_install_targets_available(&root).expect("preflight should pass");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn install_target_preflight_reports_locked_game_file() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let root = temp_celeste_root("locked");
+        let exe = root.join("Celeste.exe");
+        fs::write(&exe, b"game").expect("write celeste exe");
+        let _lock = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&exe)
+            .expect("lock celeste exe");
+
+        let error = ensure_install_targets_available(&root).expect_err("preflight should fail");
+
+        assert!(error.contains("Celeste 似乎仍在运行"));
+        assert!(error.contains("Celeste.exe"));
+
+        let _ = fs::remove_dir_all(root);
     }
 }
