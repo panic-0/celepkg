@@ -108,6 +108,8 @@ export type AppNotifier = {
 export type ConfigResponse = {
   celestePath: string;
   autoBackupEnabled: boolean;
+  autoBackupCleanupEnabled: boolean;
+  autoBackupRetentionCount: number;
   selectedSaveFiles: string[];
   profiles: ProfilesState;
   warnings: string[];

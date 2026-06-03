@@ -23,7 +23,9 @@ import { isDraftEnabled } from "./utils/format";
 
 export function App() {
   const {
+    autoBackupCleanupEnabled,
     autoBackupEnabled,
+    autoBackupRetentionCount,
     celestePath,
     clearNotice,
     configWarnings,
@@ -39,7 +41,9 @@ export function App() {
     setLoading,
     setPathInput,
     setScan,
+    updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
+    updateAutoBackupRetentionCount,
     updateSelectedSaveFiles
   } = useCelePkgData();
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -210,15 +214,21 @@ export function App() {
           />
         ) : workspaceView.activeView === "backups" ? (
           <BackupManager
+            autoBackupCleanupEnabled={autoBackupCleanupEnabled}
             autoBackupEnabled={autoBackupEnabled}
+            autoBackupRetentionCount={autoBackupRetentionCount}
             backups={backups.backups}
             celestePath={celestePath}
             loading={loading}
+            onAutoBackupCleanupEnabledChange={updateAutoBackupCleanupEnabled}
             onAutoBackupEnabledChange={updateAutoBackupEnabled}
+            onAutoBackupRetentionCountChange={updateAutoBackupRetentionCount}
             onBackupCreate={backups.createManualBackup}
+            onBackupDelete={backups.deleteSelectedBackup}
             onBackupFolderOpen={backups.openCurrentBackupFolder}
             onBackupLocationOpen={backups.openSelectedBackupLocation}
             onBackupRestore={backups.restoreSelectedBackup}
+            onBackupsCleanup={backups.cleanupOldAutoBackups}
             onBackupsRefresh={backups.refreshBackups}
           />
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (

@@ -21,6 +21,8 @@ export function validateConfigResponse(value: unknown): ConfigResponse {
   return {
     celestePath: stringAt(object.celestePath, "config.celestePath"),
     autoBackupEnabled: booleanAt(object.autoBackupEnabled, "config.autoBackupEnabled"),
+    autoBackupCleanupEnabled: booleanAt(object.autoBackupCleanupEnabled, "config.autoBackupCleanupEnabled"),
+    autoBackupRetentionCount: numberAt(object.autoBackupRetentionCount, "config.autoBackupRetentionCount"),
     selectedSaveFiles: stringArrayAt(object.selectedSaveFiles, "config.selectedSaveFiles"),
     profiles: validateProfilesState(object.profiles, "config.profiles"),
     warnings: stringArrayAt(object.warnings, "config.warnings")

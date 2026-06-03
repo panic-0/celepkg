@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createBackup, listBackups, openBackupFolder, openBackupLocation, restoreBackup } from "../api";
+import { cleanupAutoBackups, createBackup, deleteBackup, listBackups, openBackupFolder, openBackupLocation, restoreBackup } from "../api";
 import type { AppNotifier, BackupInfo, RestoreScope, ScanResult } from "../types";
 import { readError } from "../utils/format";
 
@@ -54,6 +54,34 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
     }
   }
 
+  async function deleteSelectedBackup(backupId: string) {
+    setLoading(true);
+    notifier.clearNotice();
+    try {
+      await deleteBackup(backupId);
+      setBackups(await listBackups());
+      notifier.showSuccess("已删除备份。");
+    } catch (error) {
+      notifier.showError(readError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function cleanupOldAutoBackups() {
+    setLoading(true);
+    notifier.clearNotice();
+    try {
+      const nextBackups = await cleanupAutoBackups();
+      setBackups(nextBackups);
+      notifier.showSuccess("已清理旧自动备份。");
+    } catch (error) {
+      notifier.showError(readError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function openCurrentBackupFolder() {
     setLoading(true);
     notifier.clearNotice();
@@ -80,7 +108,9 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
 
   return {
     backups,
+    cleanupOldAutoBackups,
     createManualBackup,
+    deleteSelectedBackup,
     openCurrentBackupFolder,
     openSelectedBackupLocation,
     refreshBackups,

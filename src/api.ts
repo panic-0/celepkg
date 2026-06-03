@@ -32,6 +32,14 @@ export async function setAutoBackupEnabled(autoBackupEnabled: boolean): Promise<
   return invokeChecked("set_auto_backup_enabled", validateConfigResponse, { autoBackupEnabled });
 }
 
+export async function setAutoBackupCleanupEnabled(autoBackupCleanupEnabled: boolean): Promise<ConfigResponse> {
+  return invokeChecked("set_auto_backup_cleanup_enabled", validateConfigResponse, { autoBackupCleanupEnabled });
+}
+
+export async function setAutoBackupRetentionCount(autoBackupRetentionCount: number): Promise<ConfigResponse> {
+  return invokeChecked("set_auto_backup_retention_count", validateConfigResponse, { autoBackupRetentionCount });
+}
+
 export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
   return invokeChecked("set_selected_save_files", validateConfigResponse, { saveFiles });
 }
@@ -89,6 +97,14 @@ export async function listBackups(): Promise<BackupInfo[]> {
 
 export async function restoreBackup(backupId: string, scope: RestoreScope): Promise<BackupInfo> {
   return invokeChecked("restore_backup", validateBackupInfo, { backupId, scope });
+}
+
+export async function deleteBackup(backupId: string): Promise<void> {
+  return invokeChecked("delete_backup", validateVoid, { backupId });
+}
+
+export async function cleanupAutoBackups(): Promise<BackupInfo[]> {
+  return invokeChecked("cleanup_auto_backups", validateBackupList);
 }
 
 export async function openBackupFolder(celestePath: string): Promise<void> {

@@ -141,6 +141,8 @@ pub struct AppConfig {
 pub struct ConfigResponse {
     pub celeste_path: String,
     pub auto_backup_enabled: bool,
+    pub auto_backup_cleanup_enabled: bool,
+    pub auto_backup_retention_count: usize,
     pub selected_save_files: Vec<String>,
     pub profiles: ProfilesState,
     pub warnings: Vec<String>,

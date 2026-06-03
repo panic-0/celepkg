@@ -11,6 +11,8 @@ pub fn run() {
             commands::get_config,
             commands::set_celeste_path,
             commands::set_auto_backup_enabled,
+            commands::set_auto_backup_cleanup_enabled,
+            commands::set_auto_backup_retention_count,
             commands::set_selected_save_files,
             commands::select_celeste_directory,
             commands::scan_celeste,
@@ -25,6 +27,8 @@ pub fn run() {
             commands::create_backup,
             commands::list_backups,
             commands::restore_backup,
+            commands::delete_backup,
+            commands::cleanup_auto_backups,
             commands::open_backup_folder,
             commands::open_backup_location
         ])

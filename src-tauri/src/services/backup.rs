@@ -29,29 +29,23 @@ pub fn create_auto_backup(celeste_path: &Path) -> Result<BackupInfo, String> {
     create_backup(celeste_path, BACKUP_KIND_AUTO)
 }
 
-pub fn create_auto_backup_if_enabled(celeste_path: &Path, enabled: bool) -> Result<(), String> {
+pub fn create_auto_backup_if_enabled(
+    celeste_path: &Path,
+    enabled: bool,
+    cleanup_enabled: bool,
+    retention_count: usize,
+) -> Result<(), String> {
     if enabled {
         create_auto_backup(celeste_path)?;
+        if cleanup_enabled {
+            cleanup_auto_backups(celeste_path, retention_count)?;
+        }
     }
     Ok(())
 }
 
 pub fn list_backups(celeste_path: &Path) -> Result<Vec<BackupInfo>, String> {
-    let root = backups_dir(celeste_path);
-    let Ok(entries) = fs::read_dir(&root) else {
-        return Ok(vec![]);
-    };
-    let mut backups = vec![];
-    for entry in entries.flatten() {
-        if !entry.path().is_dir() {
-            continue;
-        }
-        if let Some(info) = read_backup_info(&entry.path()) {
-            backups.push(info);
-        }
-    }
-    backups.sort_by(|left, right| right.created_at.cmp(&left.created_at));
-    Ok(backups)
+    Ok(list_backups_in(&backups_dir(celeste_path)))
 }
 
 pub fn restore_backup(
@@ -70,6 +64,17 @@ pub fn restore_backup(
         restore_file(&backup_path, file)?;
     }
     Ok(info)
+}
+
+pub fn delete_backup(celeste_path: &Path, backup_id: &str) -> Result<(), String> {
+    delete_backup_in(&backups_dir(celeste_path), backup_id)
+}
+
+pub fn cleanup_auto_backups(
+    celeste_path: &Path,
+    keep_count: usize,
+) -> Result<Vec<BackupInfo>, String> {
+    cleanup_auto_backups_in(&backups_dir(celeste_path), keep_count)
 }
 
 fn create_backup(celeste_path: &Path, kind: &str) -> Result<BackupInfo, String> {
@@ -165,6 +170,48 @@ fn read_backup_info(backup_path: &Path) -> Option<BackupInfo> {
     })
 }
 
+fn delete_backup_in(backups_root: &Path, backup_id: &str) -> Result<(), String> {
+    let backup_path = backup_path_for_id(backups_root, backup_id)?;
+    read_backup_info(&backup_path).ok_or_else(|| "备份不存在".to_string())?;
+    fs::remove_dir_all(&backup_path).map_err(|error| format!("删除备份失败：{error}"))
+}
+
+fn cleanup_auto_backups_in(
+    backups_root: &Path,
+    keep_count: usize,
+) -> Result<Vec<BackupInfo>, String> {
+    let backups = list_backups_in(backups_root);
+    let mut auto_backups: Vec<_> = backups
+        .iter()
+        .filter(|backup| backup.kind == BACKUP_KIND_AUTO)
+        .cloned()
+        .collect();
+    auto_backups.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+
+    for backup in auto_backups.into_iter().skip(keep_count) {
+        delete_backup_in(backups_root, &backup.id)?;
+    }
+
+    Ok(list_backups_in(backups_root))
+}
+
+fn list_backups_in(backups_root: &Path) -> Vec<BackupInfo> {
+    let Ok(entries) = fs::read_dir(backups_root) else {
+        return vec![];
+    };
+    let mut backups = vec![];
+    for entry in entries.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        if let Some(info) = read_backup_info(&entry.path()) {
+            backups.push(info);
+        }
+    }
+    backups.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    backups
+}
+
 fn should_restore_file(file: &BackupFileEntry, scope: &str) -> bool {
     file.category == RESTORE_SCOPE_GAME
         && (scope == RESTORE_SCOPE_ALL || scope == RESTORE_SCOPE_GAME)
@@ -203,6 +250,14 @@ fn safe_backup_id(value: &str) -> String {
         .chars()
         .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-')
         .collect()
+}
+
+fn backup_path_for_id(backups_root: &Path, backup_id: &str) -> Result<PathBuf, String> {
+    let safe_id = safe_backup_id(backup_id);
+    if safe_id.is_empty() || safe_id != backup_id {
+        return Err("备份 ID 无效".to_string());
+    }
+    Ok(backups_root.join(safe_id))
 }
 
 struct BackupSource {
@@ -329,6 +384,119 @@ mod tests {
     }
 
     #[test]
+    fn delete_backup_removes_directory_and_list_entry() {
+        let root = temp_root("delete");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        create_manifest_backup(&backups, &celeste, "100", BACKUP_KIND_MANUAL);
+
+        delete_backup_in(&backups, "100").expect("delete backup");
+
+        assert!(!backups.join("100").exists());
+        assert!(list_backups_in(&backups).is_empty());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn delete_missing_backup_returns_error() {
+        let root = temp_root("delete-missing");
+        let backups = root.join("backups");
+
+        let error = delete_backup_in(&backups, "missing").expect_err("missing backup");
+
+        assert!(error.contains("备份不存在"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn cleanup_keep_zero_deletes_all_auto_backups() {
+        let root = temp_root("cleanup-zero");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        create_manifest_backup(&backups, &celeste, "100", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "200", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "150", BACKUP_KIND_MANUAL);
+
+        let remaining = cleanup_auto_backups_in(&backups, 0).expect("cleanup");
+
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, "150");
+        assert!(!backups.join("100").exists());
+        assert!(!backups.join("200").exists());
+        assert!(backups.join("150").exists());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn cleanup_keeps_recent_auto_backups_and_manual_backups() {
+        let root = temp_root("cleanup");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        create_manifest_backup(&backups, &celeste, "100", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "200", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "300", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "150", BACKUP_KIND_MANUAL);
+
+        let remaining = cleanup_auto_backups_in(&backups, 2).expect("cleanup");
+        let remaining_ids: Vec<_> = remaining.iter().map(|backup| backup.id.as_str()).collect();
+
+        assert_eq!(remaining_ids, vec!["300", "200", "150"]);
+        assert!(!backups.join("100").exists());
+        assert!(backups.join("150").exists());
+        assert!(backups.join("200").exists());
+        assert!(backups.join("300").exists());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn auto_backup_creation_runs_cleanup() {
+        let root = temp_root("auto-cleanup");
+        let celeste = root.join("Celeste");
+        let backups = backups_dir(&celeste);
+        create_manifest_backup(&backups, &celeste, "000", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "001", BACKUP_KIND_AUTO);
+
+        create_auto_backup_if_enabled(&celeste, true, true, 1).expect("auto backup");
+
+        let backups = list_backups(&celeste).expect("list backups");
+        assert_eq!(
+            backups
+                .iter()
+                .filter(|backup| backup.kind == BACKUP_KIND_AUTO)
+                .count(),
+            1
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn auto_backup_creation_skips_cleanup_when_cleanup_is_disabled() {
+        let root = temp_root("auto-cleanup-disabled");
+        let celeste = root.join("Celeste");
+        let backups = backups_dir(&celeste);
+        create_manifest_backup(&backups, &celeste, "000", BACKUP_KIND_AUTO);
+        create_manifest_backup(&backups, &celeste, "001", BACKUP_KIND_AUTO);
+
+        create_auto_backup_if_enabled(&celeste, true, false, 1).expect("auto backup");
+
+        let backups = list_backups(&celeste).expect("list backups");
+        assert_eq!(
+            backups
+                .iter()
+                .filter(|backup| backup.kind == BACKUP_KIND_AUTO)
+                .count(),
+            3
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn backups_root_lives_under_celeste_path() {
         let celeste = PathBuf::from(r"D:\Games\Celeste");
 
@@ -361,6 +529,22 @@ mod tests {
             fs::create_dir_all(parent).expect("parent");
         }
         fs::write(path, text).expect("write");
+    }
+
+    fn create_manifest_backup(backups_root: &Path, celeste_path: &Path, id: &str, kind: &str) {
+        let backup_path = backups_root.join(id);
+        fs::create_dir_all(&backup_path).expect("backup dir");
+        write_json(
+            &backup_path.join("manifest.json"),
+            &BackupManifest {
+                id: id.to_string(),
+                created_at: id.to_string(),
+                kind: kind.to_string(),
+                celeste_path: celeste_path.to_string_lossy().to_string(),
+                files: vec![],
+            },
+        )
+        .expect("manifest");
     }
 
     fn temp_root(label: &str) -> PathBuf {

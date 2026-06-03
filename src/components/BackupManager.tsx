@@ -1,32 +1,74 @@
-import { Archive, FolderOpen, RefreshCw, RotateCcw, ToggleLeft, ToggleRight } from "lucide-react";
-import type { BackupInfo, RestoreScope } from "../types";
+import { AlertTriangle, Archive, FolderOpen, RefreshCw, RotateCcw, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { BackupFileEntry, BackupInfo, RestoreScope } from "../types";
 import { formatUnixNanoseconds } from "../utils/time";
 
 type BackupManagerProps = {
+  autoBackupCleanupEnabled: boolean;
   autoBackupEnabled: boolean;
+  autoBackupRetentionCount: number;
   backups: BackupInfo[];
   celestePath: string;
   loading: boolean;
+  onAutoBackupCleanupEnabledChange: (enabled: boolean) => void;
   onAutoBackupEnabledChange: (enabled: boolean) => void;
+  onAutoBackupRetentionCountChange: (count: number) => void;
   onBackupCreate: () => void;
+  onBackupDelete: (backupId: string) => void;
   onBackupFolderOpen: () => void;
   onBackupLocationOpen: (backupPath: string) => void;
   onBackupRestore: (backupId: string, scope: RestoreScope) => void;
+  onBackupsCleanup: () => void;
   onBackupsRefresh: () => void;
 };
 
 export function BackupManager({
+  autoBackupCleanupEnabled,
   autoBackupEnabled,
+  autoBackupRetentionCount,
   backups,
   celestePath,
   loading,
+  onAutoBackupCleanupEnabledChange,
   onAutoBackupEnabledChange,
+  onAutoBackupRetentionCountChange,
   onBackupCreate,
+  onBackupDelete,
   onBackupFolderOpen,
   onBackupLocationOpen,
   onBackupRestore,
+  onBackupsCleanup,
   onBackupsRefresh
 }: BackupManagerProps) {
+  const [retentionDraft, setRetentionDraft] = useState(String(autoBackupRetentionCount));
+  const [deleteTarget, setDeleteTarget] = useState<BackupInfo | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<BackupInfo | null>(null);
+
+  useEffect(() => {
+    setRetentionDraft(String(autoBackupRetentionCount));
+  }, [autoBackupRetentionCount]);
+
+  function commitRetentionDraft() {
+    const value = Number.parseInt(retentionDraft, 10);
+    const nextCount = Number.isFinite(value) ? Math.max(1, Math.min(100, value)) : Math.max(1, autoBackupRetentionCount);
+    setRetentionDraft(String(nextCount));
+    if (nextCount !== autoBackupRetentionCount) {
+      onAutoBackupRetentionCountChange(nextCount);
+    }
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    onBackupDelete(deleteTarget.id);
+    setDeleteTarget(null);
+  }
+
+  function confirmRestore() {
+    if (!restoreTarget) return;
+    onBackupRestore(restoreTarget.id, "game");
+    setRestoreTarget(null);
+  }
+
   return (
     <section className="backup-manager">
       <div className="list-header">
@@ -42,6 +84,46 @@ export function BackupManager({
           >
             {autoBackupEnabled ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
             修改前自动备份
+          </button>
+          <div className="backup-retention-segments" aria-label="自动清理策略">
+            <label
+              className={autoBackupCleanupEnabled ? "backup-retention-option active" : "backup-retention-option"}
+              onClick={() => {
+                if (!autoBackupCleanupEnabled && !loading) onAutoBackupCleanupEnabledChange(true);
+              }}
+            >
+              <span>保留最近</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={retentionDraft}
+                onBlur={commitRetentionDraft}
+                onChange={(event) => setRetentionDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                disabled={loading || !autoBackupCleanupEnabled}
+              />
+              <span>个</span>
+            </label>
+            <button
+              className={autoBackupCleanupEnabled ? "backup-retention-option" : "backup-retention-option active"}
+              onClick={() => onAutoBackupCleanupEnabledChange(false)}
+              disabled={loading}
+              type="button"
+            >
+              不自动清理
+            </button>
+          </div>
+          <button
+            onClick={onBackupsCleanup}
+            disabled={loading || !autoBackupCleanupEnabled}
+            title={autoBackupCleanupEnabled ? "清理超过保留数量的旧自动备份" : "当前已关闭自动清理"}
+          >
+            <Trash2 size={16} />
+            清理旧自动备份
           </button>
           <button onClick={onBackupCreate} disabled={loading}>
             <Archive size={16} />
@@ -66,7 +148,8 @@ export function BackupManager({
                 key={backup.id}
                 loading={loading}
                 onLocationOpen={onBackupLocationOpen}
-                onRestore={onBackupRestore}
+                onDelete={setDeleteTarget}
+                onRestore={setRestoreTarget}
               />
             ))}
           </div>
@@ -87,6 +170,12 @@ export function BackupManager({
           </div>
         )}
       </div>
+      {deleteTarget && (
+        <BackupDeleteDialog backup={deleteTarget} loading={loading} onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
+      )}
+      {restoreTarget && (
+        <BackupRestoreDialog backup={restoreTarget} loading={loading} onCancel={() => setRestoreTarget(null)} onConfirm={confirmRestore} />
+      )}
     </section>
   );
 }
@@ -95,12 +184,14 @@ function BackupItem({
   backup,
   loading,
   onLocationOpen,
+  onDelete,
   onRestore
 }: {
   backup: BackupInfo;
   loading: boolean;
   onLocationOpen: (backupPath: string) => void;
-  onRestore: (backupId: string, scope: RestoreScope) => void;
+  onDelete: (backup: BackupInfo) => void;
+  onRestore: (backup: BackupInfo) => void;
 }) {
   const gameFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
 
@@ -117,12 +208,117 @@ function BackupItem({
           <FolderOpen size={16} />
           位置
         </button>
-        <button onClick={() => onRestore(backup.id, "game")} disabled={loading}>
+        <button onClick={() => onRestore(backup)} disabled={loading}>
           <RotateCcw size={16} />
           还原游戏文件
         </button>
+        <button className="danger-action-button" onClick={() => onDelete(backup)} disabled={loading} title="删除此备份">
+          <Trash2 size={16} />
+          删除
+        </button>
       </div>
     </article>
+  );
+}
+
+function BackupDeleteDialog({
+  backup,
+  loading,
+  onCancel,
+  onConfirm
+}: {
+  backup: BackupInfo;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const gameFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-delete-title">
+        <div className="confirm-dialog-heading">
+          <AlertTriangle size={18} />
+          <h3 id="backup-delete-title">删除备份</h3>
+        </div>
+        <p>此操作会删除这个备份目录，删除后不能在应用内还原。</p>
+        <dl className="confirm-dialog-facts">
+          <FactRow label="时间" value={formatBackupTime(backup.createdAt)} />
+          <FactRow label="类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
+          <FactRow label="游戏文件" value={`${gameFiles}/${backup.files.filter((file) => file.category === "game").length}`} />
+          <FactRow label="位置" value={backup.backupPath} />
+        </dl>
+        <div className="confirm-dialog-actions">
+          <button onClick={onCancel} disabled={loading}>
+            取消
+          </button>
+          <button className="confirm-danger-button" onClick={onConfirm} disabled={loading}>
+            删除
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function BackupRestoreDialog({
+  backup,
+  loading,
+  onCancel,
+  onConfirm
+}: {
+  backup: BackupInfo;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const files = backup.files.filter((file) => file.category === "game");
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation">
+      <section className="confirm-dialog backup-restore-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-restore-title">
+        <div className="confirm-dialog-heading">
+          <RotateCcw size={18} />
+          <h3 id="backup-restore-title">还原游戏文件</h3>
+        </div>
+        <p>确认后会按下列清单覆盖或删除当前游戏文件。</p>
+        <dl className="confirm-dialog-facts">
+          <FactRow label="备份时间" value={formatBackupTime(backup.createdAt)} />
+          <FactRow label="备份类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
+        </dl>
+        <div className="restore-preview-list">
+          {files.map((file) => (
+            <RestorePreviewRow file={file} key={`${file.category}:${file.label}`} />
+          ))}
+        </div>
+        <div className="confirm-dialog-actions">
+          <button onClick={onCancel} disabled={loading}>
+            取消
+          </button>
+          <button className="confirm-primary-button" onClick={onConfirm} disabled={loading}>
+            确认还原
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RestorePreviewRow({ file }: { file: BackupFileEntry }) {
+  return (
+    <div className={file.existed ? "restore-preview-row overwrite" : "restore-preview-row remove"}>
+      <strong>{file.label}</strong>
+      <span>{file.existed ? "覆盖或创建目标文件" : "删除当前目标文件"}</span>
+      <small>{file.existed ? "备份时存在" : "备份时不存在"}</small>
+      <code title={file.targetPath}>{file.targetPath}</code>
+    </div>
+  );
+}
+
+function FactRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd title={value}>{value}</dd>
+    </div>
   );
 }
 

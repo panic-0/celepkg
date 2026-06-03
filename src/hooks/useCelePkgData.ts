@@ -3,8 +3,10 @@ import {
   getConfig,
   rescanCeleste,
   scanCeleste,
+  setAutoBackupCleanupEnabled,
   selectCelesteDirectory,
   setAutoBackupEnabled,
+  setAutoBackupRetentionCount,
   setCelestePath,
   setSelectedSaveFiles
 } from "../api";
@@ -30,6 +32,8 @@ export function useCelePkgData() {
   const [celestePath, setPathInput] = useState("");
   const [scan, setScan] = useState<ScanResult>(emptyScan);
   const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
+  const [autoBackupCleanupEnabled, setAutoBackupCleanupEnabledState] = useState(true);
+  const [autoBackupRetentionCount, setAutoBackupRetentionCountState] = useState(20);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loading, setLoadingState] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -108,6 +112,8 @@ export function useCelePkgData() {
     setConfigWarnings(config.warnings);
     setPathInput(config.celestePath);
     setAutoBackupEnabledState(config.autoBackupEnabled);
+    setAutoBackupCleanupEnabledState(config.autoBackupCleanupEnabled);
+    setAutoBackupRetentionCountState(config.autoBackupRetentionCount);
     setScan((current) => ({
       ...(config.celestePath.trim() && !config.warnings.length ? current : emptyScan),
       profiles: config.profiles,
@@ -129,6 +135,46 @@ export function useCelePkgData() {
         setAutoBackupEnabledState(config.autoBackupEnabled);
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", config.autoBackupEnabled ? "已开启修改前自动备份。" : "已关闭修改前自动备份。");
+      } catch (error) {
+        showNotice("error", readError(error));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearNotice, setLoading, showNotice]
+  );
+
+  const updateAutoBackupRetentionCount = useCallback(
+    async (count: number) => {
+      const normalizedCount = Math.max(1, Math.min(100, Math.trunc(count)));
+      setLoading(true);
+      setLoadingMessage("正在更新备份设置...");
+      clearNotice();
+      try {
+        const config = await setAutoBackupRetentionCount(normalizedCount);
+        setAutoBackupRetentionCountState(config.autoBackupRetentionCount);
+        setScan((current) => ({ ...current, profiles: config.profiles }));
+        showNotice("success", `已设置为保留最近 ${config.autoBackupRetentionCount} 个自动备份。`);
+      } catch (error) {
+        showNotice("error", readError(error));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearNotice, setLoading, showNotice]
+  );
+
+  const updateAutoBackupCleanupEnabled = useCallback(
+    async (enabled: boolean) => {
+      setLoading(true);
+      setLoadingMessage("正在更新备份设置...");
+      clearNotice();
+      try {
+        const config = await setAutoBackupCleanupEnabled(enabled);
+        setAutoBackupCleanupEnabledState(config.autoBackupCleanupEnabled);
+        setAutoBackupRetentionCountState(config.autoBackupRetentionCount);
+        setScan((current) => ({ ...current, profiles: config.profiles }));
+        showNotice("success", config.autoBackupCleanupEnabled ? "已开启自动清理旧备份。" : "已关闭自动清理旧备份。");
       } catch (error) {
         showNotice("error", readError(error));
       } finally {
@@ -230,7 +276,9 @@ export function useCelePkgData() {
   }, [notice]);
 
   return {
+    autoBackupCleanupEnabled,
     autoBackupEnabled,
+    autoBackupRetentionCount,
     celestePath,
     clearNotice,
     configWarnings,
@@ -247,7 +295,9 @@ export function useCelePkgData() {
     setLoading,
     setPathInput,
     setScan,
+    updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
+    updateAutoBackupRetentionCount,
     updateSelectedSaveFiles
   };
 }

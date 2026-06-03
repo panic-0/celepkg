@@ -36,6 +36,29 @@ pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigRespon
 }
 
 #[tauri::command]
+pub fn set_auto_backup_cleanup_enabled(
+    auto_backup_cleanup_enabled: bool,
+) -> Result<ConfigResponse, String> {
+    let mut state = load_state()?;
+    state.auto_backup_cleanup_enabled = auto_backup_cleanup_enabled;
+    write_state(&state)?;
+    Ok(config_response(&state, vec![]))
+}
+
+#[tauri::command]
+pub fn set_auto_backup_retention_count(
+    auto_backup_retention_count: usize,
+) -> Result<ConfigResponse, String> {
+    if !(1..=100).contains(&auto_backup_retention_count) {
+        return Err("自动备份保留数量必须在 1 到 100 之间".to_string());
+    }
+    let mut state = load_state()?;
+    state.auto_backup_retention_count = auto_backup_retention_count;
+    write_state(&state)?;
+    Ok(config_response(&state, vec![]))
+}
+
+#[tauri::command]
 pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
     let mut state = load_state()?;
     let path = resolve_input_path_from_state("", &state);
@@ -105,7 +128,12 @@ pub async fn set_record_favorite(
             &state.protected_record_ids,
             &state.selected_save_files,
         );
-        services::backup::create_auto_backup_if_enabled(&path, state.auto_backup_enabled)?;
+        services::backup::create_auto_backup_if_enabled(
+            &path,
+            state.auto_backup_enabled,
+            state.auto_backup_cleanup_enabled,
+            state.auto_backup_retention_count,
+        )?;
         services::scan::write_favorite_state(&path, &record_id, favorite, &scan)?;
         services::scan::set_scan_favorite_state(&mut scan, &record_id, favorite)?;
         services::scan::write_scan_cache(&path, &scan);
@@ -231,6 +259,31 @@ pub async fn restore_backup(backup_id: String, scope: String) -> Result<BackupIn
 }
 
 #[tauri::command]
+pub async fn delete_backup(backup_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = resolve_required_celeste_path("")?;
+        services::backup::delete_backup(&path, &backup_id)
+    })
+    .await
+    .map_err(|error| format!("删除备份任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn cleanup_auto_backups() -> Result<Vec<BackupInfo>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let state = load_state()?;
+        let path = resolve_required_celeste_path_from_state("", &state)?;
+        if state.auto_backup_cleanup_enabled {
+            services::backup::cleanup_auto_backups(&path, state.auto_backup_retention_count)
+        } else {
+            services::backup::list_backups(&path)
+        }
+    })
+    .await
+    .map_err(|error| format!("清理备份任务失败：{error}"))?
+}
+
+#[tauri::command]
 pub async fn open_backup_folder(celeste_path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve_required_celeste_path(&celeste_path)?;
@@ -288,6 +341,8 @@ fn config_response(state: &crate::storage::AppState, warnings: Vec<String>) -> C
     ConfigResponse {
         celeste_path: state.celeste_path.clone(),
         auto_backup_enabled: state.auto_backup_enabled,
+        auto_backup_cleanup_enabled: state.auto_backup_cleanup_enabled,
+        auto_backup_retention_count: state.auto_backup_retention_count,
         selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),
         warnings,

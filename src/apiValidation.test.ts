@@ -33,6 +33,8 @@ describe("api validation", () => {
       validateConfigResponse({
         celestePath: "D:/Celeste",
         autoBackupEnabled: true,
+        autoBackupCleanupEnabled: true,
+        autoBackupRetentionCount: 20,
         selectedSaveFiles: ["0.celeste"],
         profiles,
         warnings: ["配置提示"]
@@ -40,6 +42,8 @@ describe("api validation", () => {
     ).toEqual({
       celestePath: "D:/Celeste",
       autoBackupEnabled: true,
+      autoBackupCleanupEnabled: true,
+      autoBackupRetentionCount: 20,
       selectedSaveFiles: ["0.celeste"],
       profiles,
       warnings: ["配置提示"]
@@ -51,6 +55,8 @@ describe("api validation", () => {
       validateConfigResponse({
         celestePath: "D:/Celeste",
         autoBackupEnabled: "yes",
+        autoBackupCleanupEnabled: true,
+        autoBackupRetentionCount: 20,
         selectedSaveFiles: ["0.celeste"],
         profiles,
         warnings: []

@@ -16,6 +16,10 @@ pub struct AppState {
     pub active_mod_profile_id: String,
     #[serde(default = "default_auto_backup_enabled")]
     pub auto_backup_enabled: bool,
+    #[serde(default = "default_auto_backup_cleanup_enabled")]
+    pub auto_backup_cleanup_enabled: bool,
+    #[serde(default = "default_auto_backup_retention_count")]
+    pub auto_backup_retention_count: usize,
     #[serde(default = "default_selected_save_files")]
     pub selected_save_files: Vec<String>,
     #[serde(default)]
@@ -148,6 +152,8 @@ fn default_state() -> AppState {
         active_map_profile_id: "default-maps".to_string(),
         active_mod_profile_id: "default-mods".to_string(),
         auto_backup_enabled: default_auto_backup_enabled(),
+        auto_backup_cleanup_enabled: default_auto_backup_cleanup_enabled(),
+        auto_backup_retention_count: default_auto_backup_retention_count(),
         selected_save_files: default_selected_save_files(),
         protected_record_ids: vec![],
         profiles: vec![
@@ -261,6 +267,14 @@ fn default_auto_backup_enabled() -> bool {
     true
 }
 
+fn default_auto_backup_cleanup_enabled() -> bool {
+    true
+}
+
+fn default_auto_backup_retention_count() -> usize {
+    20
+}
+
 fn default_selected_save_files() -> Vec<String> {
     vec!["0.celeste".to_string()]
 }
@@ -352,6 +366,8 @@ mod tests {
         assert_eq!(state.active_map_profile_id, "default-maps");
         assert_eq!(state.active_mod_profile_id, "default-mods");
         assert!(state.auto_backup_enabled);
+        assert!(state.auto_backup_cleanup_enabled);
+        assert_eq!(state.auto_backup_retention_count, 20);
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);
