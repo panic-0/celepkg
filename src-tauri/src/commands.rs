@@ -1,7 +1,8 @@
 use crate::domain::{
-    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult,
-    ModCatalogSourceKind, ModDownloadProgress, ModInstallResult, ModMetadata, ModUpdateCheckResult,
-    ProfileInput, ProfilesState, ScanResult,
+    AppConfig, BackupInfo, ConfigResponse, EverestInstallResult, EverestRelease,
+    EverestReleaseList, LaunchResult, ModCatalogSearchResult, ModCatalogSourceKind,
+    ModDownloadProgress, ModInstallResult, ModMetadata, ModUpdateCheckResult, ProfileInput,
+    ProfilesState, ScanResult,
 };
 use crate::services;
 use crate::storage::{
@@ -199,6 +200,65 @@ pub async fn preview_mod_update_metadata(
     })
     .await
     .map_err(|error| format!("预览 Mod 更新依赖任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn list_everest_releases() -> Result<EverestReleaseList, String> {
+    tauri::async_runtime::spawn_blocking(services::everest::list_releases)
+        .await
+        .map_err(|error| format!("获取 Everest 版本列表任务失败：{error}"))
+}
+
+#[tauri::command]
+pub async fn install_everest(
+    app: tauri::AppHandle,
+    celeste_path: String,
+    release: EverestRelease,
+    operation_id: String,
+) -> Result<EverestInstallResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state()?;
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
+        let app_for_progress = app.clone();
+        let emit_progress = move |progress: ModDownloadProgress| {
+            let _ = app_for_progress.emit("mod-download-progress", progress);
+        };
+        let cancel_flag = register_mod_download(&operation_id);
+        let result = services::everest::install_release(
+            &path,
+            release,
+            state.profiles_state(),
+            &state.protected_record_ids,
+            &state.selected_save_files,
+            services::mod_catalog::ModDownloadReporter {
+                operation_id: &operation_id,
+                progress: Some(&emit_progress),
+                cancel_token: Some(&cancel_flag),
+                task_index: 1,
+                task_total: 1,
+            },
+        );
+        unregister_mod_download(&operation_id);
+        if result.is_err() {
+            let _ = app.emit(
+                "mod-download-progress",
+                ModDownloadProgress {
+                    operation_id,
+                    mod_name: "Everest".to_string(),
+                    phase: "error".to_string(),
+                    downloaded: 0,
+                    total: None,
+                    speed_bytes_per_sec: 0.0,
+                    task_index: 1,
+                    task_total: 1,
+                    url: String::new(),
+                },
+            );
+        }
+        result
+    })
+    .await
+    .map_err(|error| format!("安装 Everest 任务失败：{error}"))?
 }
 
 #[tauri::command]

@@ -114,7 +114,8 @@ export function useRecordActions({
   }
 
   function isModEnabled(id: string) {
-    return enabledModDraft.has(id);
+    const record = scan.otherMods.find((modItem) => modItem.id === id);
+    return Boolean(record?.readOnly) || enabledModDraft.has(id);
   }
 
   function enableVisibleMaps() {

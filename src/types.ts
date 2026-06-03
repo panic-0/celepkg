@@ -214,6 +214,27 @@ export type ModDownloadProgress = {
   url: string;
 };
 
+export type EverestRelease = {
+  branch: string;
+  version: number;
+  date: string;
+  commit: string;
+  mainFileSize: number | null;
+  mainDownload: string;
+  mirrorDownload: string;
+  isNative: boolean;
+};
+
+export type EverestReleaseList = {
+  releases: EverestRelease[];
+  warnings: string[];
+};
+
+export type EverestInstallResult = {
+  release: EverestRelease;
+  scan: ScanResult;
+};
+
 export type ScanTiming = {
   stage: string;
   ms: number;

@@ -22,6 +22,8 @@ pub fn run() {
             commands::search_mod_catalog,
             commands::check_mod_updates,
             commands::preview_mod_update_metadata,
+            commands::list_everest_releases,
+            commands::install_everest,
             commands::install_mod,
             commands::update_mod,
             commands::cancel_mod_download,

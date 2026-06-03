@@ -4,12 +4,14 @@ import {
   cancelModDownload,
   checkModUpdates,
   createOperationId,
+  installEverest,
   installMod,
   previewModUpdateMetadata,
   searchModCatalog,
   updateMod
 } from "./api";
 import { BackupManager } from "./components/BackupManager";
+import { EverestManager } from "./components/EverestManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
 import { ModCatalogManager } from "./components/ModCatalogManager";
@@ -29,7 +31,15 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import type { Dependency, ModCatalogEntry, ModDownloadProgress, ModRecord, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
+import type {
+  Dependency,
+  EverestRelease,
+  ModCatalogEntry,
+  ModDownloadProgress,
+  ModRecord,
+  ModUpdateCandidate,
+  ModUpdateCheckResult
+} from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
 import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "./utils/dependencyUpdateDedupe";
 import { isDraftEnabled, readError } from "./utils/format";
@@ -221,6 +231,27 @@ export function App() {
   async function updateSingleMod(candidate: ModUpdateCandidate) {
     if (!window.confirm(`更新 ${candidate.installed.name} 到 ${candidate.entry.version || "目录最新版本"}？`)) return;
     await updateModCandidate(candidate);
+  }
+
+  async function installEverestRelease(release: EverestRelease) {
+    const version = `1.${release.version}.0`;
+    if (!window.confirm(`安装 Everest ${version}？安装器会覆盖游戏目录中的 Everest 相关文件。`)) return;
+    const operationId = createOperationId("everest");
+    try {
+      startEverestDownloadProgress(release, operationId);
+      setLoading(true, `正在安装 Everest ${version}...`);
+      const result = await installEverest(celestePath, release, operationId);
+      clearMockDownloadTimer();
+      setScan(result.scan);
+      finishModDownloadProgress(operationId, 1200);
+      notifier.showSuccess(`已安装 Everest ${version}`);
+    } catch (error) {
+      const message = readError(error);
+      markDownloadProgressError();
+      notifier.showError(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function updateAllMods() {
@@ -472,6 +503,26 @@ export function App() {
     if (isMockMode()) runMockDownloadProgress(initialProgress);
   }
 
+  function startEverestDownloadProgress(release: EverestRelease, operationId: string) {
+    clearMockDownloadTimer();
+    clearProgressClearTimer();
+    activeDownloadOperationId.current = operationId;
+    setModDownloadBatchLabel("");
+    const initialProgress: ModDownloadProgress = {
+      operationId,
+      modName: "Everest",
+      phase: "downloading",
+      downloaded: 0,
+      total: release.mainFileSize,
+      speedBytesPerSec: 0,
+      taskIndex: 1,
+      taskTotal: 1,
+      url: release.mirrorDownload || release.mainDownload
+    };
+    setModDownloadProgress(initialProgress);
+    if (isMockMode()) runMockDownloadProgress(initialProgress);
+  }
+
   function finishModDownloadProgress(operationId: string, clearDelay: number) {
     clearMockDownloadTimer();
     setModDownloadProgress((current) => {
@@ -579,6 +630,7 @@ export function App() {
           workspaceView.activeView === "profiles" ||
           workspaceView.activeView === "settings" ||
           workspaceView.activeView === "backups" ||
+          workspaceView.activeView === "everest" ||
           workspaceView.activeView === "catalog"
             ? "management-view"
             : ""
@@ -692,6 +744,15 @@ export function App() {
             setLoading={setLoading}
             setScan={setScan}
           />
+        ) : workspaceView.activeView === "everest" ? (
+          <EverestManager
+            loading={loading}
+            mods={scan.otherMods}
+            notifier={notifier}
+            progress={modDownloadProgress}
+            onCancelDownload={cancelActiveModDownload}
+            onInstall={installEverestRelease}
+          />
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
@@ -711,7 +772,11 @@ export function App() {
           <ModDetail
             activeTab={uiLayout.modDetailTab}
             modItem={workspaceView.selectedMod}
-            draftEnabled={workspaceView.selectedMod ? profileDraft.enabledModDraft.has(workspaceView.selectedMod.id) : false}
+            draftEnabled={
+              workspaceView.selectedMod
+                ? workspaceView.selectedMod.readOnly || profileDraft.enabledModDraft.has(workspaceView.selectedMod.id)
+                : false
+            }
             scrollMemory={scrollMemory}
             onBack={workspaceView.showList}
             onTabChange={uiLayout.setModDetailTab}

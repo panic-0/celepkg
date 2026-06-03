@@ -414,7 +414,7 @@ function ModTable({
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
                 <div className="record-actions">
-                  <ToggleButton enabled={enabled} label="Mod" onClick={() => onToggle(modItem)} />
+                  <ToggleButton disabled={modItem.readOnly} enabled={enabled} label="Mod" onClick={() => onToggle(modItem)} />
                   <div className="record-flag-actions" aria-label="Mod 标记">
                     <FlagButton
                       active={modItem.favorite}
@@ -425,6 +425,7 @@ function ModTable({
                     />
                     <FlagButton
                       active={modItem.protected}
+                      disabled={modItem.readOnly}
                       icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />}
                       label="始终启用"
                       variant="protected"

@@ -4,6 +4,8 @@ import {
   validateBackupList,
   validateCelestePathResponse,
   validateConfigResponse,
+  validateEverestInstallResult,
+  validateEverestReleaseList,
   validateLaunchResult,
   validateModCatalogSearchResult,
   validateModInstallResult,
@@ -18,6 +20,9 @@ import { isMockMode, mockApi } from "./mockApi";
 import type {
   BackupInfo,
   ConfigResponse,
+  EverestInstallResult,
+  EverestRelease,
+  EverestReleaseList,
   ModCatalogEntry,
   ModCatalogSearchResult,
   ModCatalogSourceKind,
@@ -102,6 +107,20 @@ export async function checkModUpdates(celestePath: string, sources: ModCatalogSo
 export async function previewModUpdateMetadata(celestePath: string, entry: ModCatalogEntry): Promise<ModMetadata> {
   if (isMockMode()) return mockApi.previewModUpdateMetadata(celestePath, entry);
   return invokeChecked("preview_mod_update_metadata", validateModMetadata, { celestePath, entry });
+}
+
+export async function listEverestReleases(): Promise<EverestReleaseList> {
+  if (isMockMode()) return mockApi.listEverestReleases();
+  return invokeChecked("list_everest_releases", validateEverestReleaseList);
+}
+
+export async function installEverest(
+  celestePath: string,
+  release: EverestRelease,
+  operationId = createOperationId("everest")
+): Promise<EverestInstallResult> {
+  if (isMockMode()) return mockApi.installEverest(celestePath, release);
+  return invokeChecked("install_everest", validateEverestInstallResult, { celestePath, release, operationId });
 }
 
 export async function installMod(

@@ -4,6 +4,9 @@ import type {
   BackupModEntry,
   ConfigResponse,
   Dependency,
+  EverestInstallResult,
+  EverestRelease,
+  EverestReleaseList,
   InstalledModMatch,
   MapStats,
   ModCatalogEntry,
@@ -147,6 +150,24 @@ export function validateModInstallResult(value: unknown): ModInstallResult {
   };
 }
 
+export function validateEverestReleaseList(value: unknown): EverestReleaseList {
+  const object = objectAt(value, "everest release list");
+  return {
+    releases: arrayAt(object.releases, "everest release list.releases").map((item, index) =>
+      validateEverestRelease(item, `everest release list.releases[${index}]`)
+    ),
+    warnings: stringArrayAt(object.warnings, "everest release list.warnings")
+  };
+}
+
+export function validateEverestInstallResult(value: unknown): EverestInstallResult {
+  const object = objectAt(value, "everest install result");
+  return {
+    release: validateEverestRelease(object.release, "everest install result.release"),
+    scan: validateScanResult(object.scan)
+  };
+}
+
 export function validateVoid(value: unknown): void {
   if (value !== null && typeof value !== "undefined") {
     throw new Error("API 返回数据格式异常：void 命令不应返回数据。");
@@ -202,6 +223,20 @@ function validateModUpdateCandidate(value: unknown, path: string): ModUpdateCand
     installed: validateInstalledModMatch(object.installed, `${path}.installed`),
     updateAvailable: booleanAt(object.updateAvailable, `${path}.updateAvailable`),
     reason: stringAt(object.reason, `${path}.reason`)
+  };
+}
+
+function validateEverestRelease(value: unknown, path: string): EverestRelease {
+  const object = objectAt(value, path);
+  return {
+    branch: stringAt(object.branch, `${path}.branch`),
+    version: numberAt(object.version, `${path}.version`),
+    date: stringAt(object.date, `${path}.date`),
+    commit: stringAt(object.commit, `${path}.commit`),
+    mainFileSize: nullableNumberAt(object.mainFileSize, `${path}.mainFileSize`),
+    mainDownload: stringAt(object.mainDownload, `${path}.mainDownload`),
+    mirrorDownload: stringAt(object.mirrorDownload, `${path}.mirrorDownload`),
+    isNative: booleanAt(object.isNative, `${path}.isNative`)
   };
 }
 

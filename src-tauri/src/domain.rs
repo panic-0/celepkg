@@ -316,3 +316,30 @@ pub struct ModDownloadProgress {
     pub task_total: usize,
     pub url: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EverestRelease {
+    pub branch: String,
+    pub version: u64,
+    pub date: String,
+    pub commit: String,
+    pub main_file_size: Option<u64>,
+    pub main_download: String,
+    pub mirror_download: String,
+    pub is_native: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EverestReleaseList {
+    pub releases: Vec<EverestRelease>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EverestInstallResult {
+    pub release: EverestRelease,
+    pub scan: ScanResult,
+}

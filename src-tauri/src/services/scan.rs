@@ -365,6 +365,7 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         vec!["没有找到 Celeste/Mods 目录。".to_string()]
     };
 
+    records.extend(builtin_mod_records(celeste_path));
     let dependency_index = DependencyIndex::new(&records, celeste_path);
     let mut unknown_builtin_dependencies = HashSet::new();
 
@@ -594,6 +595,77 @@ fn builtin_dependency_versions(celeste_path: &Path) -> HashMap<String, String> {
         insert_builtin_dependency_version(&mut versions, &metadata.name, &metadata.version);
     }
     versions
+}
+
+fn builtin_mod_records(celeste_path: &Path) -> Vec<ModRecord> {
+    let versions = builtin_dependency_versions(celeste_path);
+    let everest_version = versions
+        .get(&normalize_dependency_name("Everest"))
+        .cloned()
+        .unwrap_or_default();
+    let everest_core_version = versions
+        .get(&normalize_dependency_name("EverestCore"))
+        .cloned()
+        .unwrap_or_else(|| everest_version.clone());
+    vec![
+        builtin_mod_record(
+            "builtin-everest",
+            "Everest",
+            &everest_version,
+            "Celeste/Everest",
+            "Celeste 的 Mod 加载器，安装在游戏根目录。",
+            celeste_path,
+        ),
+        builtin_mod_record(
+            "builtin-everest-core",
+            "EverestCore",
+            &everest_core_version,
+            "Celeste/EverestCore",
+            "Everest 内置核心依赖，由 Everest 安装器维护。",
+            celeste_path,
+        ),
+    ]
+}
+
+fn builtin_mod_record(
+    id: &str,
+    name: &str,
+    version: &str,
+    relative_path: &str,
+    description: &str,
+    celeste_path: &Path,
+) -> ModRecord {
+    ModRecord {
+        id: id.to_string(),
+        name: name.to_string(),
+        file_name: name.to_string(),
+        relative_path: relative_path.to_string(),
+        absolute_path: celeste_path.to_string_lossy().to_string(),
+        is_archive: false,
+        kind: ModKind::Mod,
+        enabled: true,
+        favorite: false,
+        protected: true,
+        read_only: true,
+        metadata: ModMetadata {
+            name: name.to_string(),
+            version: version.to_string(),
+            author: "Everest".to_string(),
+            description: description.to_string(),
+            dependencies: vec![],
+            optional_dependencies: vec![],
+        },
+        map_ids: vec![],
+        sub_maps: vec![],
+        map_count: 0,
+        strawberry_count: 0,
+        strawberry_total_count: 0,
+        completion_status: CompletionStatus::NotApplicable,
+        dependencies: vec![],
+        optional_dependencies: vec![],
+        stats: None,
+        warnings: vec![],
+    }
 }
 
 fn insert_builtin_dependency_version(

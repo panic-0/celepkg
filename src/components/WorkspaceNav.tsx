@@ -3,6 +3,7 @@ import {
   ArrowUpAZ,
   Archive,
   Gamepad2,
+  Mountain,
   PackageSearch,
   Search,
   Settings2,
@@ -101,6 +102,10 @@ export function WorkspaceNav({
           >
             {enabledMapCount + enabledModCount}/{totalMapCount + totalModCount}
           </strong>
+        </button>
+        <button className={activeView === "everest" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("everest")}>
+          <Mountain size={18} />
+          <span>Everest</span>
         </button>
         <button className={activeView === "catalog" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("catalog")}>
           <PackageSearch size={18} />

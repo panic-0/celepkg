@@ -83,7 +83,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
   const filteredMods = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const mods = scan.otherMods.filter((modItem) => {
-      const draftEnabled = enabledModDraft.has(modItem.id);
+      const draftEnabled = modItem.readOnly || enabledModDraft.has(modItem.id);
       if (enabledFilter === "enabled" && !draftEnabled) return false;
       if (enabledFilter === "disabled" && draftEnabled) return false;
       if (progressFilter === "warnings" && !modItem.warnings.length) return false;

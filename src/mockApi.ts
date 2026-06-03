@@ -2,6 +2,9 @@ import type {
   BackupInfo,
   BackupModEntry,
   ConfigResponse,
+  EverestInstallResult,
+  EverestRelease,
+  EverestReleaseList,
   MapStats,
   ModCatalogEntry,
   ModCatalogSearchResult,
@@ -46,9 +49,9 @@ let profiles: ProfilesState = {
       ["communal-helper", "jungle-helper"],
       "-debug"
     ),
-    profile("mods-main", "常用工具", "mods", null, ["everest-core", "communal-helper", "loenn", "infinite-backups"], ""),
-    profile("mods-minimal", "最小启动", "mods", null, ["everest-core"], ""),
-    profile("mods-testing", "测试图工具链", "mods", null, ["everest-core", "communal-helper", "jungle-helper", "speedrun-tool"], "")
+    profile("mods-main", "常用工具", "mods", null, ["builtin-everest-core", "communal-helper", "loenn", "infinite-backups"], ""),
+    profile("mods-minimal", "最小启动", "mods", null, ["builtin-everest-core"], ""),
+    profile("mods-testing", "测试图工具链", "mods", null, ["builtin-everest-core", "communal-helper", "jungle-helper", "speedrun-tool"], "")
   ]
 };
 
@@ -195,6 +198,27 @@ export const mockApi = {
 
   async previewModUpdateMetadata(_celestePath: string, entry: ModCatalogEntry): Promise<ModMetadata> {
     return clone(mockUpdateMetadata(entry));
+  },
+
+  async listEverestReleases(): Promise<EverestReleaseList> {
+    await delay(250);
+    return clone({
+      releases: createMockEverestReleases(),
+      warnings: []
+    });
+  },
+
+  async installEverest(_celestePath: string, release: EverestRelease): Promise<EverestInstallResult> {
+    await delay(1100);
+    scan = {
+      ...scan,
+      otherMods: scan.otherMods.map((item) =>
+        item.name === "Everest" || item.name === "EverestCore"
+          ? { ...item, metadata: { ...item.metadata, version: `1.${release.version}.0` } }
+          : item
+      )
+    };
+    return clone({ release, scan });
   },
 
   async installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
@@ -485,15 +509,27 @@ function createMockScan(): ScanResult {
   ];
   const otherMods = [
     record({
-      id: "everest-core",
-      name: "EverestCore",
-      fileName: "EverestCore.zip",
-      relativePath: "Mods/EverestCore.zip",
+      id: "builtin-everest",
+      name: "Everest",
+      fileName: "Everest",
+      relativePath: "Celeste/Everest",
       kind: "mod",
       enabled: true,
       readOnly: true,
       protected: true,
-      description: "Everest 核心运行时。",
+      description: "Celeste 的 Mod 加载器，安装在游戏根目录。",
+      version: "1.4980.0"
+    }),
+    record({
+      id: "builtin-everest-core",
+      name: "EverestCore",
+      fileName: "EverestCore",
+      relativePath: "Celeste/EverestCore",
+      kind: "mod",
+      enabled: true,
+      readOnly: true,
+      protected: true,
+      description: "Everest 内置核心依赖，由 Everest 安装器维护。",
       version: "1.4980.0"
     }),
     record({
@@ -587,6 +623,30 @@ function createMockCatalog(): ModCatalogEntry[] {
     catalogEntry("wegfan", "Aqua Shrine", "1.0.0", "Map", "https://celeste.weg.fan/api/v2/download/files/aqua", ["aqua-hash"]),
     catalogEntry("everestMirror", "SpeedrunTool", "3.18.2", "Mod", "https://gamebanana.com/mmdl/3333", ["speedrun-hash"])
   ];
+}
+
+function createMockEverestReleases(): EverestRelease[] {
+  return [
+    everestRelease("stable", 4980, "2026-05-21T18:15:00Z", "2f0a7cdb95ef", 43_600_000),
+    everestRelease("stable", 4970, "2026-03-08T10:20:00Z", "714c9f30254a", 42_900_000),
+    everestRelease("beta", 5011, "2026-05-30T09:42:00Z", "90bb31d6c4aa", 44_200_000),
+    everestRelease("beta", 5004, "2026-05-18T14:10:00Z", "aa72cc19334e", 44_000_000),
+    everestRelease("dev", 5033, "2026-06-02T22:05:00Z", "d7c92f4b11d0", 45_100_000),
+    everestRelease("dev", 5027, "2026-06-01T21:34:00Z", "6f1d0a77be6a", 45_000_000)
+  ];
+}
+
+function everestRelease(branch: string, version: number, date: string, commit: string, size: number): EverestRelease {
+  return {
+    branch,
+    version,
+    date,
+    commit,
+    mainFileSize: size,
+    mainDownload: `https://example.invalid/everest/${branch}/${version}.zip`,
+    mirrorDownload: `https://celeste.weg.fan/api/v2/download/everest/${version}`,
+    isNative: true
+  };
 }
 
 function catalogEntry(
