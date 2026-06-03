@@ -462,6 +462,7 @@ struct EverestCatalogEntry {
     version: Option<String>,
     last_update: Option<i64>,
     size: Option<u64>,
+    #[serde(rename = "URL")]
     url: Option<String>,
     #[serde(rename = "xxHash", default)]
     xx_hash: Vec<String>,
@@ -679,6 +680,7 @@ Helper:
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "Helper");
         assert_eq!(entries[0].version, "1.2.3");
+        assert_eq!(entries[0].download_url, "https://gamebanana.com/mmdl/456");
         assert_eq!(entries[0].xx_hash, vec!["abcdef0123456789"]);
         assert_eq!(entries[0].game_banana_file_id, Some(456));
     }

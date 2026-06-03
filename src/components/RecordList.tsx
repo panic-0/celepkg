@@ -390,14 +390,17 @@ function ModTable({
 }
 
 function InlineUpdateButton({ candidate, onUpdate }: { candidate: ModUpdateCandidate; onUpdate: (candidate: ModUpdateCandidate) => void }) {
+  const hasDownloadUrl = candidate.entry.downloadUrl.trim().length > 0;
   return (
     <button
       className="record-update-button"
+      disabled={!hasDownloadUrl}
       onClick={(event) => {
         event.stopPropagation();
+        if (!hasDownloadUrl) return;
         onUpdate(candidate);
       }}
-      title={`更新到 ${candidate.entry.version || "目录最新版本"}`}
+      title={hasDownloadUrl ? `更新到 ${candidate.entry.version || "目录最新版本"}` : "该目录条目没有下载地址"}
     >
       <Download size={13} />
       更新

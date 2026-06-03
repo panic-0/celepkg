@@ -68,6 +68,10 @@ export function App() {
     }
     return byRecordId;
   }, [modUpdateResult.updates]);
+  const downloadableModUpdates = useMemo(
+    () => modUpdateResult.updates.filter((candidate) => candidate.entry.downloadUrl.trim().length > 0),
+    [modUpdateResult.updates]
+  );
 
   useEffect(() => {
     if (configWarnings.length && !celestePath.trim()) setIssuesOpen(true);
@@ -147,7 +151,7 @@ export function App() {
   }
 
   async function updateAllMods() {
-    const candidates = [...modUpdateResult.updates];
+    const candidates = [...downloadableModUpdates];
     if (!candidates.length) return;
     if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
     try {
@@ -359,7 +363,7 @@ export function App() {
             scrollMemory={scrollMemory}
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
-            modUpdateCount={modUpdateResult.updates.length}
+            modUpdateCount={downloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
