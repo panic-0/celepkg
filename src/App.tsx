@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { checkModUpdates, createOperationId, updateMod } from "./api";
+import { checkModUpdates, createOperationId, installMod, previewModUpdateMetadata, searchModCatalog, updateMod } from "./api";
 import { BackupManager } from "./components/BackupManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
@@ -21,7 +21,8 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import type { ModDownloadProgress, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
+import type { Dependency, ModCatalogEntry, ModDownloadProgress, ModRecord, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
+import { normalizeDependencyName } from "./utils/dependencies";
 import { isDraftEnabled, readError } from "./utils/format";
 import { isMockMode } from "./mockApi";
 
@@ -58,7 +59,9 @@ export function App() {
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [modDownloadProgress, setModDownloadProgress] = useState<ModDownloadProgress | null>(null);
   const [modDownloadBatchLabel, setModDownloadBatchLabel] = useState("");
+  const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
   const activeDownloadOperationId = useRef<string | null>(null);
+  const completedModUpdatePaths = useRef<Set<string>>(new Set());
   const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const mockDownloadTimer = useRef<number | null>(null);
@@ -214,18 +217,19 @@ export function App() {
     const candidates = [...downloadableModUpdates];
     if (!candidates.length) return;
     if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
+    let updatedCount = 0;
+    completedModUpdatePaths.current.clear();
     try {
       for (const [index, candidate] of candidates.entries()) {
-        const operationId = createOperationId("mod-update");
-        startModDownloadProgress(candidate, operationId, `${index + 1}/${candidates.length}`);
-        setLoading(true, `正在更新 Mod (${index + 1}/${candidates.length})...`);
-        const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId);
-        clearMockDownloadTimer();
-        setScan(result.scan);
-        removeUpdatedCandidate(candidate);
-        finishModDownloadProgress(operationId, index === candidates.length - 1 ? 800 : 0);
+        if (completedModUpdatePaths.current.has(candidate.installed.absolutePath)) continue;
+        const updated = await performModUpdate(
+          candidate,
+          `${index + 1}/${candidates.length}`,
+          `正在更新 Mod (${index + 1}/${candidates.length})...`
+        );
+        if (updated) updatedCount += 1;
       }
-      notifier.showSuccess(`已更新 ${candidates.length} 个 Mod`);
+      notifier.showSuccess(`已更新 ${updatedCount} 个 Mod`);
     } catch (error) {
       const message = readError(error);
       markDownloadProgressError();
@@ -235,24 +239,163 @@ export function App() {
     }
   }
 
-  async function updateModCandidate(candidate: ModUpdateCandidate) {
+  async function updateModCandidate(candidate: ModUpdateCandidate, batchLabel = "") {
+    const dependencyPlan = await prepareDependencyUpdates(candidate);
+    if (!dependencyPlan) return false;
+    const dependenciesUpdated = await applyDependencyPlan(dependencyPlan);
+    if (!dependenciesUpdated) return false;
+    return await performModUpdate(
+      candidate,
+      batchLabel,
+      batchLabel ? `正在更新 Mod (${batchLabel})...` : `正在更新 ${candidate.installed.name}...`
+    );
+  }
+
+  async function performModUpdate(candidate: ModUpdateCandidate, batchLabel = "", message = `正在更新 ${candidate.installed.name}...`) {
     const operationId = createOperationId("mod-update");
     try {
-      startModDownloadProgress(candidate, operationId);
-      setLoading(true, `正在更新 ${candidate.installed.name}...`);
+      startModDownloadProgress(candidate, operationId, batchLabel);
+      setLoading(true, message);
       const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId);
       clearMockDownloadTimer();
       setScan(result.scan);
       removeUpdatedCandidate(candidate);
       finishModDownloadProgress(operationId, 800);
       notifier.showSuccess(`已更新 ${candidate.installed.name}`);
+      return true;
     } catch (error) {
       const message = readError(error);
       markDownloadProgressError();
       notifier.showError(message);
+      return false;
     } finally {
       setLoading(false);
     }
+  }
+
+  async function prepareDependencyUpdates(candidate: ModUpdateCandidate): Promise<DependencyUpdatePlan | null> {
+    let metadata;
+    try {
+      setLoading(true, `正在检查 ${candidate.installed.name} 的依赖...`);
+      metadata = await previewModUpdateMetadata(celestePath, candidate.entry);
+    } catch (error) {
+      const message = readError(error);
+      notifier.showWarning(message);
+      if (!window.confirm(`无法预览 ${candidate.installed.name} 更新后的依赖。仍然继续更新？`)) return null;
+      return { candidate, choice: "none", issues: [] };
+    } finally {
+      setLoading(false);
+    }
+
+    const issues = dependencyIssuesForMetadata(metadata.dependencies, false).concat(
+      dependencyIssuesForMetadata(metadata.optionalDependencies, true)
+    );
+    if (!issues.length) return { candidate, choice: "none", issues: [] };
+
+    const choice = await requestDependencyChoice(candidate, issues);
+    if (!choice) return null;
+    return { candidate, choice, issues };
+  }
+
+  async function applyDependencyPlan(plan: DependencyUpdatePlan) {
+    if (plan.choice === "none") return true;
+    const selectedIssues = plan.issues.filter((issue) => !issue.optional || plan.choice === "all");
+    const actions: DependencyUpdateAction[] = [];
+    const unavailable: DependencyIssue[] = [];
+    for (const issue of selectedIssues) {
+      const action = await resolveDependencyAction(issue);
+      if (action) actions.push(action);
+      else unavailable.push(issue);
+    }
+    if (unavailable.length) {
+      const text = unavailable.map(formatDependencyIssue).join("\n");
+      if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续覆盖目标 Mod？`)) return false;
+    }
+    for (const action of actions) {
+      const result =
+        action.kind === "update"
+          ? await performModUpdate(action.candidate, "", `正在更新依赖 ${action.name}...`)
+          : await performDependencyInstall(action.entry);
+      if (!result) return false;
+    }
+    return true;
+  }
+
+  function dependencyIssuesForMetadata(dependencies: Dependency[], optional: boolean): DependencyIssue[] {
+    const installedIndex = buildInstalledDependencyIndex([...scan.maps, ...scan.otherMods]);
+    const issues: DependencyIssue[] = [];
+    for (const dependency of dependencies) {
+      const installed = installedIndex.get(normalizeDependencyName(dependency.name));
+      if (!installed) {
+        issues.push({ dependency, optional, reason: "missing" });
+        continue;
+      }
+      if (dependency.version.trim() && versionTooLow(installed.metadata.version, dependency.version)) {
+        issues.push({ dependency, installed, optional, reason: "tooLow" });
+      }
+    }
+    return issues;
+  }
+
+  async function resolveDependencyAction(issue: DependencyIssue): Promise<DependencyUpdateAction | null> {
+    if (isBuiltinDependencyName(issue.dependency.name)) return null;
+    if (issue.installed) {
+      const candidate = downloadableModUpdates.find((item) => item.installed.recordId === issue.installed?.id);
+      if (candidate && dependencyEntrySatisfies(candidate.entry, issue.dependency)) {
+        return { kind: "update", name: issue.dependency.name, candidate };
+      }
+    }
+    const entry = await findCatalogEntryForDependency(issue.dependency);
+    if (!entry) return null;
+    if (issue.installed) {
+      return {
+        kind: "update",
+        name: issue.dependency.name,
+        candidate: updateCandidateFromRecord(entry, issue.installed)
+      };
+    }
+    return { kind: "install", name: issue.dependency.name, entry };
+  }
+
+  async function findCatalogEntryForDependency(dependency: Dependency): Promise<ModCatalogEntry | null> {
+    try {
+      const result = await searchModCatalog(dependency.name, modCatalogSources);
+      const normalized = normalizeDependencyName(dependency.name);
+      return (
+        result.entries.find((entry) => normalizeDependencyName(entry.name) === normalized && dependencyEntrySatisfies(entry, dependency)) ??
+        null
+      );
+    } catch (error) {
+      notifier.showWarning(readError(error));
+      return null;
+    }
+  }
+
+  async function performDependencyInstall(entry: ModCatalogEntry) {
+    const operationId = createOperationId("mod-install");
+    try {
+      startCatalogDownloadProgress(entry, operationId);
+      setLoading(true, `正在安装依赖 ${entry.name}...`);
+      const result = await installMod(celestePath, entry, operationId);
+      clearMockDownloadTimer();
+      setScan(result.scan);
+      finishModDownloadProgress(operationId, 800);
+      notifier.showSuccess(`已安装依赖 ${entry.name}`);
+      return true;
+    } catch (error) {
+      const message = readError(error);
+      markDownloadProgressError();
+      notifier.showError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function requestDependencyChoice(candidate: ModUpdateCandidate, issues: DependencyIssue[]) {
+    return new Promise<DependencyUpdateChoice | null>((resolve) => {
+      setDependencyPrompt({ candidate, issues, resolve });
+    });
   }
 
   function startModDownloadProgress(candidate: ModUpdateCandidate, operationId: string, batchLabel = "") {
@@ -267,6 +410,23 @@ export function App() {
       downloaded: 0,
       total: candidate.entry.size,
       url: candidate.entry.downloadUrl
+    };
+    setModDownloadProgress(initialProgress);
+    if (isMockMode()) runMockDownloadProgress(initialProgress);
+  }
+
+  function startCatalogDownloadProgress(entry: ModCatalogEntry, operationId: string) {
+    clearMockDownloadTimer();
+    clearProgressClearTimer();
+    activeDownloadOperationId.current = operationId;
+    setModDownloadBatchLabel("");
+    const initialProgress: ModDownloadProgress = {
+      operationId,
+      modName: entry.name,
+      phase: "downloading",
+      downloaded: 0,
+      total: entry.size,
+      url: entry.downloadUrl
     };
     setModDownloadProgress(initialProgress);
     if (isMockMode()) runMockDownloadProgress(initialProgress);
@@ -327,6 +487,7 @@ export function App() {
   }
 
   function removeUpdatedCandidate(candidate: ModUpdateCandidate) {
+    completedModUpdatePaths.current.add(candidate.installed.absolutePath);
     setModUpdateResult((current) => ({
       ...current,
       updates: current.updates.filter((item) => item.installed.absolutePath !== candidate.installed.absolutePath),
@@ -546,6 +707,15 @@ export function App() {
         scanWarnings={scan.warnings}
         onClose={() => setIssuesOpen(false)}
       />
+      {dependencyPrompt && (
+        <DependencyUpdateDialog
+          prompt={dependencyPrompt}
+          onClose={(choice) => {
+            dependencyPrompt.resolve(choice);
+            setDependencyPrompt(null);
+          }}
+        />
+      )}
       <ToastHost notice={notice} onClose={clearNotice} />
     </main>
   );
@@ -553,6 +723,150 @@ export function App() {
 
 function isWorkspaceLoadingMessage(message: string) {
   return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
+}
+
+type DependencyUpdateChoice = "none" | "required" | "all";
+
+type DependencyIssue = {
+  dependency: Dependency;
+  installed?: ModRecord;
+  optional: boolean;
+  reason: "missing" | "tooLow";
+};
+
+type DependencyUpdateAction =
+  | { kind: "update"; name: string; candidate: ModUpdateCandidate }
+  | { kind: "install"; name: string; entry: ModCatalogEntry };
+
+type DependencyUpdatePlan = {
+  candidate: ModUpdateCandidate;
+  choice: DependencyUpdateChoice;
+  issues: DependencyIssue[];
+};
+
+type DependencyPromptState = {
+  candidate: ModUpdateCandidate;
+  issues: DependencyIssue[];
+  resolve: (choice: DependencyUpdateChoice | null) => void;
+};
+
+function DependencyUpdateDialog({
+  prompt,
+  onClose
+}: {
+  prompt: DependencyPromptState;
+  onClose: (choice: DependencyUpdateChoice | null) => void;
+}) {
+  const requiredCount = prompt.issues.filter((issue) => !issue.optional).length;
+  const optionalCount = prompt.issues.length - requiredCount;
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dependency-update-title">
+        <div className="confirm-dialog-heading">
+          <LoaderCircle size={18} />
+          <h3 id="dependency-update-title">更新前依赖检查</h3>
+        </div>
+        <p>{`${prompt.candidate.installed.name} 更新后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
+        <div className="dependency-preview-list">
+          {prompt.issues.map((issue) => (
+            <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>
+              <strong>{issue.dependency.name}</strong>
+              <span>{issue.optional ? "可选依赖" : "必需依赖"}</span>
+              <small>{formatDependencyIssue(issue)}</small>
+            </div>
+          ))}
+        </div>
+        <div className="confirm-dialog-actions">
+          <button onClick={() => onClose(null)}>取消</button>
+          <button onClick={() => onClose("none")}>不更新依赖</button>
+          <button className="confirm-primary-button" onClick={() => onClose("required")}>
+            更新必须
+          </button>
+          <button className="confirm-primary-button" onClick={() => onClose("all")}>
+            更新全部
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function buildInstalledDependencyIndex(records: ModRecord[]) {
+  const index = new Map<string, ModRecord>();
+  for (const record of records) {
+    for (const alias of [
+      record.id,
+      record.name,
+      record.metadata.name,
+      record.fileName,
+      record.fileName.replace(/\.zip$/i, ""),
+      record.relativePath
+    ]) {
+      const normalized = normalizeDependencyName(alias);
+      if (normalized) index.set(normalized, record);
+    }
+  }
+  return index;
+}
+
+function updateCandidateFromRecord(entry: ModCatalogEntry, record: ModRecord): ModUpdateCandidate {
+  return {
+    entry,
+    installed: {
+      recordId: record.id,
+      name: record.name,
+      fileName: record.fileName,
+      relativePath: record.relativePath,
+      absolutePath: record.absolutePath,
+      version: record.metadata.version,
+      hash: ""
+    },
+    updateAvailable: true,
+    reason: "依赖版本需要更新"
+  };
+}
+
+function dependencyEntrySatisfies(entry: ModCatalogEntry, dependency: Dependency) {
+  return entry.downloadUrl.trim().length > 0 && !versionTooLow(entry.version, dependency.version);
+}
+
+function formatDependencyIssue(issue: DependencyIssue) {
+  const requiredVersion = issue.dependency.version.trim() || "未指定版本";
+  if (issue.reason === "missing") return `缺少 ${requiredVersion}`;
+  return `需要 ${requiredVersion}，本地 ${issue.installed?.metadata.version || "未知版本"}`;
+}
+
+function versionTooLow(installedVersion: string, requiredVersion: string) {
+  const installed = parseNumericVersion(installedVersion);
+  const required = parseNumericVersion(requiredVersion);
+  if (!installed || !required) return false;
+  return compareNumericVersions(installed, required) < 0;
+}
+
+function parseNumericVersion(value: string) {
+  const matches = value.match(/\d+/g);
+  return matches?.map((part) => Number.parseInt(part, 10)).filter((part) => Number.isFinite(part)) ?? null;
+}
+
+function compareNumericVersions(left: number[], right: number[]) {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function isBuiltinDependencyName(name: string) {
+  const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return (
+    normalized.startsWith("everest") ||
+    normalized === "celeste" ||
+    normalized === "monocle" ||
+    normalized === "fna" ||
+    normalized === "dotnet" ||
+    normalized === "netframework" ||
+    normalized === "microsoftnetframework"
+  );
 }
 
 const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);

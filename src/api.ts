@@ -7,6 +7,7 @@ import {
   validateLaunchResult,
   validateModCatalogSearchResult,
   validateModInstallResult,
+  validateModMetadata,
   validateModUpdateCheckResult,
   validateNullableString,
   validateProfilesState,
@@ -21,6 +22,7 @@ import type {
   ModCatalogSearchResult,
   ModCatalogSourceKind,
   ModInstallResult,
+  ModMetadata,
   ModUpdateCheckResult,
   Profile,
   ProfilesState,
@@ -95,6 +97,11 @@ export async function searchModCatalog(query: string, sources: ModCatalogSourceK
 export async function checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
   if (isMockMode()) return mockApi.checkModUpdates(celestePath, sources);
   return invokeChecked("check_mod_updates", validateModUpdateCheckResult, { celestePath, sources });
+}
+
+export async function previewModUpdateMetadata(celestePath: string, entry: ModCatalogEntry): Promise<ModMetadata> {
+  if (isMockMode()) return mockApi.previewModUpdateMetadata(celestePath, entry);
+  return invokeChecked("preview_mod_update_metadata", validateModMetadata, { celestePath, entry });
 }
 
 export async function installMod(

@@ -6,6 +6,7 @@ import type {
   ModCatalogSearchResult,
   ModCatalogSourceKind,
   ModInstallResult,
+  ModMetadata,
   ModRecord,
   ModUpdateCheckResult,
   Profile,
@@ -189,6 +190,10 @@ export const mockApi = {
       matched: allMatched,
       warnings: []
     });
+  },
+
+  async previewModUpdateMetadata(_celestePath: string, entry: ModCatalogEntry): Promise<ModMetadata> {
+    return clone(mockUpdateMetadata(entry));
   },
 
   async installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
@@ -599,6 +604,27 @@ function catalogEntry(
     size: 12_345_678,
     lastUpdate: 1770040000,
     xxHash
+  };
+}
+
+function mockUpdateMetadata(entry: ModCatalogEntry): ModMetadata {
+  if (entry.name === "Galactica") {
+    return {
+      name: entry.name,
+      version: entry.version,
+      author: "Mock Author",
+      description: "",
+      dependencies: [{ name: "CommunalHelper", version: "1.24.0" }],
+      optionalDependencies: [{ name: "SpeedrunTool", version: "3.19.0" }]
+    };
+  }
+  return {
+    name: entry.name,
+    version: entry.version,
+    author: "Mock Author",
+    description: "",
+    dependencies: [],
+    optionalDependencies: []
   };
 }
 

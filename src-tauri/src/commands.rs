@@ -1,6 +1,6 @@
 use crate::domain::{
     AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult,
-    ModCatalogSourceKind, ModDownloadProgress, ModInstallResult, ModUpdateCheckResult,
+    ModCatalogSourceKind, ModDownloadProgress, ModInstallResult, ModMetadata, ModUpdateCheckResult,
     ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
@@ -177,6 +177,20 @@ pub async fn check_mod_updates(
     })
     .await
     .map_err(|error| format!("检查 Mod 更新任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn preview_mod_update_metadata(
+    celeste_path: String,
+    entry: crate::domain::ModCatalogEntry,
+) -> Result<ModMetadata, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state()?;
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
+        services::mod_catalog::preview_update_metadata(&path, &entry)
+    })
+    .await
+    .map_err(|error| format!("预览 Mod 更新依赖任务失败：{error}"))?
 }
 
 #[tauri::command]

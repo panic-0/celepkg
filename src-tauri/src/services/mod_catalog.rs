@@ -1,9 +1,9 @@
 use crate::domain::{
     InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind,
-    ModDownloadProgress, ModInstallResult, ModRecord, ModUpdateCandidate, ModUpdateCheckResult,
-    ProfilesState,
+    ModDownloadProgress, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
+    ModUpdateCheckResult, ProfilesState,
 };
-use crate::utils::{normalize_dependency_name, stable_id};
+use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -11,6 +11,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use xxhash_rust::xxh64::Xxh64;
+use zip::ZipArchive;
 
 const EVEREST_MIRROR_UPDATE_URL: &str =
     "https://everestapi.github.io/updatermirror/everest_update.yaml";
@@ -134,6 +135,23 @@ pub fn xxh64_file(path: &Path) -> Result<String, String> {
         hasher.update(&buffer[..read]);
     }
     Ok(format!("{:016x}", hasher.digest()))
+}
+
+pub fn preview_update_metadata(
+    celeste_path: &Path,
+    entry: &ModCatalogEntry,
+) -> Result<ModMetadata, String> {
+    let (temp_path, _) = download_entry(
+        celeste_path,
+        entry,
+        ModDownloadReporter {
+            operation_id: "",
+            progress: None,
+        },
+    )?;
+    let metadata = read_zip_metadata(&temp_path);
+    let _ = fs::remove_file(&temp_path);
+    metadata
 }
 
 pub fn download_and_install(
@@ -287,6 +305,29 @@ fn emit_download_progress(
             url: url.to_string(),
         });
     }
+}
+
+fn read_zip_metadata(path: &Path) -> Result<ModMetadata, String> {
+    let file = File::open(path).map_err(|error| format!("打开下载文件失败：{error}"))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| format!("读取 Mod 压缩包失败：{error}"))?;
+    for index in 0..archive.len() {
+        let mut file = archive
+            .by_index(index)
+            .map_err(|error| format!("读取压缩包条目失败：{error}"))?;
+        if is_everest_yaml_entry(&normalize_slash(file.name())) {
+            let mut text = String::new();
+            file.read_to_string(&mut text)
+                .map_err(|error| format!("读取 everest.yaml 失败：{error}"))?;
+            return Ok(crate::parsers::everest::parse_metadata(&text));
+        }
+    }
+    Ok(ModMetadata::default())
+}
+
+fn is_everest_yaml_entry(entry: &str) -> bool {
+    let basename = entry.rsplit('/').next().unwrap_or(entry);
+    basename.eq_ignore_ascii_case("everest.yaml") || basename.eq_ignore_ascii_case("everest.yml")
 }
 
 fn mirror_urls(url: &str) -> Vec<String> {

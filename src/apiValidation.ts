@@ -271,7 +271,7 @@ function validateModRecord(value: unknown, path: string): ModRecord {
   };
 }
 
-function validateModMetadata(value: unknown, path: string): ModMetadata {
+export function validateModMetadata(value: unknown, path = "mod metadata"): ModMetadata {
   const object = objectAt(value, path);
   return {
     name: stringAt(object.name, `${path}.name`),

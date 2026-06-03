@@ -1654,6 +1654,43 @@ button.profile {
   padding: 7px;
 }
 
+.dependency-preview-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.dependency-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  border: 1px solid #dce4ec;
+  border-radius: 7px;
+  background: #fbfcfd;
+  padding: 7px 8px;
+}
+
+.dependency-preview-row strong,
+.dependency-preview-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dependency-preview-row span {
+  color: #657384;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dependency-preview-row small {
+  grid-column: 1 / -1;
+  color: #657384;
+  font-size: 12px;
+}
+
 .restore-preview-row strong,
 .restore-preview-row span,
 .restore-preview-row small,
