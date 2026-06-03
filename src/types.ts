@@ -134,6 +134,61 @@ export type BackupInfo = {
 
 export type RestoreScope = "game";
 
+export type ModCatalogSourceKind = "everest" | "everestMirror" | "wegfan";
+
+export type ModCatalogEntry = {
+  source: ModCatalogSourceKind;
+  id: string;
+  name: string;
+  version: string;
+  downloadUrl: string;
+  pageUrl: string;
+  gameBananaType: string;
+  gameBananaId: number | null;
+  gameBananaFileId: number | null;
+  size: number | null;
+  lastUpdate: number | null;
+  xxHash: string[];
+};
+
+export type ModCatalogSearchResult = {
+  sources: ModCatalogSourceKind[];
+  entries: ModCatalogEntry[];
+  warnings: string[];
+};
+
+export type InstalledModMatch = {
+  recordId: string;
+  name: string;
+  fileName: string;
+  relativePath: string;
+  absolutePath: string;
+  version: string;
+  hash: string;
+};
+
+export type ModUpdateCandidate = {
+  entry: ModCatalogEntry;
+  installed: InstalledModMatch;
+  updateAvailable: boolean;
+  reason: string;
+};
+
+export type ModUpdateCheckResult = {
+  sources: ModCatalogSourceKind[];
+  updates: ModUpdateCandidate[];
+  matched: ModUpdateCandidate[];
+  warnings: string[];
+};
+
+export type ModInstallResult = {
+  entry: ModCatalogEntry;
+  destinationPath: string;
+  replacedPath: string | null;
+  hash: string;
+  scan: ScanResult;
+};
+
 export type ScanTiming = {
   stage: string;
   ms: number;

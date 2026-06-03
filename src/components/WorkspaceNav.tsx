@@ -4,6 +4,7 @@ import {
   Archive,
   Gamepad2,
   Layers,
+  PackageSearch,
   Search,
   Settings2,
   SlidersHorizontal,
@@ -102,6 +103,10 @@ export function WorkspaceNav({
           <strong className="nav-count" title={`${enabledModCount}/${totalModCount} Mod 启用`}>
             {enabledModCount}/{totalModCount}
           </strong>
+        </button>
+        <button className={activeView === "catalog" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("catalog")}>
+          <PackageSearch size={18} />
+          <span>获取更新</span>
         </button>
         <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
           <UserRound size={18} />

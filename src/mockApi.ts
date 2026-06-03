@@ -2,7 +2,12 @@ import type {
   BackupInfo,
   ConfigResponse,
   MapStats,
+  ModCatalogEntry,
+  ModCatalogSearchResult,
+  ModCatalogSourceKind,
+  ModInstallResult,
   ModRecord,
+  ModUpdateCheckResult,
   Profile,
   ProfilesState,
   RestoreScope,
@@ -44,6 +49,7 @@ let profiles: ProfilesState = {
 };
 
 let scan = createMockScan();
+const catalogEntries = createMockCatalog();
 let backups: BackupInfo[] = [
   backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\.celepkg\\backups\\1770048600000000000-auto", true, true),
   backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\.celepkg\\backups\\1770045000000000000-auto", true, false),
@@ -98,6 +104,102 @@ export const mockApi = {
   async rescanCeleste(celestePath: string): Promise<ScanResult> {
     scan = { ...scan, celestePath, profiles, selectedSaveFiles, timings: createTimings() };
     return clone(scan);
+  },
+
+  async searchModCatalog(query: string, sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
+    const selectedSources = sources.length ? sources : (["everestMirror", "wegfan"] satisfies ModCatalogSourceKind[]);
+    const needle = query.trim().toLowerCase();
+    const entries = catalogEntries
+      .filter((entry) => selectedSources.includes(entry.source))
+      .filter((entry) => !needle || `${entry.name} ${entry.version} ${entry.gameBananaType}`.toLowerCase().includes(needle));
+    return clone({
+      sources: selectedSources,
+      entries,
+      warnings: selectedSources.includes("everest") ? ["Mock：官方指针源暂时较慢，已继续显示其他结果。"] : []
+    });
+  },
+
+  async checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
+    void celestePath;
+    const selectedSources = sources.length ? sources : (["everestMirror", "wegfan"] satisfies ModCatalogSourceKind[]);
+    const installed = [...scan.maps, ...scan.otherMods];
+    const matched = catalogEntries
+      .filter((entry) => selectedSources.includes(entry.source))
+      .flatMap((entry) => {
+        const record = installed.find((item) => item.name.toLowerCase() === entry.name.toLowerCase());
+        if (!record) return [];
+        const updateAvailable = ["CommunalHelper", "Galactica"].includes(record.name);
+        return [
+          {
+            entry,
+            installed: {
+              recordId: record.id,
+              name: record.name,
+              fileName: record.fileName,
+              relativePath: record.relativePath,
+              absolutePath: record.absolutePath,
+              version: record.metadata.version,
+              hash: updateAvailable ? "old-local-hash" : entry.xxHash[0]
+            },
+            updateAvailable,
+            reason: updateAvailable ? "本地文件哈希不在目录记录中" : "本地文件哈希已在目录记录中"
+          }
+        ];
+      });
+    return clone({
+      sources: selectedSources,
+      updates: matched.filter((item) => item.updateAvailable),
+      matched,
+      warnings: []
+    });
+  },
+
+  async installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
+    const installed = record({
+      id: `mock-installed-${entry.id}`,
+      name: entry.name,
+      fileName: `${entry.name}.zip`,
+      relativePath: `Mods/${entry.name}.zip`,
+      kind: entry.gameBananaType.toLowerCase() === "map" ? "map" : "mod",
+      enabled: false,
+      description: "Mock 安装的目录条目。",
+      version: entry.version
+    });
+    if (installed.kind === "map") {
+      scan = { ...scan, maps: [...scan.maps, installed] };
+    } else {
+      scan = { ...scan, otherMods: [...scan.otherMods, installed] };
+    }
+    return clone({
+      entry,
+      destinationPath: `${celestePath}\\Mods\\${entry.name}.zip`,
+      replacedPath: null,
+      hash: entry.xxHash[0] ?? "mock-hash",
+      scan
+    });
+  },
+
+  async updateMod(celestePath: string, entry: ModCatalogEntry, installedPath: string): Promise<ModInstallResult> {
+    scan = updateRecord(scan, entry.name.toLowerCase().replace(/\s+/g, "-"), (item) => ({
+      ...item,
+      metadata: { ...item.metadata, version: entry.version }
+    }));
+    scan = {
+      ...scan,
+      maps: scan.maps.map((item) =>
+        item.name === entry.name ? { ...item, metadata: { ...item.metadata, version: entry.version } } : item
+      ),
+      otherMods: scan.otherMods.map((item) =>
+        item.name === entry.name ? { ...item, metadata: { ...item.metadata, version: entry.version } } : item
+      )
+    };
+    return clone({
+      entry,
+      destinationPath: installedPath || `${celestePath}\\Mods\\${entry.name}.zip`,
+      replacedPath: installedPath || `${celestePath}\\Mods\\${entry.name}.zip`,
+      hash: entry.xxHash[0] ?? "mock-hash",
+      scan
+    });
   },
 
   async saveProfile(profileDraft: Partial<Profile> & { name: string }): Promise<ProfilesState> {
@@ -420,6 +522,42 @@ function createMockScan(): ScanResult {
     selectedSaveFiles,
     warnings: ["内置依赖版本无法确认：FNA 22.8.0，无法判断本地版本"],
     timings: createTimings()
+  };
+}
+
+function createMockCatalog(): ModCatalogEntry[] {
+  return [
+    catalogEntry("everestMirror", "CommunalHelper", "1.24.3", "Mod", "https://gamebanana.com/mmdl/1111", ["new-communal-hash"]),
+    catalogEntry("everestMirror", "Galactica", "2.1.0", "Map", "https://gamebanana.com/mmdl/2222", ["new-galactica-hash"]),
+    catalogEntry("wegfan", "Strawberry Jam Collab", "1.2.9", "Map", "https://celeste.weg.fan/api/v2/download/files/sj", [
+      "current-sj-hash"
+    ]),
+    catalogEntry("wegfan", "Aqua Shrine", "1.0.0", "Map", "https://celeste.weg.fan/api/v2/download/files/aqua", ["aqua-hash"]),
+    catalogEntry("everestMirror", "SpeedrunTool", "3.18.2", "Mod", "https://gamebanana.com/mmdl/3333", ["speedrun-hash"])
+  ];
+}
+
+function catalogEntry(
+  source: ModCatalogSourceKind,
+  name: string,
+  version: string,
+  gameBananaType: string,
+  downloadUrl: string,
+  xxHash: string[]
+): ModCatalogEntry {
+  return {
+    source,
+    id: `${source}-${name.toLowerCase().replace(/\s+/g, "-")}`,
+    name,
+    version,
+    downloadUrl,
+    pageUrl: `https://gamebanana.com/mods/mock-${encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"))}`,
+    gameBananaType,
+    gameBananaId: 1000,
+    gameBananaFileId: 2000,
+    size: 12_345_678,
+    lastUpdate: 1770040000,
+    xxHash
   };
 }
 

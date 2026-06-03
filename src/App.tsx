@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BackupManager } from "./components/BackupManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
+import { ModCatalogManager } from "./components/ModCatalogManager";
 import { ModDetail } from "./components/ModDetail";
 import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
@@ -133,7 +134,10 @@ export function App() {
 
       <section
         className={`workspace ${
-          workspaceView.activeView === "profiles" || workspaceView.activeView === "settings" || workspaceView.activeView === "backups"
+          workspaceView.activeView === "profiles" ||
+          workspaceView.activeView === "settings" ||
+          workspaceView.activeView === "backups" ||
+          workspaceView.activeView === "catalog"
             ? "management-view"
             : ""
         }`}
@@ -230,6 +234,15 @@ export function App() {
             onBackupRestore={backups.restoreSelectedBackup}
             onBackupsCleanup={backups.cleanupOldAutoBackups}
             onBackupsRefresh={backups.refreshBackups}
+          />
+        ) : workspaceView.activeView === "catalog" ? (
+          <ModCatalogManager
+            celestePath={celestePath}
+            loading={loading}
+            notifier={notifier}
+            scan={scan}
+            setLoading={setLoading}
+            setScan={setScan}
           />
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (
           <MapDetail

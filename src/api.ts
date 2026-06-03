@@ -5,13 +5,28 @@ import {
   validateCelestePathResponse,
   validateConfigResponse,
   validateLaunchResult,
+  validateModCatalogSearchResult,
+  validateModInstallResult,
+  validateModUpdateCheckResult,
   validateNullableString,
   validateProfilesState,
   validateVoid,
   validateScanResult
 } from "./apiValidation";
 import { isMockMode, mockApi } from "./mockApi";
-import type { BackupInfo, ConfigResponse, Profile, ProfilesState, RestoreScope, ScanResult } from "./types";
+import type {
+  BackupInfo,
+  ConfigResponse,
+  ModCatalogEntry,
+  ModCatalogSearchResult,
+  ModCatalogSourceKind,
+  ModInstallResult,
+  ModUpdateCheckResult,
+  Profile,
+  ProfilesState,
+  RestoreScope,
+  ScanResult
+} from "./types";
 
 async function invokeChecked<T>(command: string, validator: (value: unknown) => T, args?: Record<string, unknown>): Promise<T> {
   return validator(await invoke<unknown>(command, args));
@@ -60,6 +75,26 @@ export async function scanCeleste(celestePath: string): Promise<ScanResult> {
 export async function rescanCeleste(celestePath: string): Promise<ScanResult> {
   if (isMockMode()) return mockApi.rescanCeleste(celestePath);
   return invokeChecked("rescan_celeste", validateScanResult, { celestePath });
+}
+
+export async function searchModCatalog(query: string, sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
+  if (isMockMode()) return mockApi.searchModCatalog(query, sources);
+  return invokeChecked("search_mod_catalog", validateModCatalogSearchResult, { query, sources });
+}
+
+export async function checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
+  if (isMockMode()) return mockApi.checkModUpdates(celestePath, sources);
+  return invokeChecked("check_mod_updates", validateModUpdateCheckResult, { celestePath, sources });
+}
+
+export async function installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
+  if (isMockMode()) return mockApi.installMod(celestePath, entry);
+  return invokeChecked("install_mod", validateModInstallResult, { celestePath, entry });
+}
+
+export async function updateMod(celestePath: string, entry: ModCatalogEntry, installedPath: string): Promise<ModInstallResult> {
+  if (isMockMode()) return mockApi.updateMod(celestePath, entry, installedPath);
+  return invokeChecked("update_mod", validateModInstallResult, { celestePath, entry, installedPath });
 }
 
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {

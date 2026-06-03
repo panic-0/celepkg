@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { validateConfigResponse, validateScanResult } from "./apiValidation";
+import {
+  validateConfigResponse,
+  validateModCatalogSearchResult,
+  validateModInstallResult,
+  validateModUpdateCheckResult,
+  validateScanResult
+} from "./apiValidation";
 
 const profiles = {
   activeMapProfileId: "default-maps",
@@ -25,6 +31,36 @@ const metadata = {
   description: "",
   dependencies: [],
   optionalDependencies: []
+};
+
+const catalogEntry = {
+  source: "everestMirror",
+  id: "helper",
+  name: "Helper",
+  version: "1.2.3",
+  downloadUrl: "https://gamebanana.com/mmdl/1",
+  pageUrl: "https://gamebanana.com/mods/1",
+  gameBananaType: "Mod",
+  gameBananaId: 1,
+  gameBananaFileId: 2,
+  size: 1024,
+  lastUpdate: 1700000000,
+  xxHash: ["abc"]
+};
+
+const scanResult = {
+  celestePath: "D:/Celeste",
+  modsPath: "D:/Celeste/Mods",
+  blacklistPath: "D:/Celeste/blacklist.txt",
+  blacklistEntries: [],
+  gameExecutable: "Celeste.exe",
+  maps: [],
+  otherMods: [],
+  profiles,
+  availableSaveFiles: [],
+  selectedSaveFiles: ["0.celeste"],
+  warnings: [],
+  timings: []
 };
 
 describe("api validation", () => {
@@ -106,5 +142,51 @@ describe("api validation", () => {
         timings: []
       })
     ).toThrow("scan.maps[0].kind");
+  });
+
+  it("accepts mod catalog search and update responses", () => {
+    expect(
+      validateModCatalogSearchResult({
+        sources: ["everestMirror"],
+        entries: [catalogEntry],
+        warnings: []
+      }).entries[0].xxHash
+    ).toEqual(["abc"]);
+
+    expect(
+      validateModUpdateCheckResult({
+        sources: ["everestMirror"],
+        updates: [
+          {
+            entry: catalogEntry,
+            installed: {
+              recordId: "helper",
+              name: "Helper",
+              fileName: "Helper.zip",
+              relativePath: "Mods/Helper.zip",
+              absolutePath: "D:/Celeste/Mods/Helper.zip",
+              version: "1.0.0",
+              hash: "old"
+            },
+            updateAvailable: true,
+            reason: "hash changed"
+          }
+        ],
+        matched: [],
+        warnings: []
+      }).updates[0].entry.source
+    ).toBe("everestMirror");
+  });
+
+  it("accepts mod install responses with nested scan", () => {
+    expect(
+      validateModInstallResult({
+        entry: catalogEntry,
+        destinationPath: "D:/Celeste/Mods/Helper.zip",
+        replacedPath: null,
+        hash: "abc",
+        scan: scanResult
+      }).scan.celestePath
+    ).toBe("D:/Celeste");
   });
 });

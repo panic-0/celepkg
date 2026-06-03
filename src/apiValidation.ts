@@ -3,9 +3,16 @@ import type {
   BackupInfo,
   ConfigResponse,
   Dependency,
+  InstalledModMatch,
   MapStats,
+  ModCatalogEntry,
+  ModCatalogSearchResult,
+  ModCatalogSourceKind,
+  ModInstallResult,
   ModMetadata,
   ModRecord,
+  ModUpdateCandidate,
+  ModUpdateCheckResult,
   Profile,
   ProfilesState,
   SaveFileInfo,
@@ -94,6 +101,46 @@ export function validateBackupList(value: unknown): BackupInfo[] {
   return arrayAt(value, "backups").map((item, index) => validateBackupInfo(item, `backups[${index}]`));
 }
 
+export function validateModCatalogSearchResult(value: unknown): ModCatalogSearchResult {
+  const object = objectAt(value, "mod catalog search");
+  return {
+    sources: arrayAt(object.sources, "mod catalog search.sources").map((item, index) =>
+      validateModCatalogSourceKind(item, `mod catalog search.sources[${index}]`)
+    ),
+    entries: arrayAt(object.entries, "mod catalog search.entries").map((item, index) =>
+      validateModCatalogEntry(item, `mod catalog search.entries[${index}]`)
+    ),
+    warnings: stringArrayAt(object.warnings, "mod catalog search.warnings")
+  };
+}
+
+export function validateModUpdateCheckResult(value: unknown): ModUpdateCheckResult {
+  const object = objectAt(value, "mod update check");
+  return {
+    sources: arrayAt(object.sources, "mod update check.sources").map((item, index) =>
+      validateModCatalogSourceKind(item, `mod update check.sources[${index}]`)
+    ),
+    updates: arrayAt(object.updates, "mod update check.updates").map((item, index) =>
+      validateModUpdateCandidate(item, `mod update check.updates[${index}]`)
+    ),
+    matched: arrayAt(object.matched, "mod update check.matched").map((item, index) =>
+      validateModUpdateCandidate(item, `mod update check.matched[${index}]`)
+    ),
+    warnings: stringArrayAt(object.warnings, "mod update check.warnings")
+  };
+}
+
+export function validateModInstallResult(value: unknown): ModInstallResult {
+  const object = objectAt(value, "mod install result");
+  return {
+    entry: validateModCatalogEntry(object.entry, "mod install result.entry"),
+    destinationPath: stringAt(object.destinationPath, "mod install result.destinationPath"),
+    replacedPath: object.replacedPath === null ? null : stringAt(object.replacedPath, "mod install result.replacedPath"),
+    hash: stringAt(object.hash, "mod install result.hash"),
+    scan: validateScanResult(object.scan)
+  };
+}
+
 export function validateVoid(value: unknown): void {
   if (value !== null && typeof value !== "undefined") {
     throw new Error("API 返回数据格式异常：void 命令不应返回数据。");
@@ -109,6 +156,51 @@ function validateBackupFileEntry(value: unknown, path: string): BackupFileEntry 
     backupPath: stringAt(object.backupPath, `${path}.backupPath`),
     existed: booleanAt(object.existed, `${path}.existed`)
   };
+}
+
+function validateModCatalogEntry(value: unknown, path: string): ModCatalogEntry {
+  const object = objectAt(value, path);
+  return {
+    source: validateModCatalogSourceKind(object.source, `${path}.source`),
+    id: stringAt(object.id, `${path}.id`),
+    name: stringAt(object.name, `${path}.name`),
+    version: stringAt(object.version, `${path}.version`),
+    downloadUrl: stringAt(object.downloadUrl, `${path}.downloadUrl`),
+    pageUrl: stringAt(object.pageUrl, `${path}.pageUrl`),
+    gameBananaType: stringAt(object.gameBananaType, `${path}.gameBananaType`),
+    gameBananaId: nullableNumberAt(object.gameBananaId, `${path}.gameBananaId`),
+    gameBananaFileId: nullableNumberAt(object.gameBananaFileId, `${path}.gameBananaFileId`),
+    size: nullableNumberAt(object.size, `${path}.size`),
+    lastUpdate: nullableNumberAt(object.lastUpdate, `${path}.lastUpdate`),
+    xxHash: stringArrayAt(object.xxHash, `${path}.xxHash`)
+  };
+}
+
+function validateModUpdateCandidate(value: unknown, path: string): ModUpdateCandidate {
+  const object = objectAt(value, path);
+  return {
+    entry: validateModCatalogEntry(object.entry, `${path}.entry`),
+    installed: validateInstalledModMatch(object.installed, `${path}.installed`),
+    updateAvailable: booleanAt(object.updateAvailable, `${path}.updateAvailable`),
+    reason: stringAt(object.reason, `${path}.reason`)
+  };
+}
+
+function validateInstalledModMatch(value: unknown, path: string): InstalledModMatch {
+  const object = objectAt(value, path);
+  return {
+    recordId: stringAt(object.recordId, `${path}.recordId`),
+    name: stringAt(object.name, `${path}.name`),
+    fileName: stringAt(object.fileName, `${path}.fileName`),
+    relativePath: stringAt(object.relativePath, `${path}.relativePath`),
+    absolutePath: stringAt(object.absolutePath, `${path}.absolutePath`),
+    version: stringAt(object.version, `${path}.version`),
+    hash: stringAt(object.hash, `${path}.hash`)
+  };
+}
+
+function validateModCatalogSourceKind(value: unknown, path: string): ModCatalogSourceKind {
+  return oneOfAt(value, ["everest", "everestMirror", "wegfan"], path);
 }
 
 function validateSaveFileInfo(value: unknown, path: string): SaveFileInfo {
@@ -268,6 +360,11 @@ function numberAt(value: unknown, path: string): number {
     throw new Error(`API 返回数据格式异常：${path} 应为数字。`);
   }
   return value;
+}
+
+function nullableNumberAt(value: unknown, path: string): number | null {
+  if (value === null) return null;
+  return numberAt(value, path);
 }
 
 function oneOfAt<const Values extends readonly string[]>(value: unknown, values: Values, path: string): Values[number] {

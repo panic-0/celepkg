@@ -59,8 +59,9 @@ export function useCelePkgData() {
     [clearNotice, showNotice]
   );
 
-  const setLoading = useCallback((nextLoading: boolean) => {
+  const setLoading = useCallback((nextLoading: boolean, message?: string) => {
     setLoadingState(nextLoading);
+    if (message) setLoadingMessage(message);
     if (!nextLoading) setLoadingMessage("");
   }, []);
 
