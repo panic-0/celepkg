@@ -7,7 +7,7 @@ use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -233,22 +233,29 @@ fn download_entry(
             Ok(()) => {
                 emit_download_progress(reporter, &entry.name, "verifying", 0, None, 0.0, &url);
                 let hash = xxh64_file(staging.path())?;
-                if entry.xx_hash.is_empty()
-                    || entry
+                if !entry.xx_hash.is_empty()
+                    && !entry
                         .xx_hash
                         .iter()
                         .any(|expected| expected.eq_ignore_ascii_case(&hash))
                 {
-                    if let Err(error) = read_zip_metadata(staging.path()) {
+                    last_error = Some(format!(
+                        "{url}: 校验失败，目录记录为 {}，实际为 {hash}",
+                        entry.xx_hash.join("、")
+                    ));
+                    continue;
+                }
+                if entry.xx_hash.is_empty() {
+                    if let Err(error) = validate_zip_full_read(staging.path()) {
                         last_error = Some(format!("{url}: {error}"));
                         continue;
                     }
-                    return Ok((staging.keep(), hash));
                 }
-                last_error = Some(format!(
-                    "{url}: 校验失败，目录记录为 {}，实际为 {hash}",
-                    entry.xx_hash.join("、")
-                ));
+                if let Err(error) = read_zip_metadata(staging.path()) {
+                    last_error = Some(format!("{url}: {error}"));
+                    continue;
+                }
+                return Ok((staging.keep(), hash));
             }
             Err(error) => {
                 last_error = Some(format!("{url}: {error}"));
@@ -431,6 +438,23 @@ fn read_zip_metadata(path: &Path) -> Result<ModMetadata, String> {
         }
     }
     Err("Mod 压缩包缺少 everest.yaml".to_string())
+}
+
+fn validate_zip_full_read(path: &Path) -> Result<(), String> {
+    let file = File::open(path).map_err(|error| format!("打开下载文件失败：{error}"))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|error| format!("读取 Mod 压缩包失败：{error}"))?;
+    for index in 0..archive.len() {
+        let mut file = archive
+            .by_index(index)
+            .map_err(|error| format!("读取压缩包条目失败：{error}"))?;
+        if file.is_dir() {
+            continue;
+        }
+        io::copy(&mut file, &mut io::sink())
+            .map_err(|error| format!("完整读取压缩包失败：{error}"))?;
+    }
+    Ok(())
 }
 
 fn is_everest_yaml_entry(entry: &str) -> bool {
@@ -1076,6 +1100,26 @@ Helper:
     }
 
     #[test]
+    fn full_zip_read_detects_corrupt_non_metadata_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let valid = dir.path().join("Valid.zip");
+        write_zip(
+            &valid,
+            &[
+                ("everest.yaml", "Name: Helper\nVersion: 1.2.3\n"),
+                ("payload.txt", "unchanged payload"),
+            ],
+        );
+        let corrupt = dir.path().join("Corrupt.zip");
+        fs::copy(&valid, &corrupt).unwrap();
+        corrupt_zip_payload(&corrupt, b"unchanged payload", b"changed!! payload");
+
+        let metadata = read_zip_metadata(&corrupt).unwrap();
+        assert_eq!(metadata.name, "Helper");
+        assert!(validate_zip_full_read(&corrupt).is_err());
+    }
+
+    #[test]
     fn download_url_to_file_stops_before_request_when_cancelled() {
         let dir = tempfile::tempdir().unwrap();
         let entry = test_catalog_entry("helper", "Helper");
@@ -1203,11 +1247,24 @@ Helper:
     fn write_zip(path: &Path, entries: &[(&str, &str)]) {
         let file = File::create(path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
         for (name, text) in entries {
-            zip.start_file(*name, SimpleFileOptions::default()).unwrap();
+            zip.start_file(*name, options).unwrap();
             zip.write_all(text.as_bytes()).unwrap();
         }
         zip.finish().unwrap();
+    }
+
+    fn corrupt_zip_payload(path: &Path, needle: &[u8], replacement: &[u8]) {
+        assert_eq!(needle.len(), replacement.len());
+        let mut bytes = fs::read(path).unwrap();
+        let offset = bytes
+            .windows(needle.len())
+            .position(|window| window == needle)
+            .expect("payload should be stored in test zip");
+        bytes[offset..offset + replacement.len()].copy_from_slice(replacement);
+        fs::write(path, bytes).unwrap();
     }
 
     fn test_record(path: &Path, metadata_name: &str, version: &str) -> ModRecord {
