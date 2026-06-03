@@ -434,7 +434,7 @@ fn install_downloaded_zip(
             }
         });
     }
-    fs::remove_file(&backup_path).map_err(|error| format!("移除旧 Mod 暂存文件失败：{error}"))?;
+    let _ = fs::remove_file(&backup_path);
     Ok(Some(destination.to_path_buf()))
 }
 
@@ -988,6 +988,22 @@ Helper:
         assert!(read_zip_metadata(&not_zip)
             .unwrap_err()
             .contains("读取 Mod 压缩包失败"));
+    }
+
+    #[test]
+    fn replacing_zip_installs_new_file_and_cleans_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("Helper.zip");
+        let staged = dir.path().join("Helper.zip.download");
+        fs::write(&destination, b"old").unwrap();
+        fs::write(&staged, b"new").unwrap();
+
+        let replaced = install_downloaded_zip(&staged, &destination, true).unwrap();
+
+        assert_eq!(replaced.as_deref(), Some(destination.as_path()));
+        assert_eq!(fs::read(&destination).unwrap(), b"new");
+        assert!(!staged.exists());
+        assert!(!replacement_backup_path(&destination).exists());
     }
 
     #[test]
