@@ -1,5 +1,6 @@
 use crate::domain::{
-    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ProfileInput, ProfilesState, ScanResult,
+    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult,
+    ModUpdateCheckResult, ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
 use crate::storage::{
@@ -111,6 +112,46 @@ pub async fn rescan_celeste(celeste_path: String) -> Result<ScanResult, String> 
     })
     .await
     .map_err(|error| format!("重新扫描任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn search_mod_catalog(
+    query: String,
+    sources: Vec<String>,
+) -> Result<ModCatalogSearchResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sources = services::mod_catalog::parse_sources(&sources);
+        Ok(services::mod_catalog::search_catalog(&query, &sources))
+    })
+    .await
+    .map_err(|error| format!("搜索 Mod 目录任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn check_mod_updates(
+    celeste_path: String,
+    sources: Vec<String>,
+) -> Result<ModUpdateCheckResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state()?;
+        let path = resolve_input_path_from_state(&celeste_path, &state);
+        let scan = services::scan::full_scan_fresh(
+            &path,
+            state.profiles_state(),
+            &state.protected_record_ids,
+            &state.selected_save_files,
+        );
+        let sources = services::mod_catalog::parse_sources(&sources);
+        let records = scan
+            .maps
+            .iter()
+            .chain(scan.other_mods.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        Ok(services::mod_catalog::check_updates(&records, &sources))
+    })
+    .await
+    .map_err(|error| format!("检查 Mod 更新任务失败：{error}"))?
 }
 
 #[tauri::command]

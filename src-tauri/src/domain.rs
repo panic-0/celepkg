@@ -214,3 +214,66 @@ pub struct BackupInfo {
     pub backup_path: String,
     pub files: Vec<BackupFileEntry>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ModCatalogSourceKind {
+    Everest,
+    EverestMirror,
+    Wegfan,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModCatalogEntry {
+    pub source: ModCatalogSourceKind,
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub download_url: String,
+    pub page_url: String,
+    pub game_banana_type: String,
+    pub game_banana_id: Option<u64>,
+    pub game_banana_file_id: Option<u64>,
+    pub size: Option<u64>,
+    pub last_update: Option<i64>,
+    pub xx_hash: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModCatalogSearchResult {
+    pub sources: Vec<ModCatalogSourceKind>,
+    pub entries: Vec<ModCatalogEntry>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledModMatch {
+    pub record_id: String,
+    pub name: String,
+    pub file_name: String,
+    pub relative_path: String,
+    pub absolute_path: String,
+    pub version: String,
+    pub hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateCandidate {
+    pub entry: ModCatalogEntry,
+    pub installed: InstalledModMatch,
+    pub update_available: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModUpdateCheckResult {
+    pub sources: Vec<ModCatalogSourceKind>,
+    pub updates: Vec<ModUpdateCandidate>,
+    pub matched: Vec<ModUpdateCandidate>,
+    pub warnings: Vec<String>,
+}

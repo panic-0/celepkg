@@ -17,6 +17,8 @@ pub fn run() {
             commands::select_celeste_directory,
             commands::scan_celeste,
             commands::rescan_celeste,
+            commands::search_mod_catalog,
+            commands::check_mod_updates,
             commands::set_record_favorite,
             commands::set_record_protected,
             commands::save_profile,

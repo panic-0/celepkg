@@ -1,0 +1,586 @@
+use crate::domain::{
+    InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModRecord,
+    ModUpdateCandidate, ModUpdateCheckResult,
+};
+use crate::utils::{normalize_dependency_name, stable_id};
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use xxhash_rust::xxh64::Xxh64;
+
+const EVEREST_MIRROR_UPDATE_URL: &str =
+    "https://everestapi.github.io/updatermirror/everest_update.yaml";
+const EVEREST_UPDATE_POINTER_URL: &str = "https://everestapi.github.io/modupdater.txt";
+const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
+
+pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
+    if sources.is_empty() {
+        return vec![
+            ModCatalogSourceKind::EverestMirror,
+            ModCatalogSourceKind::Wegfan,
+        ];
+    }
+    let mut parsed = vec![];
+    for source in sources {
+        let kind = match source.trim().to_ascii_lowercase().as_str() {
+            "everest" | "official" => Some(ModCatalogSourceKind::Everest),
+            "everestmirror" | "everest-mirror" | "mirror" => {
+                Some(ModCatalogSourceKind::EverestMirror)
+            }
+            "wegfan" | "weg-fan" => Some(ModCatalogSourceKind::Wegfan),
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            if !parsed.contains(&kind) {
+                parsed.push(kind);
+            }
+        }
+    }
+    parsed
+}
+
+pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatalogSearchResult {
+    let load = load_catalogs(sources);
+    let normalized_query = normalize_dependency_name(query);
+    let mut entries = load.entries;
+    if !normalized_query.is_empty() {
+        entries.retain(|entry| entry_matches_query(entry, &normalized_query));
+    }
+    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    entries.truncate(200);
+    ModCatalogSearchResult {
+        sources: load.sources,
+        entries,
+        warnings: load.warnings,
+    }
+}
+
+pub fn check_updates(
+    records: &[ModRecord],
+    sources: &[ModCatalogSourceKind],
+) -> ModUpdateCheckResult {
+    let load = load_catalogs(sources);
+    let installed = InstalledModIndex::new(records);
+    let mut matched = vec![];
+    let mut seen_installed_paths = HashSet::new();
+
+    for entry in load.entries {
+        let Some(installed_match) = installed.find(&entry) else {
+            continue;
+        };
+        if !seen_installed_paths.insert(installed_match.absolute_path.clone()) {
+            continue;
+        }
+        let local_hash = installed_match.hash.to_ascii_lowercase();
+        let update_available = !entry.xx_hash.is_empty()
+            && !entry
+                .xx_hash
+                .iter()
+                .any(|hash| hash.eq_ignore_ascii_case(&local_hash));
+        let reason = if update_available {
+            format!("本地文件哈希 {local_hash} 不在目录记录的最新哈希中")
+        } else {
+            "本地文件哈希已在目录记录中".to_string()
+        };
+        matched.push(ModUpdateCandidate {
+            entry,
+            installed: installed_match,
+            update_available,
+            reason,
+        });
+    }
+
+    matched.sort_by(|a, b| {
+        a.entry
+            .name
+            .to_lowercase()
+            .cmp(&b.entry.name.to_lowercase())
+    });
+    let updates = matched
+        .iter()
+        .filter(|candidate| candidate.update_available)
+        .cloned()
+        .collect();
+
+    ModUpdateCheckResult {
+        sources: load.sources,
+        updates,
+        matched,
+        warnings: load.warnings,
+    }
+}
+
+pub fn xxh64_file(path: &Path) -> Result<String, String> {
+    let mut file = File::open(path).map_err(|error| format!("打开文件失败：{error}"))?;
+    let mut hasher = Xxh64::new(0);
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|error| format!("读取文件失败：{error}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:016x}", hasher.digest()))
+}
+
+fn entry_matches_query(entry: &ModCatalogEntry, normalized_query: &str) -> bool {
+    let haystack = [
+        entry.name.as_str(),
+        entry.version.as_str(),
+        entry.game_banana_type.as_str(),
+        entry.page_url.as_str(),
+    ]
+    .join(" ");
+    normalize_dependency_name(&haystack).contains(normalized_query)
+}
+
+struct CatalogLoad {
+    sources: Vec<ModCatalogSourceKind>,
+    entries: Vec<ModCatalogEntry>,
+    warnings: Vec<String>,
+}
+
+fn load_catalogs(sources: &[ModCatalogSourceKind]) -> CatalogLoad {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("celepkg/0.2")
+        .build();
+    let mut entries = vec![];
+    let mut loaded_sources = vec![];
+    let mut warnings = vec![];
+
+    let Ok(client) = client else {
+        return CatalogLoad {
+            sources: vec![],
+            entries,
+            warnings: vec!["初始化下载客户端失败".to_string()],
+        };
+    };
+
+    for source in sources {
+        match load_catalog(&client, *source) {
+            Ok(mut source_entries) => {
+                loaded_sources.push(*source);
+                entries.append(&mut source_entries);
+            }
+            Err(error) => warnings.push(error),
+        }
+    }
+    dedupe_catalog_entries(&mut entries);
+    CatalogLoad {
+        sources: loaded_sources,
+        entries,
+        warnings,
+    }
+}
+
+fn load_catalog(
+    client: &reqwest::blocking::Client,
+    source: ModCatalogSourceKind,
+) -> Result<Vec<ModCatalogEntry>, String> {
+    match source {
+        ModCatalogSourceKind::Everest => {
+            let url = client
+                .get(EVEREST_UPDATE_POINTER_URL)
+                .send()
+                .map_err(|error| format!("读取 Everest 更新目录地址失败：{error}"))?
+                .error_for_status()
+                .map_err(|error| format!("读取 Everest 更新目录地址失败：{error}"))?
+                .text()
+                .map_err(|error| format!("读取 Everest 更新目录地址失败：{error}"))?;
+            load_everest_catalog(client, source, url.trim())
+        }
+        ModCatalogSourceKind::EverestMirror => {
+            load_everest_catalog(client, source, EVEREST_MIRROR_UPDATE_URL)
+        }
+        ModCatalogSourceKind::Wegfan => {
+            let text = client
+                .get(WEGFAN_MOD_LIST_URL)
+                .send()
+                .map_err(|error| format!("读取 WEGFan Mod 目录失败：{error}"))?
+                .error_for_status()
+                .map_err(|error| format!("读取 WEGFan Mod 目录失败：{error}"))?
+                .text()
+                .map_err(|error| format!("读取 WEGFan Mod 目录失败：{error}"))?;
+            parse_wegfan_catalog(&text)
+        }
+    }
+}
+
+fn load_everest_catalog(
+    client: &reqwest::blocking::Client,
+    source: ModCatalogSourceKind,
+    url: &str,
+) -> Result<Vec<ModCatalogEntry>, String> {
+    let text = client
+        .get(url)
+        .send()
+        .map_err(|error| format!("读取 Everest 更新目录失败：{error}"))?
+        .error_for_status()
+        .map_err(|error| format!("读取 Everest 更新目录失败：{error}"))?
+        .text()
+        .map_err(|error| format!("读取 Everest 更新目录失败：{error}"))?;
+    parse_everest_catalog(&text, source)
+}
+
+fn dedupe_catalog_entries(entries: &mut Vec<ModCatalogEntry>) {
+    let mut seen = HashSet::new();
+    entries.retain(|entry| {
+        seen.insert(format!(
+            "{:?}:{}:{}",
+            entry.source,
+            normalize_dependency_name(&entry.name),
+            entry.download_url
+        ))
+    });
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct EverestCatalogEntry {
+    version: Option<String>,
+    last_update: Option<i64>,
+    size: Option<u64>,
+    url: Option<String>,
+    #[serde(rename = "xxHash", default)]
+    xx_hash: Vec<String>,
+    game_banana_type: Option<String>,
+    game_banana_id: Option<u64>,
+    game_banana_file_id: Option<u64>,
+}
+
+fn parse_everest_catalog(
+    text: &str,
+    source: ModCatalogSourceKind,
+) -> Result<Vec<ModCatalogEntry>, String> {
+    let catalog: HashMap<String, EverestCatalogEntry> = serde_yaml::from_str(text)
+        .map_err(|error| format!("解析 Everest 更新目录失败：{error}"))?;
+    Ok(catalog
+        .into_iter()
+        .map(|(name, item)| ModCatalogEntry {
+            source,
+            id: stable_id(&format!("{source:?}:{name}")),
+            name,
+            version: item.version.unwrap_or_default(),
+            download_url: item.url.unwrap_or_default(),
+            page_url: item
+                .game_banana_id
+                .map(|id| format!("https://gamebanana.com/mods/{id}"))
+                .unwrap_or_default(),
+            game_banana_type: item.game_banana_type.unwrap_or_default(),
+            game_banana_id: item.game_banana_id,
+            game_banana_file_id: item.game_banana_file_id,
+            size: item.size,
+            last_update: item.last_update,
+            xx_hash: normalize_hashes(item.xx_hash),
+        })
+        .collect())
+}
+
+#[derive(Debug, Deserialize)]
+struct WegfanCatalog {
+    #[serde(default)]
+    data: Vec<WegfanModFile>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WegfanModFile {
+    id: String,
+    name: String,
+    version: Option<String>,
+    #[serde(default)]
+    xx_hash: Vec<String>,
+    submission_file: WegfanSubmissionFile,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WegfanSubmissionFile {
+    url: String,
+    size: Option<u64>,
+    game_banana_id: Option<u64>,
+    submission: Option<WegfanSubmission>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WegfanSubmission {
+    name: String,
+    page_url: Option<String>,
+    game_banana_section: Option<String>,
+    game_banana_id: Option<u64>,
+    latest_update_added_time: Option<String>,
+}
+
+fn parse_wegfan_catalog(text: &str) -> Result<Vec<ModCatalogEntry>, String> {
+    let catalog: WegfanCatalog =
+        serde_json::from_str(text).map_err(|error| format!("解析 WEGFan Mod 目录失败：{error}"))?;
+    Ok(catalog
+        .data
+        .into_iter()
+        .map(|item| {
+            let submission = item.submission_file.submission;
+            let page_url = submission
+                .as_ref()
+                .and_then(|submission| submission.page_url.clone())
+                .unwrap_or_default();
+            let game_banana_type = submission
+                .as_ref()
+                .and_then(|submission| submission.game_banana_section.clone())
+                .unwrap_or_default();
+            let game_banana_id = submission
+                .as_ref()
+                .and_then(|submission| submission.game_banana_id)
+                .or(item.submission_file.game_banana_id);
+            let name = submission
+                .as_ref()
+                .map(|submission| submission.name.clone())
+                .filter(|name| !name.trim().is_empty())
+                .unwrap_or(item.name);
+            let last_update = submission.as_ref().and_then(|submission| {
+                parse_rfc3339_seconds(submission.latest_update_added_time.as_deref())
+            });
+            ModCatalogEntry {
+                source: ModCatalogSourceKind::Wegfan,
+                id: item.id,
+                name,
+                version: item.version.unwrap_or_default(),
+                download_url: item.submission_file.url,
+                page_url,
+                game_banana_type,
+                game_banana_id,
+                game_banana_file_id: item.submission_file.game_banana_id,
+                size: item.submission_file.size,
+                last_update,
+                xx_hash: normalize_hashes(item.xx_hash),
+            }
+        })
+        .collect())
+}
+
+fn parse_rfc3339_seconds(value: Option<&str>) -> Option<i64> {
+    let value = value?;
+    let date_time =
+        time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339).ok()?;
+    Some(date_time.unix_timestamp())
+}
+
+fn normalize_hashes(hashes: Vec<String>) -> Vec<String> {
+    hashes
+        .into_iter()
+        .map(|hash| hash.trim().to_ascii_lowercase())
+        .filter(|hash| !hash.is_empty())
+        .collect()
+}
+
+struct InstalledModIndex {
+    mods: HashMap<String, InstalledModMatch>,
+}
+
+impl InstalledModIndex {
+    fn new(records: &[ModRecord]) -> Self {
+        let mut mods = HashMap::new();
+        for record in records {
+            if !record.is_archive || record.read_only {
+                continue;
+            }
+            let path = Path::new(&record.absolute_path);
+            let Ok(hash) = xxh64_file(path) else {
+                continue;
+            };
+            let installed = InstalledModMatch {
+                record_id: record.id.clone(),
+                name: record.name.clone(),
+                file_name: record.file_name.clone(),
+                relative_path: record.relative_path.clone(),
+                absolute_path: record.absolute_path.clone(),
+                version: record.metadata.version.clone(),
+                hash,
+            };
+            for key in installed_keys(record) {
+                mods.entry(key).or_insert_with(|| installed.clone());
+            }
+        }
+        Self { mods }
+    }
+
+    fn find(&self, entry: &ModCatalogEntry) -> Option<InstalledModMatch> {
+        catalog_keys(entry).find_map(|key| self.mods.get(&key).cloned())
+    }
+}
+
+fn installed_keys(record: &ModRecord) -> Vec<String> {
+    [
+        record.name.as_str(),
+        record.metadata.name.as_str(),
+        record.file_name.as_str(),
+        record
+            .file_name
+            .trim_end_matches(".zip")
+            .trim_end_matches(".ZIP"),
+        record.relative_path.as_str(),
+    ]
+    .into_iter()
+    .map(normalize_dependency_name)
+    .filter(|key| !key.is_empty())
+    .collect()
+}
+
+fn catalog_keys(entry: &ModCatalogEntry) -> impl Iterator<Item = String> + '_ {
+    [entry.name.as_str()]
+        .into_iter()
+        .map(normalize_dependency_name)
+        .filter(|key| !key.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{CompletionStatus, ModKind, ModMetadata};
+    use std::fs;
+
+    #[test]
+    fn parses_everest_catalog_entries() {
+        let text = r#"
+Helper:
+  GameBananaType: Mod
+  Version: 1.2.3
+  LastUpdate: 1700000000
+  Size: 42
+  GameBananaId: 123
+  GameBananaFileId: 456
+  xxHash:
+  - ABCDEF0123456789
+  URL: https://gamebanana.com/mmdl/456
+"#;
+        let entries = parse_everest_catalog(text, ModCatalogSourceKind::EverestMirror).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "Helper");
+        assert_eq!(entries[0].version, "1.2.3");
+        assert_eq!(entries[0].xx_hash, vec!["abcdef0123456789"]);
+        assert_eq!(entries[0].game_banana_file_id, Some(456));
+    }
+
+    #[test]
+    fn parses_wegfan_catalog_entries() {
+        let text = r#"{
+          "data": [{
+            "id": "file-1",
+            "name": "Fallback",
+            "version": "2.0.0",
+            "xxHash": ["001122"],
+            "submissionFile": {
+              "url": "https://example.test/file.zip",
+              "size": 99,
+              "gameBananaId": 777,
+              "submission": {
+                "name": "Pretty Name",
+                "pageUrl": "https://gamebanana.com/mods/555",
+                "gameBananaSection": "Map",
+                "gameBananaId": 555,
+                "latestUpdateAddedTime": "2024-04-11T22:16:10Z"
+              }
+            }
+          }]
+        }"#;
+        let entries = parse_wegfan_catalog(text).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].source, ModCatalogSourceKind::Wegfan);
+        assert_eq!(entries[0].name, "Pretty Name");
+        assert_eq!(entries[0].download_url, "https://example.test/file.zip");
+        assert_eq!(entries[0].game_banana_type, "Map");
+        assert_eq!(entries[0].last_update, Some(1712873770));
+    }
+
+    #[test]
+    fn update_check_uses_xxhash_not_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let mod_path = dir.path().join("Helper.zip");
+        fs::write(&mod_path, b"local zip bytes").unwrap();
+        let local_hash = xxh64_file(&mod_path).unwrap();
+        let mut record = test_record(&mod_path, "Helper", "1.0.0");
+        record.metadata.version = "999.0.0".to_string();
+        let entry = ModCatalogEntry {
+            source: ModCatalogSourceKind::EverestMirror,
+            id: "helper".to_string(),
+            name: "Helper".to_string(),
+            version: "1.0.0".to_string(),
+            download_url: "https://example.test/helper.zip".to_string(),
+            page_url: String::new(),
+            game_banana_type: "Mod".to_string(),
+            game_banana_id: None,
+            game_banana_file_id: None,
+            size: None,
+            last_update: None,
+            xx_hash: vec![local_hash],
+        };
+        let installed = InstalledModIndex::new(&[record]);
+        let matched = installed.find(&entry).unwrap();
+        assert_eq!(matched.name, "Helper");
+    }
+
+    #[test]
+    fn update_check_matches_filename_variants() {
+        let dir = tempfile::tempdir().unwrap();
+        let mod_path = dir.path().join("Fancy-Helper.zip");
+        fs::write(&mod_path, b"local zip bytes").unwrap();
+        let record = test_record(&mod_path, "", "1.0.0");
+        let entry = ModCatalogEntry {
+            source: ModCatalogSourceKind::EverestMirror,
+            id: "helper".to_string(),
+            name: "Fancy Helper".to_string(),
+            version: "2.0.0".to_string(),
+            download_url: String::new(),
+            page_url: String::new(),
+            game_banana_type: "Mod".to_string(),
+            game_banana_id: None,
+            game_banana_file_id: None,
+            size: None,
+            last_update: None,
+            xx_hash: vec!["different".to_string()],
+        };
+        let installed = InstalledModIndex::new(&[record]);
+        assert!(installed.find(&entry).is_some());
+    }
+
+    fn test_record(path: &Path, metadata_name: &str, version: &str) -> ModRecord {
+        let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+        ModRecord {
+            id: stable_id(&file_name),
+            name: if metadata_name.is_empty() {
+                file_name.trim_end_matches(".zip").replace('-', " ")
+            } else {
+                metadata_name.to_string()
+            },
+            file_name: file_name.clone(),
+            relative_path: file_name,
+            absolute_path: path.to_string_lossy().to_string(),
+            is_archive: true,
+            kind: ModKind::Mod,
+            enabled: true,
+            favorite: false,
+            protected: false,
+            read_only: false,
+            metadata: ModMetadata {
+                name: metadata_name.to_string(),
+                version: version.to_string(),
+                ..ModMetadata::default()
+            },
+            map_ids: vec![],
+            sub_maps: vec![],
+            map_count: 0,
+            strawberry_count: 0,
+            strawberry_total_count: 0,
+            completion_status: CompletionStatus::Unknown,
+            dependencies: vec![],
+            optional_dependencies: vec![],
+            stats: None,
+            warnings: vec![],
+        }
+    }
+}
