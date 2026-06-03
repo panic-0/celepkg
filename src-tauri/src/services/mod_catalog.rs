@@ -18,6 +18,8 @@ const EVEREST_MIRROR_UPDATE_URL: &str =
     "https://everestapi.github.io/updatermirror/everest_update.yaml";
 const EVEREST_UPDATE_POINTER_URL: &str = "https://everestapi.github.io/modupdater.txt";
 const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
+const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Copy)]
 pub struct ModDownloadReporter<'a> {
@@ -214,33 +216,34 @@ fn download_entry(
     if entry.download_url.trim().is_empty() {
         return Err("目录条目没有下载地址".to_string());
     }
-    let temp_path = staging_download_path(celeste_path, entry, reporter.operation_id);
-    if let Some(download_dir) = temp_path.parent() {
+    let mut staging = StagingDownloadFile::new(staging_download_path(
+        celeste_path,
+        entry,
+        reporter.operation_id,
+    ));
+    if let Some(download_dir) = staging.path().parent() {
         fs::create_dir_all(download_dir).map_err(|error| format!("创建下载目录失败：{error}"))?;
     }
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("celepkg/0.2")
-        .build()
-        .map_err(|error| format!("初始化下载客户端失败：{error}"))?;
+    let client = download_client()?;
     let mut last_error = None;
     for url in mirror_urls(&entry.download_url) {
         ensure_download_not_cancelled(reporter)?;
-        let _ = fs::remove_file(&temp_path);
-        match download_url_to_file(&client, &url, &temp_path, entry, reporter) {
+        let _ = fs::remove_file(staging.path());
+        match download_url_to_file(&client, &url, staging.path(), entry, reporter) {
             Ok(()) => {
                 emit_download_progress(reporter, &entry.name, "verifying", 0, None, 0.0, &url);
-                let hash = xxh64_file(&temp_path)?;
+                let hash = xxh64_file(staging.path())?;
                 if entry.xx_hash.is_empty()
                     || entry
                         .xx_hash
                         .iter()
                         .any(|expected| expected.eq_ignore_ascii_case(&hash))
                 {
-                    if let Err(error) = read_zip_metadata(&temp_path) {
+                    if let Err(error) = read_zip_metadata(staging.path()) {
                         last_error = Some(format!("{url}: {error}"));
                         continue;
                     }
-                    return Ok((temp_path, hash));
+                    return Ok((staging.keep(), hash));
                 }
                 last_error = Some(format!(
                     "{url}: 校验失败，目录记录为 {}，实际为 {hash}",
@@ -252,11 +255,47 @@ fn download_entry(
             }
         }
     }
-    let _ = fs::remove_file(&temp_path);
     Err(format!(
         "下载 Mod 失败：{}",
         last_error.unwrap_or_else(|| "没有可用下载地址".to_string())
     ))
+}
+
+fn download_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .user_agent("celepkg/0.2")
+        .connect_timeout(DOWNLOAD_CONNECT_TIMEOUT)
+        .timeout(DOWNLOAD_REQUEST_TIMEOUT)
+        .build()
+        .map_err(|error| format!("初始化下载客户端失败：{error}"))
+}
+
+struct StagingDownloadFile {
+    path: PathBuf,
+    keep: bool,
+}
+
+impl StagingDownloadFile {
+    fn new(path: PathBuf) -> Self {
+        Self { path, keep: false }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn keep(&mut self) -> PathBuf {
+        self.keep = true;
+        self.path.clone()
+    }
+}
+
+impl Drop for StagingDownloadFile {
+    fn drop(&mut self) {
+        if !self.keep {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
 }
 
 fn staging_download_path(
@@ -1059,6 +1098,34 @@ Helper:
         .unwrap_err();
 
         assert_eq!(error, "下载已取消");
+    }
+
+    #[test]
+    fn download_entry_cleans_staging_file_when_cancelled_between_mirrors() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut entry = test_catalog_entry("helper", "Helper");
+        entry.download_url = "https://gamebanana.com/mmdl/12345".to_string();
+        let operation_id = "cancel-cleanup";
+        let staged = staging_download_path(dir.path(), &entry, operation_id);
+        fs::create_dir_all(staged.parent().unwrap()).unwrap();
+        fs::write(&staged, b"partial").unwrap();
+        let cancel = AtomicBool::new(true);
+
+        let error = download_entry(
+            dir.path(),
+            &entry,
+            ModDownloadReporter {
+                operation_id,
+                progress: None,
+                cancel_token: Some(&cancel),
+                task_index: 1,
+                task_total: 1,
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "下载已取消");
+        assert!(!staged.exists());
     }
 
     #[test]
