@@ -30,6 +30,14 @@ npm run dev
 npm run dev:web
 ```
 
+启动带假数据的 UI 预览：
+
+```bash
+npm run dev:mock
+```
+
+Mock 预览入口是 `/mock`，也可以在任意本地地址后加 `?mock=1`。它不会调用 Tauri 后端，Profile、备份、收藏、始终启用、启动和还原等操作都只会修改浏览器内存里的假数据，适合快速截图反馈 UI 问题。
+
 Vite 端口可通过 `.env` 配置。可以复制 `.env.example`：
 
 ```bash

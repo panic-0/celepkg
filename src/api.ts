@@ -10,6 +10,7 @@ import {
   validateVoid,
   validateScanResult
 } from "./apiValidation";
+import { isMockMode, mockApi } from "./mockApi";
 import type { BackupInfo, ConfigResponse, Profile, ProfilesState, RestoreScope, ScanResult } from "./types";
 
 async function invokeChecked<T>(command: string, validator: (value: unknown) => T, args?: Record<string, unknown>): Promise<T> {
@@ -17,50 +18,62 @@ async function invokeChecked<T>(command: string, validator: (value: unknown) => 
 }
 
 export async function getConfig(): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.getConfig();
   return invokeChecked("get_config", validateConfigResponse);
 }
 
 export async function setCelestePath(celestePath: string): Promise<{ celestePath: string }> {
+  if (isMockMode()) return mockApi.setCelestePath(celestePath);
   return invokeChecked("set_celeste_path", validateCelestePathResponse, { celestePath });
 }
 
 export async function selectCelesteDirectory(): Promise<string | null> {
+  if (isMockMode()) return mockApi.selectCelesteDirectory();
   return invokeChecked("select_celeste_directory", validateNullableString);
 }
 
 export async function setAutoBackupEnabled(autoBackupEnabled: boolean): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setAutoBackupEnabled(autoBackupEnabled);
   return invokeChecked("set_auto_backup_enabled", validateConfigResponse, { autoBackupEnabled });
 }
 
 export async function setAutoBackupCleanupEnabled(autoBackupCleanupEnabled: boolean): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setAutoBackupCleanupEnabled(autoBackupCleanupEnabled);
   return invokeChecked("set_auto_backup_cleanup_enabled", validateConfigResponse, { autoBackupCleanupEnabled });
 }
 
 export async function setAutoBackupRetentionCount(autoBackupRetentionCount: number): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setAutoBackupRetentionCount(autoBackupRetentionCount);
   return invokeChecked("set_auto_backup_retention_count", validateConfigResponse, { autoBackupRetentionCount });
 }
 
 export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setSelectedSaveFiles(saveFiles);
   return invokeChecked("set_selected_save_files", validateConfigResponse, { saveFiles });
 }
 
 export async function scanCeleste(celestePath: string): Promise<ScanResult> {
+  if (isMockMode()) return mockApi.scanCeleste(celestePath);
   return invokeChecked("scan_celeste", validateScanResult, { celestePath });
 }
 
 export async function rescanCeleste(celestePath: string): Promise<ScanResult> {
+  if (isMockMode()) return mockApi.rescanCeleste(celestePath);
   return invokeChecked("rescan_celeste", validateScanResult, { celestePath });
 }
 
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {
+  if (isMockMode()) return mockApi.saveProfile(profile);
   return invokeChecked("save_profile", validateProfilesState, { profile });
 }
 
 export async function deleteProfile(profileId: string): Promise<ProfilesState> {
+  if (isMockMode()) return mockApi.deleteProfile(profileId);
   return invokeChecked("delete_profile", validateProfilesState, { profileId });
 }
 
 export async function applyProfile(celestePath: string, mapProfileId: string, modProfileId: string): Promise<ScanResult> {
+  if (isMockMode()) return mockApi.applyProfile(celestePath, mapProfileId, modProfileId);
   return invokeChecked("apply_profile", validateScanResult, { celestePath, mapProfileId, modProfileId });
 }
 
@@ -69,6 +82,7 @@ export async function launchProfile(
   mapProfileId: string,
   modProfileId: string
 ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+  if (isMockMode()) return mockApi.launchProfile(celestePath, mapProfileId, modProfileId);
   return invokeChecked("launch_profile", validateLaunchResult, { celestePath, mapProfileId, modProfileId });
 }
 
@@ -76,41 +90,51 @@ export async function launchGame(
   celestePath: string,
   launchArgs: string
 ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+  if (isMockMode()) return mockApi.launchGame(celestePath, launchArgs);
   return invokeChecked("launch_game", validateLaunchResult, { celestePath, launchArgs });
 }
 
 export async function setRecordFavorite(celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {
+  if (isMockMode()) return mockApi.setRecordFavorite(celestePath, recordId, favorite);
   return invokeChecked("set_record_favorite", validateScanResult, { celestePath, recordId, favorite });
 }
 
 export async function setRecordProtected(celestePath: string, recordId: string, protectedValue: boolean): Promise<ScanResult> {
+  if (isMockMode()) return mockApi.setRecordProtected(celestePath, recordId, protectedValue);
   return invokeChecked("set_record_protected", validateScanResult, { celestePath, recordId, protected: protectedValue });
 }
 
 export async function createBackup(celestePath: string, kind: "manual" | "auto" = "manual"): Promise<BackupInfo> {
+  if (isMockMode()) return mockApi.createBackup(celestePath, kind);
   return invokeChecked("create_backup", validateBackupInfo, { celestePath, kind });
 }
 
 export async function listBackups(): Promise<BackupInfo[]> {
+  if (isMockMode()) return mockApi.listBackups();
   return invokeChecked("list_backups", validateBackupList);
 }
 
 export async function restoreBackup(backupId: string, scope: RestoreScope): Promise<BackupInfo> {
+  if (isMockMode()) return mockApi.restoreBackup(backupId, scope);
   return invokeChecked("restore_backup", validateBackupInfo, { backupId, scope });
 }
 
 export async function deleteBackup(backupId: string): Promise<void> {
+  if (isMockMode()) return mockApi.deleteBackup(backupId);
   return invokeChecked("delete_backup", validateVoid, { backupId });
 }
 
 export async function cleanupAutoBackups(): Promise<BackupInfo[]> {
+  if (isMockMode()) return mockApi.cleanupAutoBackups();
   return invokeChecked("cleanup_auto_backups", validateBackupList);
 }
 
 export async function openBackupFolder(celestePath: string): Promise<void> {
+  if (isMockMode()) return mockApi.openBackupFolder(celestePath);
   return invokeChecked("open_backup_folder", validateVoid, { celestePath });
 }
 
 export async function openBackupLocation(backupPath: string): Promise<void> {
+  if (isMockMode()) return mockApi.openBackupLocation(backupPath);
   return invokeChecked("open_backup_location", validateVoid, { backupPath });
 }

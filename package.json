@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "dev:web": "vite",
+    "dev:mock": "vite --open /mock",
     "build": "tauri build",
     "build:web": "tsc && vite build",
     "lint": "eslint .",
