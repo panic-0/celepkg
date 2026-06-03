@@ -134,7 +134,7 @@ pub async fn check_mod_updates(
 ) -> Result<ModUpdateCheckResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
-        let path = resolve_input_path_from_state(&celeste_path, &state);
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
         let scan = services::scan::full_scan_fresh(
             &path,
             state.profiles_state(),

@@ -142,20 +142,7 @@ pub fn download_and_install(
         Some(path) => normalize_replace_path(&mods_dir, path)?,
         None => fresh_install_path(&mods_dir, &entry)?,
     };
-    let temp_path = download_entry(celeste_path, &entry)?;
-    let hash = xxh64_file(&temp_path)?;
-    if !entry.xx_hash.is_empty()
-        && !entry
-            .xx_hash
-            .iter()
-            .any(|expected| expected.eq_ignore_ascii_case(&hash))
-    {
-        let _ = fs::remove_file(&temp_path);
-        return Err(format!(
-            "下载文件校验失败：目录记录为 {}，实际为 {hash}",
-            entry.xx_hash.join("、")
-        ));
-    }
+    let (temp_path, hash) = download_entry(celeste_path, &entry)?;
 
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建安装目录失败：{error}"))?;
@@ -183,7 +170,10 @@ pub fn download_and_install(
     })
 }
 
-fn download_entry(celeste_path: &Path, entry: &ModCatalogEntry) -> Result<PathBuf, String> {
+fn download_entry(
+    celeste_path: &Path,
+    entry: &ModCatalogEntry,
+) -> Result<(PathBuf, String), String> {
     if entry.download_url.trim().is_empty() {
         return Err("目录条目没有下载地址".to_string());
     }
@@ -198,12 +188,27 @@ fn download_entry(celeste_path: &Path, entry: &ModCatalogEntry) -> Result<PathBu
     for url in mirror_urls(&entry.download_url) {
         let _ = fs::remove_file(&temp_path);
         match download_url_to_file(&client, &url, &temp_path) {
-            Ok(()) => return Ok(temp_path),
+            Ok(()) => {
+                let hash = xxh64_file(&temp_path)?;
+                if entry.xx_hash.is_empty()
+                    || entry
+                        .xx_hash
+                        .iter()
+                        .any(|expected| expected.eq_ignore_ascii_case(&hash))
+                {
+                    return Ok((temp_path, hash));
+                }
+                last_error = Some(format!(
+                    "{url}: 校验失败，目录记录为 {}，实际为 {hash}",
+                    entry.xx_hash.join("、")
+                ));
+            }
             Err(error) => {
                 last_error = Some(format!("{url}: {error}"));
             }
         }
     }
+    let _ = fs::remove_file(&temp_path);
     Err(format!(
         "下载 Mod 失败：{}",
         last_error.unwrap_or_else(|| "没有可用下载地址".to_string())
