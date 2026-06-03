@@ -277,3 +277,13 @@ pub struct ModUpdateCheckResult {
     pub matched: Vec<ModUpdateCandidate>,
     pub warnings: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModInstallResult {
+    pub entry: ModCatalogEntry,
+    pub destination_path: String,
+    pub replaced_path: Option<String>,
+    pub hash: String,
+    pub scan: ScanResult,
+}

@@ -1,13 +1,13 @@
 use crate::domain::{
-    InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModRecord,
-    ModUpdateCandidate, ModUpdateCheckResult,
+    InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind,
+    ModInstallResult, ModRecord, ModUpdateCandidate, ModUpdateCheckResult, ProfilesState,
 };
 use crate::utils::{normalize_dependency_name, stable_id};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 use xxhash_rust::xxh64::Xxh64;
 
 const EVEREST_MIRROR_UPDATE_URL: &str =
@@ -126,6 +126,218 @@ pub fn xxh64_file(path: &Path) -> Result<String, String> {
         hasher.update(&buffer[..read]);
     }
     Ok(format!("{:016x}", hasher.digest()))
+}
+
+pub fn download_and_install(
+    celeste_path: &Path,
+    entry: ModCatalogEntry,
+    replace_path: Option<&Path>,
+    profiles: ProfilesState,
+    protected_record_ids: &[String],
+    selected_save_files: &[String],
+) -> Result<ModInstallResult, String> {
+    let mods_dir = celeste_path.join("Mods");
+    fs::create_dir_all(&mods_dir).map_err(|error| format!("创建 Mods 目录失败：{error}"))?;
+    let destination = match replace_path {
+        Some(path) => normalize_replace_path(&mods_dir, path)?,
+        None => fresh_install_path(&mods_dir, &entry)?,
+    };
+    let temp_path = download_entry(celeste_path, &entry)?;
+    let hash = xxh64_file(&temp_path)?;
+    if !entry.xx_hash.is_empty()
+        && !entry
+            .xx_hash
+            .iter()
+            .any(|expected| expected.eq_ignore_ascii_case(&hash))
+    {
+        let _ = fs::remove_file(&temp_path);
+        return Err(format!(
+            "下载文件校验失败：目录记录为 {}，实际为 {hash}",
+            entry.xx_hash.join("、")
+        ));
+    }
+
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("创建安装目录失败：{error}"))?;
+    }
+    let replaced_path = install_downloaded_zip(&temp_path, &destination, replace_path.is_some())?;
+    let mut timings = vec![];
+    let scan = crate::services::scan::full_scan(
+        celeste_path,
+        profiles,
+        crate::services::scan::list_available_save_files(celeste_path),
+        selected_save_files.to_vec(),
+        &mut timings,
+    );
+    let mut scan = scan;
+    for record in scan.maps.iter_mut().chain(scan.other_mods.iter_mut()) {
+        record.protected = record.read_only || protected_record_ids.contains(&record.id);
+    }
+    crate::services::scan::write_scan_cache(celeste_path, &scan);
+    Ok(ModInstallResult {
+        entry,
+        destination_path: destination.to_string_lossy().to_string(),
+        replaced_path: replaced_path.map(|path| path.to_string_lossy().to_string()),
+        hash,
+        scan,
+    })
+}
+
+fn download_entry(celeste_path: &Path, entry: &ModCatalogEntry) -> Result<PathBuf, String> {
+    if entry.download_url.trim().is_empty() {
+        return Err("目录条目没有下载地址".to_string());
+    }
+    let download_dir = celeste_path.join(".celepkg").join("downloads");
+    fs::create_dir_all(&download_dir).map_err(|error| format!("创建下载目录失败：{error}"))?;
+    let temp_path = download_dir.join(format!("{}.zip.download", stable_id(&entry.id)));
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("celepkg/0.2")
+        .build()
+        .map_err(|error| format!("初始化下载客户端失败：{error}"))?;
+    let mut last_error = None;
+    for url in mirror_urls(&entry.download_url) {
+        let _ = fs::remove_file(&temp_path);
+        match download_url_to_file(&client, &url, &temp_path) {
+            Ok(()) => return Ok(temp_path),
+            Err(error) => {
+                last_error = Some(format!("{url}: {error}"));
+            }
+        }
+    }
+    Err(format!(
+        "下载 Mod 失败：{}",
+        last_error.unwrap_or_else(|| "没有可用下载地址".to_string())
+    ))
+}
+
+fn download_url_to_file(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    destination: &Path,
+) -> Result<(), String> {
+    let mut response = client
+        .get(url)
+        .send()
+        .map_err(|error| format!("请求失败：{error}"))?
+        .error_for_status()
+        .map_err(|error| format!("服务器返回错误：{error}"))?;
+    let mut file =
+        File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
+    io::copy(&mut response, &mut file).map_err(|error| format!("写入下载文件失败：{error}"))?;
+    Ok(())
+}
+
+fn mirror_urls(url: &str) -> Vec<String> {
+    let Some(game_banana_file_id) = game_banana_file_id(url) else {
+        return vec![url.to_string()];
+    };
+    vec![
+        url.to_string(),
+        format!("https://celeste.weg.fan/api/v2/download/gamebanana-files/{game_banana_file_id}"),
+        format!("https://banana-mirror-mods.celestemods.com/{game_banana_file_id}.zip"),
+        format!("https://celestemodupdater.0x0a.de/banana-mirror/{game_banana_file_id}.zip"),
+    ]
+}
+
+fn game_banana_file_id(url: &str) -> Option<u64> {
+    for prefix in [
+        "http://gamebanana.com/dl/",
+        "https://gamebanana.com/dl/",
+        "http://gamebanana.com/mmdl/",
+        "https://gamebanana.com/mmdl/",
+    ] {
+        if let Some(rest) = url.strip_prefix(prefix) {
+            return rest.parse().ok();
+        }
+    }
+    None
+}
+
+fn fresh_install_path(mods_dir: &Path, entry: &ModCatalogEntry) -> Result<PathBuf, String> {
+    let destination = mods_dir.join(safe_zip_file_name(&entry.name));
+    if destination.exists() {
+        return Err(format!(
+            "目标 Mod 文件已存在：{}",
+            destination.to_string_lossy()
+        ));
+    }
+    Ok(destination)
+}
+
+fn normalize_replace_path(mods_dir: &Path, replace_path: &Path) -> Result<PathBuf, String> {
+    let canonical_mods = mods_dir
+        .canonicalize()
+        .map_err(|error| format!("读取 Mods 目录失败：{error}"))?;
+    let canonical_target = replace_path
+        .canonicalize()
+        .map_err(|error| format!("读取待更新 Mod 文件失败：{error}"))?;
+    if !canonical_target.starts_with(&canonical_mods) {
+        return Err("只能更新 Mods 目录下的文件".to_string());
+    }
+    if !canonical_target.is_file()
+        || !canonical_target
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+    {
+        return Err("只能更新 zip 格式的 Mod 文件".to_string());
+    }
+    Ok(canonical_target)
+}
+
+fn install_downloaded_zip(
+    temp_path: &Path,
+    destination: &Path,
+    replace_existing: bool,
+) -> Result<Option<PathBuf>, String> {
+    if !replace_existing {
+        fs::rename(temp_path, destination).map_err(|error| format!("安装 Mod 失败：{error}"))?;
+        return Ok(None);
+    }
+
+    let backup_path = replacement_backup_path(destination);
+    let _ = fs::remove_file(&backup_path);
+    fs::rename(destination, &backup_path).map_err(|error| format!("暂存旧 Mod 失败：{error}"))?;
+    if let Err(error) = fs::rename(temp_path, destination) {
+        let restore_result = fs::rename(&backup_path, destination);
+        return Err(match restore_result {
+            Ok(()) => format!("安装更新失败，旧文件已恢复：{error}"),
+            Err(restore_error) => {
+                format!("安装更新失败，且旧文件恢复失败：{error}；{restore_error}")
+            }
+        });
+    }
+    fs::remove_file(&backup_path).map_err(|error| format!("移除旧 Mod 暂存文件失败：{error}"))?;
+    Ok(Some(destination.to_path_buf()))
+}
+
+fn replacement_backup_path(destination: &Path) -> PathBuf {
+    let file_name = destination
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "mod.zip".to_string());
+    destination.with_file_name(format!("{file_name}.celepkg-old"))
+}
+
+fn safe_zip_file_name(name: &str) -> String {
+    let mut safe = name
+        .chars()
+        .map(|ch| match ch {
+            '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string();
+    if safe.is_empty() {
+        safe = "Mod".to_string();
+    }
+    if !safe.to_ascii_lowercase().ends_with(".zip") {
+        safe.push_str(".zip");
+    }
+    safe
 }
 
 fn entry_matches_query(entry: &ModCatalogEntry, normalized_query: &str) -> bool {
@@ -546,6 +758,56 @@ Helper:
         };
         let installed = InstalledModIndex::new(&[record]);
         assert!(installed.find(&entry).is_some());
+    }
+
+    #[test]
+    fn game_banana_downloads_expand_to_known_mirrors() {
+        let urls = mirror_urls("https://gamebanana.com/mmdl/12345");
+        assert_eq!(urls[0], "https://gamebanana.com/mmdl/12345");
+        assert!(urls.contains(
+            &"https://celeste.weg.fan/api/v2/download/gamebanana-files/12345".to_string()
+        ));
+        assert!(urls.contains(&"https://banana-mirror-mods.celestemods.com/12345.zip".to_string()));
+        assert!(
+            urls.contains(&"https://celestemodupdater.0x0a.de/banana-mirror/12345.zip".to_string())
+        );
+    }
+
+    #[test]
+    fn fresh_install_path_sanitizes_file_name_and_rejects_existing_zip() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = ModCatalogEntry {
+            source: ModCatalogSourceKind::Wegfan,
+            id: "entry".to_string(),
+            name: "Bad:/Name?".to_string(),
+            version: String::new(),
+            download_url: String::new(),
+            page_url: String::new(),
+            game_banana_type: String::new(),
+            game_banana_id: None,
+            game_banana_file_id: None,
+            size: None,
+            last_update: None,
+            xx_hash: vec![],
+        };
+        let path = fresh_install_path(dir.path(), &entry).unwrap();
+        assert_eq!(
+            path.file_name().unwrap().to_string_lossy(),
+            "Bad__Name_.zip"
+        );
+        fs::write(&path, b"already here").unwrap();
+        assert!(fresh_install_path(dir.path(), &entry).is_err());
+    }
+
+    #[test]
+    fn replacing_zip_restores_old_file_when_new_file_move_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("Helper.zip");
+        fs::write(&destination, b"old").unwrap();
+        let missing_temp = dir.path().join("missing.zip");
+        let error = install_downloaded_zip(&missing_temp, &destination, true).unwrap_err();
+        assert!(error.contains("旧文件已恢复"));
+        assert_eq!(fs::read(&destination).unwrap(), b"old");
     }
 
     fn test_record(path: &Path, metadata_name: &str, version: &str) -> ModRecord {

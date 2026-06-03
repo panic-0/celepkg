@@ -1,5 +1,5 @@
 use crate::domain::{
-    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult,
+    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult, ModInstallResult,
     ModUpdateCheckResult, ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
@@ -152,6 +152,49 @@ pub async fn check_mod_updates(
     })
     .await
     .map_err(|error| format!("检查 Mod 更新任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn install_mod(
+    celeste_path: String,
+    entry: crate::domain::ModCatalogEntry,
+) -> Result<ModInstallResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state()?;
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
+        services::mod_catalog::download_and_install(
+            &path,
+            entry,
+            None,
+            state.profiles_state(),
+            &state.protected_record_ids,
+            &state.selected_save_files,
+        )
+    })
+    .await
+    .map_err(|error| format!("安装 Mod 任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn update_mod(
+    celeste_path: String,
+    entry: crate::domain::ModCatalogEntry,
+    installed_path: String,
+) -> Result<ModInstallResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state()?;
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
+        services::mod_catalog::download_and_install(
+            &path,
+            entry,
+            Some(Path::new(&installed_path)),
+            state.profiles_state(),
+            &state.protected_record_ids,
+            &state.selected_save_files,
+        )
+    })
+    .await
+    .map_err(|error| format!("更新 Mod 任务失败：{error}"))?
 }
 
 #[tauri::command]
