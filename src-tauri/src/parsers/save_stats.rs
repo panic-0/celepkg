@@ -6,10 +6,21 @@ use std::fs;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-struct SaveFileSnapshot {
+struct ParsedSaveFile {
     name: String,
-    text: String,
-    lower_text: String,
+    areas: Vec<ParsedAreaStats>,
+}
+
+struct ParsedAreaStats {
+    haystack: String,
+    area_stats: MapStats,
+    modes: Vec<ParsedModeStats>,
+}
+
+struct ParsedModeStats {
+    stats: MapStats,
+    berry_ids: HashSet<String>,
+    missing_berry_ids: bool,
 }
 
 struct SaveStatsAccumulator {
@@ -82,7 +93,7 @@ pub fn read_save_stats(
 ) -> Vec<ModRecord> {
     let saves_path = celeste_path.join("Saves");
     let selected: HashSet<&str> = selected_save_files.iter().map(String::as_str).collect();
-    let save_files: Vec<SaveFileSnapshot> = fs::read_dir(saves_path)
+    let save_files: Vec<ParsedSaveFile> = fs::read_dir(saves_path)
         .map(|entries| {
             entries
                 .flatten()
@@ -99,10 +110,9 @@ pub fn read_save_stats(
                 })
                 .filter_map(|path| {
                     let text = fs::read_to_string(&path).ok()?;
-                    Some(SaveFileSnapshot {
+                    Some(ParsedSaveFile {
                         name: path.file_name()?.to_string_lossy().to_string(),
-                        lower_text: text.to_lowercase(),
-                        text,
+                        areas: parse_save_areas(&text),
                     })
                 })
                 .collect()
@@ -149,22 +159,16 @@ pub fn read_save_stats(
 }
 
 fn collect_stats_from_saves(
-    save_files: &[SaveFileSnapshot],
+    save_files: &[ParsedSaveFile],
     needles: &[String],
     mode_index: Option<u8>,
 ) -> Option<MapStats> {
     let mut accumulator = SaveStatsAccumulator::new();
     for file in save_files {
-        if !needles
-            .iter()
-            .any(|needle| !needle.is_empty() && file.lower_text.contains(needle))
-        {
-            continue;
-        }
         let before = accumulator.stats.clone();
         let berry_count = accumulator.berry_ids.len();
         let missing_berries = accumulator.missing_berry_ids;
-        accumulate_save_stats(&file.text, needles, mode_index, &mut accumulator);
+        accumulate_parsed_save_stats(file, needles, mode_index, &mut accumulator);
         if accumulator.stats.deaths != before.deaths
             || accumulator.berry_ids.len() != berry_count
             || accumulator.stats.time_played != before.time_played
@@ -185,6 +189,149 @@ fn collect_stats_from_saves(
     } else {
         Some(stats)
     }
+}
+
+fn accumulate_parsed_save_stats(
+    file: &ParsedSaveFile,
+    needles: &[String],
+    mode_index: Option<u8>,
+    accumulator: &mut SaveStatsAccumulator,
+) {
+    for area in &file.areas {
+        if !needles
+            .iter()
+            .any(|needle| !needle.is_empty() && area.haystack.contains(needle))
+        {
+            continue;
+        }
+        if mode_index.is_none() || mode_index == Some(0) {
+            add_basic_stats(&area.area_stats, &mut accumulator.stats);
+        }
+        for (index, mode) in area.modes.iter().enumerate() {
+            if mode_index
+                .map(|selected| selected as usize == index)
+                .unwrap_or(true)
+            {
+                add_basic_stats(&mode.stats, &mut accumulator.stats);
+                accumulator.berry_ids.extend(mode.berry_ids.iter().cloned());
+                accumulator.missing_berry_ids =
+                    accumulator.missing_berry_ids || mode.missing_berry_ids;
+            }
+        }
+    }
+}
+
+fn parse_save_areas(xml: &str) -> Vec<ParsedAreaStats> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    let mut areas = vec![];
+    let mut current_area: Option<ParsedAreaStats> = None;
+    let mut current_area_sid = String::new();
+    let mut current_mode: Option<ParsedModeStats> = None;
+    let mut area_depth: Option<usize> = None;
+    let mut area_mode_depth: Option<usize> = None;
+    let mut strawberry_depth: Option<usize> = None;
+    let mut area_mode_total_strawberries = 0u64;
+    let mut area_mode_berry_ids_seen = 0usize;
+    let mut depth = 0usize;
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(event)) => {
+                depth += 1;
+                if is_area_stats_event(&event) {
+                    let mut area_stats = MapStats::default();
+                    add_area_event_stats(&event, &mut area_stats);
+                    current_area_sid = attr_value(&event, b"SID").unwrap_or_default();
+                    current_area = Some(ParsedAreaStats {
+                        haystack: event_haystack(&event),
+                        area_stats,
+                        modes: vec![],
+                    });
+                    area_depth = Some(depth);
+                } else if current_area.is_some() && is_area_mode_stats_event(&event) {
+                    let mut stats = MapStats::default();
+                    area_mode_total_strawberries = add_event_stats(&event, &mut stats);
+                    area_mode_berry_ids_seen = 0;
+                    current_mode = Some(ParsedModeStats {
+                        stats,
+                        berry_ids: HashSet::new(),
+                        missing_berry_ids: false,
+                    });
+                    area_mode_depth = Some(depth);
+                } else if area_mode_depth.is_some()
+                    && event.name().as_ref().eq_ignore_ascii_case(b"Strawberries")
+                {
+                    strawberry_depth = Some(depth);
+                } else if strawberry_depth.is_some()
+                    && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
+                    && add_berry_id_to_mode(&event, &current_area_sid, &mut current_mode)
+                {
+                    area_mode_berry_ids_seen += 1;
+                }
+            }
+            Ok(Event::Empty(event)) => {
+                if current_area.is_some() && is_area_mode_stats_event(&event) {
+                    let mut stats = MapStats::default();
+                    let total = add_event_stats(&event, &mut stats);
+                    if let Some(area) = current_area.as_mut() {
+                        area.modes.push(ParsedModeStats {
+                            stats,
+                            berry_ids: HashSet::new(),
+                            missing_berry_ids: total > 0,
+                        });
+                    }
+                } else if strawberry_depth.is_some()
+                    && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
+                    && add_berry_id_to_mode(&event, &current_area_sid, &mut current_mode)
+                {
+                    area_mode_berry_ids_seen += 1;
+                }
+            }
+            Ok(Event::End(event)) => {
+                if area_mode_depth == Some(depth) {
+                    if let Some(mut mode) = current_mode.take() {
+                        if area_mode_total_strawberries > 0 && area_mode_berry_ids_seen == 0 {
+                            mode.missing_berry_ids = true;
+                        }
+                        if let Some(area) = current_area.as_mut() {
+                            area.modes.push(mode);
+                        }
+                    }
+                    area_mode_depth = None;
+                    area_mode_total_strawberries = 0;
+                    area_mode_berry_ids_seen = 0;
+                }
+                if strawberry_depth == Some(depth) {
+                    strawberry_depth = None;
+                }
+                if area_depth == Some(depth)
+                    || event.name().as_ref().eq_ignore_ascii_case(b"AreaStats")
+                {
+                    if let Some(area) = current_area.take() {
+                        areas.push(area);
+                    }
+                    area_depth = None;
+                    current_area_sid.clear();
+                }
+                depth = depth.saturating_sub(1);
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    areas
+}
+
+fn add_basic_stats(source: &MapStats, target: &mut MapStats) {
+    target.deaths = target.deaths.saturating_add(source.deaths);
+    target.time_played = target.time_played.saturating_add(source.time_played);
+    target.completed = target.completed || source.completed;
+    target.completion_known = target.completion_known || source.completion_known;
+    target.cassettes = target.cassettes.saturating_add(source.cassettes);
+    target.hearts = target.hearts.saturating_add(source.hearts);
 }
 
 pub fn is_selectable_save_file(name: &str) -> bool {
@@ -289,6 +436,7 @@ fn official_area_sid(sub_map: &SubMapInfo) -> Option<String> {
     }
 }
 
+#[cfg(test)]
 fn accumulate_save_stats(
     xml: &str,
     needles: &[String],
@@ -397,7 +545,15 @@ fn is_area_mode_stats_event(event: &BytesStart<'_>) -> bool {
     event.name().as_ref().eq_ignore_ascii_case(b"AreaModeStats")
 }
 
+#[cfg(test)]
 fn event_matches(event: &BytesStart<'_>, needles: &[String]) -> bool {
+    let haystack = event_haystack(event);
+    needles
+        .iter()
+        .any(|needle| !needle.is_empty() && haystack.contains(needle))
+}
+
+fn event_haystack(event: &BytesStart<'_>) -> String {
     let mut haystack = String::from_utf8_lossy(event.name().as_ref()).to_lowercase();
     for attr in event.attributes().flatten() {
         haystack.push(' ');
@@ -405,9 +561,7 @@ fn event_matches(event: &BytesStart<'_>, needles: &[String]) -> bool {
         haystack.push('=');
         haystack.push_str(&String::from_utf8_lossy(attr.value.as_ref()).to_lowercase());
     }
-    needles
-        .iter()
-        .any(|needle| !needle.is_empty() && haystack.contains(needle))
+    haystack
 }
 
 fn add_area_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) {
@@ -456,6 +610,7 @@ fn add_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) -> u64 {
     total_strawberries
 }
 
+#[cfg(test)]
 fn add_berry_id(
     event: &BytesStart<'_>,
     area_sid: &str,
@@ -466,6 +621,23 @@ fn add_berry_id(
         true
     } else {
         accumulator.missing_berry_ids = true;
+        false
+    }
+}
+
+fn add_berry_id_to_mode(
+    event: &BytesStart<'_>,
+    area_sid: &str,
+    mode: &mut Option<ParsedModeStats>,
+) -> bool {
+    let Some(mode) = mode.as_mut() else {
+        return false;
+    };
+    if let Some(key) = attr_value(event, b"Key") {
+        mode.berry_ids.insert(format!("{area_sid}:{key}"));
+        true
+    } else {
+        mode.missing_berry_ids = true;
         false
     }
 }

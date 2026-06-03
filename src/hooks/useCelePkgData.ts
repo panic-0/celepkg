@@ -22,7 +22,8 @@ const emptyScan: ScanResult = {
   profiles: { activeMapProfileId: "default-maps", activeModProfileId: "default-mods", profiles: [] },
   availableSaveFiles: [],
   selectedSaveFiles: ["0.celeste"],
-  warnings: []
+  warnings: [],
+  timings: []
 };
 
 export function useCelePkgData() {

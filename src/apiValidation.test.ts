@@ -96,7 +96,8 @@ describe("api validation", () => {
         profiles,
         availableSaveFiles: [],
         selectedSaveFiles: ["0.celeste"],
-        warnings: []
+        warnings: [],
+        timings: []
       })
     ).toThrow("scan.maps[0].kind");
   });

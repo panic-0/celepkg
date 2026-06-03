@@ -358,6 +358,7 @@ mod tests {
             available_save_files: vec![],
             selected_save_files: vec![],
             warnings: vec![],
+            timings: vec![],
         };
 
         let resolved =
@@ -423,6 +424,7 @@ mod tests {
             available_save_files: vec![],
             selected_save_files: vec![],
             warnings: vec![],
+            timings: vec![],
         };
 
         let resolved = resolve_required_mod_ids(&scan, &[], &[]);

@@ -4,6 +4,12 @@ pub struct StrawberryCounts {
     pub total: u64,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MapBinSummary {
+    pub strawberry_counts: StrawberryCounts,
+    pub map_icon: Option<String>,
+}
+
 impl StrawberryCounts {
     fn saturating_add(self, other: Self) -> Self {
         Self {
@@ -23,25 +29,17 @@ pub fn count_visible_strawberries(bytes: &[u8]) -> Option<u64> {
     count_strawberry_counts(bytes).map(|counts| counts.visible)
 }
 
+#[cfg(test)]
 pub fn count_strawberry_counts(bytes: &[u8]) -> Option<StrawberryCounts> {
-    let mut reader = BinReader::new(bytes);
-    let header = reader.take_string().ok()?;
-    if header != "CELESTE MAP" {
-        return None;
-    }
-    let _package = reader.take_string().ok()?;
-    let lookup_count = reader.take_i16().ok()?;
-    if lookup_count < 0 {
-        return None;
-    }
-    let mut lookup = Vec::with_capacity(lookup_count as usize);
-    for _ in 0..lookup_count {
-        lookup.push(reader.take_string().ok()?);
-    }
-    count_element_strawberries(&mut reader, &lookup).ok()
+    read_map_summary(bytes).map(|summary| summary.strawberry_counts)
 }
 
+#[cfg(test)]
 pub fn read_map_icon(bytes: &[u8]) -> Option<String> {
+    read_map_summary(bytes).and_then(|summary| summary.map_icon)
+}
+
+pub fn read_map_summary(bytes: &[u8]) -> Option<MapBinSummary> {
     let mut reader = BinReader::new(bytes);
     let header = reader.take_string().ok()?;
     if header != "CELESTE MAP" {
@@ -56,7 +54,7 @@ pub fn read_map_icon(bytes: &[u8]) -> Option<String> {
     for _ in 0..lookup_count {
         lookup.push(reader.take_string().ok()?);
     }
-    read_element_map_icon(&mut reader, &lookup).ok().flatten()
+    read_element_summary(&mut reader, &lookup).ok()
 }
 
 #[cfg(test)]
@@ -64,55 +62,43 @@ pub fn is_strawberry_entity(name: &str) -> bool {
     is_strawberry_entity_name(&normalized_entity_name(name))
 }
 
-fn count_element_strawberries(
+fn read_element_summary(
     reader: &mut BinReader<'_>,
     lookup: &[String],
-) -> Result<StrawberryCounts, ()> {
+) -> Result<MapBinSummary, ()> {
     let name = reader.take_lookup(lookup)?;
+    let is_meta = name.eq_ignore_ascii_case("meta");
     let mut moon = false;
+    let mut map_icon = None;
     let attr_count = reader.take_u8()?;
     for _ in 0..attr_count {
         let key = reader.take_lookup(lookup)?;
         if key.eq_ignore_ascii_case("moon") {
             moon = reader.take_boolish_attr(lookup)?;
-        } else {
-            reader.skip_attr(lookup)?;
-        }
-    }
-    let mut count = strawberry_counts_for_entity(name, moon);
-    let child_count = reader.take_u16()?;
-    for _ in 0..child_count {
-        count = count.saturating_add(count_element_strawberries(reader, lookup)?);
-    }
-    Ok(count)
-}
-
-fn read_element_map_icon(
-    reader: &mut BinReader<'_>,
-    lookup: &[String],
-) -> Result<Option<String>, ()> {
-    let name = reader.take_lookup(lookup)?;
-    let is_meta = name.eq_ignore_ascii_case("meta");
-    let mut icon = None;
-    let attr_count = reader.take_u8()?;
-    for _ in 0..attr_count {
-        let key = reader.take_lookup(lookup)?;
-        if is_meta && key.eq_ignore_ascii_case("Icon") {
+        } else if is_meta && key.eq_ignore_ascii_case("Icon") {
             let value = reader.take_attr_string(lookup)?;
             if !value.trim().is_empty() {
-                icon = Some(value);
+                map_icon = Some(value);
             }
         } else {
             reader.skip_attr(lookup)?;
         }
     }
+    let mut summary = MapBinSummary {
+        strawberry_counts: strawberry_counts_for_entity(name, moon),
+        map_icon,
+    };
     let child_count = reader.take_u16()?;
     for _ in 0..child_count {
-        if let Some(child_icon) = read_element_map_icon(reader, lookup)? {
-            icon.get_or_insert(child_icon);
+        let child = read_element_summary(reader, lookup)?;
+        summary.strawberry_counts = summary
+            .strawberry_counts
+            .saturating_add(child.strawberry_counts);
+        if summary.map_icon.is_none() {
+            summary.map_icon = child.map_icon;
         }
     }
-    Ok(icon)
+    Ok(summary)
 }
 
 fn strawberry_counts_for_entity(name: &str, moon: bool) -> StrawberryCounts {

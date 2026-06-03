@@ -10,6 +10,7 @@ import type {
   ProfilesState,
   SaveFileInfo,
   ScanResult,
+  ScanTiming,
   SubMapInfo
 } from "./types";
 
@@ -51,7 +52,8 @@ export function validateScanResult(value: unknown): ScanResult {
       validateSaveFileInfo(item, `scan.availableSaveFiles[${index}]`)
     ),
     selectedSaveFiles: stringArrayAt(object.selectedSaveFiles, "scan.selectedSaveFiles"),
-    warnings: stringArrayAt(object.warnings, "scan.warnings")
+    warnings: stringArrayAt(object.warnings, "scan.warnings"),
+    timings: arrayAt(object.timings, "scan.timings").map((item, index) => validateScanTiming(item, `scan.timings[${index}]`))
   };
 }
 
@@ -114,6 +116,14 @@ function validateSaveFileInfo(value: unknown, path: string): SaveFileInfo {
     playerName: stringAt(object.playerName, `${path}.playerName`),
     currentMap: stringAt(object.currentMap, `${path}.currentMap`),
     lastModified: stringAt(object.lastModified, `${path}.lastModified`)
+  };
+}
+
+function validateScanTiming(value: unknown, path: string): ScanTiming {
+  const object = objectAt(value, path);
+  return {
+    stage: stringAt(object.stage, `${path}.stage`),
+    ms: numberAt(object.ms, `${path}.ms`)
   };
 }
 

@@ -1,24 +1,25 @@
 use crate::domain::{
     CompletionStatus, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult,
-    SubMapInfo,
+    ScanTiming, SubMapInfo,
 };
 use crate::parsers::dialog::{
     dialog_title_for_key, dialog_title_for_sid, is_dialog_file, read_dialog_titles,
 };
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
-use crate::parsers::map_bin::{count_strawberry_counts, read_map_icon, StrawberryCounts};
+use crate::parsers::map_bin::{read_map_summary, StrawberryCounts};
 use crate::parsers::save_stats::{
     is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
 };
 use crate::services::game::resolve_game_executable;
 use crate::storage::{read_json, scan_cache_path, write_json, write_text_file};
 use crate::utils::{normalize_slash, path_basename, stable_id};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
@@ -54,16 +55,26 @@ struct Blacklist {
     entries: HashSet<String>,
 }
 
+struct ModScanTarget {
+    file_name: String,
+    path: PathBuf,
+}
+
 pub fn full_scan_cached(
     celeste_path: &Path,
     profiles: ProfilesState,
     protected_record_ids: &[String],
     selected_save_files: &[String],
 ) -> ScanResult {
-    let available_save_files = list_save_files(celeste_path);
+    let mut timings = vec![];
+    let available_save_files = time_stage(&mut timings, "列出存档", || {
+        list_save_files(celeste_path)
+    });
     let selected_save_files =
         normalize_selected_save_files(&available_save_files, selected_save_files);
-    let signature = build_scan_signature(celeste_path, &selected_save_files);
+    let signature = time_stage(&mut timings, "生成缓存签名", || {
+        build_scan_signature(celeste_path, &selected_save_files)
+    });
     let cache_path = scan_cache_path(celeste_path);
     if let Some(mut cached) = read_json::<CachedScan>(&cache_path) {
         if cached.signature == signature {
@@ -71,6 +82,11 @@ pub fn full_scan_cached(
             cached.result.available_save_files = available_save_files;
             cached.result.selected_save_files = selected_save_files;
             apply_protected_flags(&mut cached.result, protected_record_ids);
+            timings.push(ScanTiming {
+                stage: "命中扫描缓存".to_string(),
+                ms: 0,
+            });
+            cached.result.timings = timings;
             return cached.result;
         }
     }
@@ -82,6 +98,7 @@ pub fn full_scan_cached(
         available_save_files,
         selected_save_files,
         signature,
+        &mut timings,
     )
 }
 
@@ -91,10 +108,15 @@ pub fn full_scan_fresh(
     protected_record_ids: &[String],
     selected_save_files: &[String],
 ) -> ScanResult {
-    let available_save_files = list_save_files(celeste_path);
+    let mut timings = vec![];
+    let available_save_files = time_stage(&mut timings, "列出存档", || {
+        list_save_files(celeste_path)
+    });
     let selected_save_files =
         normalize_selected_save_files(&available_save_files, selected_save_files);
-    let signature = build_scan_signature(celeste_path, &selected_save_files);
+    let signature = time_stage(&mut timings, "生成缓存签名", || {
+        build_scan_signature(celeste_path, &selected_save_files)
+    });
     scan_and_write_cache(
         celeste_path,
         profiles,
@@ -102,6 +124,7 @@ pub fn full_scan_fresh(
         available_save_files,
         selected_save_files,
         signature,
+        &mut timings,
     )
 }
 
@@ -112,20 +135,28 @@ fn scan_and_write_cache(
     available_save_files: Vec<SaveFileInfo>,
     selected_save_files: Vec<String>,
     signature: ScanSignature,
+    timings: &mut Vec<ScanTiming>,
 ) -> ScanResult {
     let mut result = full_scan(
         celeste_path,
         profiles,
         available_save_files,
         selected_save_files,
+        timings,
     );
-    apply_protected_flags(&mut result, protected_record_ids);
+    time_stage(timings, "应用始终启用标记", || {
+        apply_protected_flags(&mut result, protected_record_ids);
+    });
+    result.timings = timings.clone();
     let cache = CachedScan {
         signature,
         result: result.clone(),
     };
     let cache_path = scan_cache_path(celeste_path);
-    let _ = write_json(&cache_path, &cache);
+    time_stage(timings, "写入扫描缓存", || {
+        let _ = write_json(&cache_path, &cache);
+    });
+    result.timings = timings.clone();
     result
 }
 
@@ -146,12 +177,27 @@ pub fn full_scan(
     profiles: ProfilesState,
     available_save_files: Vec<SaveFileInfo>,
     selected_save_files: Vec<String>,
+    timings: &mut Vec<ScanTiming>,
 ) -> ScanResult {
-    let mut scan = scan_mods(celeste_path, &profiles);
-    scan.maps = read_save_stats(celeste_path, scan.maps, &selected_save_files);
+    let mut scan = time_stage(timings, "扫描 Mod 和地图", || {
+        scan_mods(celeste_path, &profiles)
+    });
+    scan.maps = time_stage(timings, "读取存档统计", || {
+        read_save_stats(celeste_path, scan.maps, &selected_save_files)
+    });
     scan.available_save_files = available_save_files;
     scan.selected_save_files = selected_save_files;
     scan
+}
+
+fn time_stage<T>(timings: &mut Vec<ScanTiming>, stage: &str, task: impl FnOnce() -> T) -> T {
+    let started = Instant::now();
+    let value = task();
+    timings.push(ScanTiming {
+        stage: stage.to_string(),
+        ms: started.elapsed().as_millis(),
+    });
+    value
 }
 
 fn apply_protected_flags(scan: &mut ScanResult, protected_record_ids: &[String]) {
@@ -279,29 +325,42 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
     let blacklist = read_blacklist(&mods_path);
     let favorites = read_favorites(&mods_path);
     let mut records = scan_official_maps(celeste_path, &favorites);
-    if let Ok(entries) = fs::read_dir(&mods_path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            if file_name.eq_ignore_ascii_case("blacklist.txt")
-                || file_name.eq_ignore_ascii_case("favorites.txt")
-            {
-                continue;
-            }
-            let parsed = if path.is_dir() {
-                read_directory_mod(&path, &mods_path)
-            } else if path.is_file() && file_name.to_lowercase().ends_with(".zip") {
-                read_zip_mod(&path, &mods_path)
+    let targets: Vec<ModScanTarget> = fs::read_dir(&mods_path)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    if file_name.eq_ignore_ascii_case("blacklist.txt")
+                        || file_name.eq_ignore_ascii_case("favorites.txt")
+                    {
+                        return None;
+                    }
+                    (path.is_dir()
+                        || (path.is_file() && file_name.to_lowercase().ends_with(".zip")))
+                    .then_some(ModScanTarget { file_name, path })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut scanned: Vec<ModRecord> = targets
+        .par_iter()
+        .filter_map(|target| {
+            if target.path.is_dir() {
+                read_directory_mod(&target.path, &mods_path)
+            } else if target.path.is_file() && target.file_name.to_lowercase().ends_with(".zip") {
+                read_zip_mod(&target.path, &mods_path)
             } else {
                 None
-            };
-            if let Some(mut record) = parsed {
-                record.enabled = !is_blacklisted(&record, &blacklist);
-                record.favorite = is_favorite(&record, &favorites);
-                records.push(record);
             }
-        }
+        })
+        .collect();
+    for record in &mut scanned {
+        record.enabled = !is_blacklisted(record, &blacklist);
+        record.favorite = is_favorite(record, &favorites);
     }
+    records.append(&mut scanned);
     let warnings = if mods_path.exists() {
         vec![]
     } else {
@@ -361,6 +420,7 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         available_save_files: vec![],
         selected_save_files: vec![],
         warnings,
+        timings: vec![],
     }
 }
 
@@ -405,7 +465,7 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
         .map(|file| {
             let strawberry_counts = fs::read(&file.path)
                 .ok()
-                .and_then(|bytes| count_strawberry_counts(&bytes))
+                .and_then(|bytes| read_map_summary(&bytes).map(|summary| summary.strawberry_counts))
                 .unwrap_or_default();
             let sid = format!("{}/{}", file.sid, file.side_name);
             SubMapInfo {
@@ -742,13 +802,14 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             normalize_slash(&entry.path().strip_prefix(dir_path).ok()?.to_string_lossy());
         if let Some(sid) = map_sid_from_entry(&relative) {
             if let Ok(bytes) = fs::read(entry.path()) {
-                if let Some(counts) = count_strawberry_counts(&bytes) {
-                    strawberry_counts.insert(sid.clone(), counts);
-                }
-                if let Some(difficulty) =
-                    read_map_icon(&bytes).and_then(|icon| difficulty_from_map_icon(&icon))
-                {
-                    map_difficulties.insert(sid, difficulty);
+                if let Some(summary) = read_map_summary(&bytes) {
+                    strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
+                    if let Some(difficulty) = summary
+                        .map_icon
+                        .and_then(|icon| difficulty_from_map_icon(&icon))
+                    {
+                        map_difficulties.insert(sid, difficulty);
+                    }
                 }
             }
         }
@@ -803,13 +864,14 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         if let Some(sid) = map_sid_from_entry(&name) {
             let mut bytes = Vec::new();
             let _ = file.read_to_end(&mut bytes);
-            if let Some(counts) = count_strawberry_counts(&bytes) {
-                strawberry_counts.insert(sid.clone(), counts);
-            }
-            if let Some(difficulty) =
-                read_map_icon(&bytes).and_then(|icon| difficulty_from_map_icon(&icon))
-            {
-                map_difficulties.insert(sid, difficulty);
+            if let Some(summary) = read_map_summary(&bytes) {
+                strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
+                if let Some(difficulty) = summary
+                    .map_icon
+                    .and_then(|icon| difficulty_from_map_icon(&icon))
+                {
+                    map_difficulties.insert(sid, difficulty);
+                }
             }
         }
         if path_basename(&name).eq_ignore_ascii_case("everest.yaml")
@@ -1342,6 +1404,7 @@ CompleteScreen:
             available_save_files: vec![],
             selected_save_files: vec![],
             warnings: vec![],
+            timings: vec![],
         };
 
         write_profile_blacklist(&root, &[], &["mod-id".to_string()], &scan)
@@ -1394,6 +1457,7 @@ CompleteScreen:
             available_save_files: vec![],
             selected_save_files: vec![],
             warnings: vec![],
+            timings: vec![],
         };
 
         write_profile_blacklist(&root, &[], &["disabled-always-enabled".to_string()], &scan)

@@ -148,6 +148,13 @@ pub struct ConfigResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ScanTiming {
+    pub stage: String,
+    pub ms: u128,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScanResult {
     pub celeste_path: String,
     pub mods_path: String,
@@ -160,6 +167,8 @@ pub struct ScanResult {
     pub available_save_files: Vec<SaveFileInfo>,
     pub selected_save_files: Vec<String>,
     pub warnings: Vec<String>,
+    #[serde(default)]
+    pub timings: Vec<ScanTiming>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

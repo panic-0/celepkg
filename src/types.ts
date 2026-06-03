@@ -132,6 +132,11 @@ export type BackupInfo = {
 
 export type RestoreScope = "game";
 
+export type ScanTiming = {
+  stage: string;
+  ms: number;
+};
+
 export type ScanResult = {
   celestePath: string;
   modsPath: string;
@@ -144,4 +149,5 @@ export type ScanResult = {
   availableSaveFiles: SaveFileInfo[];
   selectedSaveFiles: string[];
   warnings: string[];
+  timings: ScanTiming[];
 };
