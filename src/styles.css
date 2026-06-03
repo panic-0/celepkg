@@ -1363,6 +1363,15 @@ button.profile {
   padding: 9px;
 }
 
+.catalog-row-clickable {
+  cursor: pointer;
+}
+
+.catalog-row-clickable:hover {
+  border-color: #9fb7ca;
+  background: #f6f9fb;
+}
+
 .catalog-row.update-row {
   border-color: #b7d7e4;
   background: #f1f9fd;
@@ -1417,6 +1426,12 @@ button.profile {
   gap: 6px;
 }
 
+.catalog-row-actions .catalog-detail-button {
+  width: 32px;
+  min-height: 32px;
+  border-radius: 5px;
+}
+
 .catalog-row-actions a {
   width: 32px;
   min-height: 32px;
@@ -1432,6 +1447,45 @@ button.profile {
 .catalog-row-actions a:hover {
   border-color: #7c9dbb;
   color: #0a4c75;
+}
+
+.catalog-detail-dialog {
+  position: relative;
+  width: min(620px, calc(100vw - 28px));
+}
+
+.catalog-detail-dialog .confirm-dialog-heading {
+  min-height: 36px;
+  padding-right: 36px;
+}
+
+.catalog-detail-close-button {
+  position: absolute;
+  top: 16px;
+  right: 14px;
+}
+
+.catalog-detail-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.catalog-detail-facts div:nth-last-child(-n + 2) {
+  grid-column: 1 / -1;
+}
+
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #cbd7e3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #263849;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .catalog-warning-list {

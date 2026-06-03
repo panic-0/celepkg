@@ -1,4 +1,4 @@
-import { Download, ExternalLink, PackageCheck, Search } from "lucide-react";
+import { Download, ExternalLink, Info, PackageCheck, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { installMod, searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
@@ -18,6 +18,7 @@ const defaultSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
 export function ModCatalogManager({ celestePath, loading, notifier, scan, sources, setLoading, setScan }: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
+  const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
   const installedNames = useMemo(
     () => new Set([...scan.maps, ...scan.otherMods].map((item) => item.name.toLowerCase())),
     [scan.maps, scan.otherMods]
@@ -92,19 +93,39 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, source
                 installed={installedNames.has(entry.name.toLowerCase())}
                 key={`${entry.source}:${entry.id}`}
                 onInstall={() => installEntry(entry)}
+                onOpenDetail={() => setDetailEntry(entry)}
               />
             ))}
             {!searchResult.entries.length && <EmptyCatalog text="输入关键字搜索可下载的新 Mod。" />}
           </div>
         </section>
       </div>
+      {detailEntry && (
+        <CatalogEntryDetailDialog
+          entry={detailEntry}
+          installed={installedNames.has(detailEntry.name.toLowerCase())}
+          loading={loading}
+          onClose={() => setDetailEntry(null)}
+          onInstall={() => installEntry(detailEntry)}
+        />
+      )}
     </section>
   );
 }
 
-function CatalogEntryRow({ entry, installed, onInstall }: { entry: ModCatalogEntry; installed: boolean; onInstall: () => void }) {
+function CatalogEntryRow({
+  entry,
+  installed,
+  onInstall,
+  onOpenDetail
+}: {
+  entry: ModCatalogEntry;
+  installed: boolean;
+  onInstall: () => void;
+  onOpenDetail: () => void;
+}) {
   return (
-    <article className="catalog-row">
+    <article className="catalog-row catalog-row-clickable" onClick={onOpenDetail}>
       <div className="catalog-row-main">
         <strong title={entry.name}>{entry.name}</strong>
         <span>{sourceLabel(entry.source)}</span>
@@ -115,18 +136,93 @@ function CatalogEntryRow({ entry, installed, onInstall }: { entry: ModCatalogEnt
         <small>{formatSize(entry.size)}</small>
       </div>
       <div className="catalog-row-actions">
+        <button className="icon-button catalog-detail-button" onClick={stopAndRun(onOpenDetail)} title="查看详情">
+          <Info size={15} />
+        </button>
         {entry.pageUrl && (
-          <a href={entry.pageUrl} target="_blank" rel="noreferrer" title="打开来源页面">
+          <a href={entry.pageUrl} target="_blank" rel="noreferrer" title="打开来源页面" onClick={(event) => event.stopPropagation()}>
             <ExternalLink size={15} />
           </a>
         )}
-        <button onClick={onInstall} disabled={installed || !entry.downloadUrl}>
+        <button onClick={stopAndRun(onInstall)} disabled={installed || !entry.downloadUrl}>
           <Download size={15} />
           {installed ? "已安装" : "安装"}
         </button>
       </div>
     </article>
   );
+}
+
+function CatalogEntryDetailDialog({
+  entry,
+  installed,
+  loading,
+  onClose,
+  onInstall
+}: {
+  entry: ModCatalogEntry;
+  installed: boolean;
+  loading: boolean;
+  onClose: () => void;
+  onInstall: () => void;
+}) {
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="confirm-dialog catalog-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="catalog-detail-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="confirm-dialog-heading">
+          <PackageCheck size={18} />
+          <h3 id="catalog-detail-title">{entry.name}</h3>
+          <button className="icon-button catalog-detail-close-button" onClick={onClose} disabled={loading} title="关闭详情">
+            <X size={16} />
+          </button>
+        </div>
+        <dl className="confirm-dialog-facts catalog-detail-facts">
+          <FactRow label="版本" value={entry.version || "无版本号"} />
+          <FactRow label="来源" value={sourceLabel(entry.source)} />
+          <FactRow label="类型" value={entry.gameBananaType || "Mod"} />
+          <FactRow label="大小" value={formatSize(entry.size)} />
+          <FactRow label="更新" value={formatCatalogTime(entry.lastUpdate)} />
+          <FactRow label="GameBanana" value={formatGameBananaInfo(entry)} />
+          <FactRow label="下载地址" value={entry.downloadUrl || "无下载地址"} />
+          <FactRow label="来源页面" value={entry.pageUrl || "无来源页面"} />
+        </dl>
+        <div className="confirm-dialog-actions">
+          {entry.pageUrl && (
+            <a className="button-like" href={entry.pageUrl} target="_blank" rel="noreferrer">
+              <ExternalLink size={15} />
+              来源页面
+            </a>
+          )}
+          <button className="confirm-primary-button" onClick={onInstall} disabled={loading || installed || !entry.downloadUrl}>
+            <Download size={15} />
+            {installed ? "已安装" : "安装"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function FactRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd title={value}>{value}</dd>
+    </div>
+  );
+}
+
+function stopAndRun(callback: () => void) {
+  return (event: React.MouseEvent) => {
+    event.stopPropagation();
+    callback();
+  };
 }
 
 function WarningStrip({ warnings }: { warnings: string[] }) {
@@ -158,4 +254,17 @@ function formatSize(size: number | null) {
   if (!size) return "未知大小";
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KiB`;
   return `${(size / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+function formatCatalogTime(value: number | null) {
+  if (!value) return "未知";
+  return new Date(value * 1000).toLocaleString();
+}
+
+function formatGameBananaInfo(entry: ModCatalogEntry) {
+  const parts = [
+    entry.gameBananaId === null ? "" : `Mod ${entry.gameBananaId}`,
+    entry.gameBananaFileId === null ? "" : `File ${entry.gameBananaFileId}`
+  ].filter(Boolean);
+  return parts.length ? parts.join("，") : "无";
 }
