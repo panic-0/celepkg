@@ -1,6 +1,7 @@
 import type {
   BackupFileEntry,
   BackupInfo,
+  BackupModEntry,
   ConfigResponse,
   Dependency,
   InstalledModMatch,
@@ -97,7 +98,8 @@ export function validateBackupInfo(value: unknown, path = "backup"): BackupInfo 
     kind: oneOfAt(object.kind, ["manual", "auto"], `${path}.kind`),
     celestePath: stringAt(object.celestePath, `${path}.celestePath`),
     backupPath: stringAt(object.backupPath, `${path}.backupPath`),
-    files: arrayAt(object.files, `${path}.files`).map((item, index) => validateBackupFileEntry(item, `${path}.files[${index}]`))
+    files: arrayAt(object.files, `${path}.files`).map((item, index) => validateBackupFileEntry(item, `${path}.files[${index}]`)),
+    mods: arrayAt(object.mods ?? [], `${path}.mods`).map((item, index) => validateBackupModEntry(item, `${path}.mods[${index}]`))
   };
 }
 
@@ -159,6 +161,19 @@ function validateBackupFileEntry(value: unknown, path: string): BackupFileEntry 
     targetPath: stringAt(object.targetPath, `${path}.targetPath`),
     backupPath: stringAt(object.backupPath, `${path}.backupPath`),
     existed: booleanAt(object.existed, `${path}.existed`)
+  };
+}
+
+function validateBackupModEntry(value: unknown, path: string): BackupModEntry {
+  const object = objectAt(value, path);
+  return {
+    name: stringAt(object.name, `${path}.name`),
+    metadataName: stringAt(object.metadataName, `${path}.metadataName`),
+    fileName: stringAt(object.fileName, `${path}.fileName`),
+    relativePath: stringAt(object.relativePath, `${path}.relativePath`),
+    version: stringAt(object.version, `${path}.version`),
+    enabled: booleanAt(object.enabled, `${path}.enabled`),
+    isArchive: booleanAt(object.isArchive, `${path}.isArchive`)
   };
 }
 

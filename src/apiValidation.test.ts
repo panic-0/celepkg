@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  validateBackupInfo,
   validateConfigResponse,
   validateModCatalogSearchResult,
   validateModInstallResult,
@@ -104,6 +105,30 @@ describe("api validation", () => {
         warnings: []
       })
     ).toThrow("config.autoBackupEnabled");
+  });
+
+  it("accepts backup responses with installed mod snapshots", () => {
+    expect(
+      validateBackupInfo({
+        id: "100-auto",
+        createdAt: "100",
+        kind: "auto",
+        celestePath: "D:/Celeste",
+        backupPath: "D:/Celeste/celepkg/backups/100-auto",
+        files: [],
+        mods: [
+          {
+            name: "Helper",
+            metadataName: "Helper",
+            fileName: "Helper.zip",
+            relativePath: "Helper.zip",
+            version: "1.2.3",
+            enabled: true,
+            isArchive: true
+          }
+        ]
+      }).mods[0].version
+    ).toBe("1.2.3");
   });
 
   it("rejects scan records with unknown enum values", () => {

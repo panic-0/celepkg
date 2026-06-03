@@ -208,6 +208,18 @@ pub struct BackupFileEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BackupModEntry {
+    pub name: String,
+    pub metadata_name: String,
+    pub file_name: String,
+    pub relative_path: String,
+    pub version: String,
+    pub enabled: bool,
+    pub is_archive: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupInfo {
     pub id: String,
     pub created_at: String,
@@ -215,6 +227,7 @@ pub struct BackupInfo {
     pub celeste_path: String,
     pub backup_path: String,
     pub files: Vec<BackupFileEntry>,
+    pub mods: Vec<BackupModEntry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,10 +1,13 @@
-use crate::domain::{BackupFileEntry, BackupInfo};
+use crate::domain::{BackupFileEntry, BackupInfo, BackupModEntry, ModMetadata};
+use crate::parsers::everest::parse_metadata;
 use crate::storage::{read_json, write_json};
 use crate::utils::normalize_slash;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use zip::ZipArchive;
 
 const BACKUP_KIND_AUTO: &str = "auto";
 const BACKUP_KIND_MANUAL: &str = "manual";
@@ -19,6 +22,8 @@ struct BackupManifest {
     kind: String,
     celeste_path: String,
     files: Vec<BackupFileEntry>,
+    #[serde(default)]
+    mods: Vec<BackupModEntry>,
 }
 
 pub fn create_manual_backup(celeste_path: &Path) -> Result<BackupInfo, String> {
@@ -103,6 +108,7 @@ fn create_backup_in(
         kind: kind.to_string(),
         celeste_path: celeste_path.to_string_lossy().to_string(),
         files,
+        mods: collect_installed_mods(celeste_path),
     };
     write_json(&backup_path.join("manifest.json"), &manifest)?;
     read_backup_info(&backup_path).ok_or_else(|| "读取备份清单失败".to_string())
@@ -167,6 +173,7 @@ fn read_backup_info(backup_path: &Path) -> Option<BackupInfo> {
         celeste_path: manifest.celeste_path,
         backup_path: backup_path.to_string_lossy().to_string(),
         files: manifest.files,
+        mods: manifest.mods,
     })
 }
 
@@ -260,6 +267,147 @@ fn backup_path_for_id(backups_root: &Path, backup_id: &str) -> Result<PathBuf, S
     Ok(backups_root.join(safe_id))
 }
 
+fn collect_installed_mods(celeste_path: &Path) -> Vec<BackupModEntry> {
+    let mods_path = celeste_path.join("Mods");
+    let blacklist = read_backup_blacklist(&mods_path);
+    let Ok(entries) = fs::read_dir(&mods_path) else {
+        return vec![];
+    };
+    let mut mods = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if file_name.eq_ignore_ascii_case("blacklist.txt")
+                || file_name.eq_ignore_ascii_case("favorites.txt")
+            {
+                return None;
+            }
+            let is_archive = path.is_file() && file_name.to_lowercase().ends_with(".zip");
+            if !path.is_dir() && !is_archive {
+                return None;
+            }
+            let metadata = read_backup_mod_metadata(&path, is_archive);
+            Some(create_backup_mod_entry(
+                &path, &mods_path, is_archive, metadata, &blacklist,
+            ))
+        })
+        .collect::<Vec<_>>();
+    mods.sort_by(|left, right| left.name.cmp(&right.name));
+    mods
+}
+
+fn create_backup_mod_entry(
+    path: &Path,
+    mods_path: &Path,
+    is_archive: bool,
+    metadata: ModMetadata,
+    blacklist: &[String],
+) -> BackupModEntry {
+    let relative_path = normalize_slash(
+        &path
+            .strip_prefix(mods_path)
+            .unwrap_or(path)
+            .to_string_lossy(),
+    );
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| relative_path.clone());
+    let fallback_name = file_name.trim_end_matches(".zip").replace(['_', '-'], " ");
+    let name = if metadata.name.is_empty() {
+        fallback_name
+    } else {
+        metadata.name.clone()
+    };
+    BackupModEntry {
+        enabled: !is_backup_mod_blacklisted(
+            &file_name,
+            &relative_path,
+            &name,
+            &metadata,
+            blacklist,
+        ),
+        name,
+        metadata_name: metadata.name,
+        file_name,
+        relative_path,
+        version: metadata.version,
+        is_archive,
+    }
+}
+
+fn read_backup_mod_metadata(path: &Path, is_archive: bool) -> ModMetadata {
+    let yaml_text = if is_archive {
+        read_zip_everest_yaml(path)
+    } else {
+        read_directory_everest_yaml(path)
+    };
+    parse_metadata(&yaml_text)
+}
+
+fn read_directory_everest_yaml(path: &Path) -> String {
+    ["everest.yaml", "everest.yml"]
+        .iter()
+        .find_map(|file_name| fs::read_to_string(path.join(file_name)).ok())
+        .unwrap_or_default()
+}
+
+fn read_zip_everest_yaml(path: &Path) -> String {
+    let Ok(file) = File::open(path) else {
+        return String::new();
+    };
+    let Ok(mut archive) = ZipArchive::new(file) else {
+        return String::new();
+    };
+    for index in 0..archive.len() {
+        let Ok(mut file) = archive.by_index(index) else {
+            continue;
+        };
+        if is_everest_yaml_entry(&normalize_slash(file.name())) {
+            let mut text = String::new();
+            let _ = file.read_to_string(&mut text);
+            return text;
+        }
+    }
+    String::new()
+}
+
+fn read_backup_blacklist(mods_path: &Path) -> Vec<String> {
+    fs::read_to_string(mods_path.join("blacklist.txt"))
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| normalize_slash(line).to_lowercase())
+        .collect()
+}
+
+fn is_backup_mod_blacklisted(
+    file_name: &str,
+    relative_path: &str,
+    name: &str,
+    metadata: &ModMetadata,
+    blacklist: &[String],
+) -> bool {
+    [
+        file_name,
+        relative_path,
+        name,
+        metadata.name.as_str(),
+        file_name.trim_end_matches(".zip"),
+    ]
+    .iter()
+    .filter(|value| !value.is_empty())
+    .map(|value| normalize_slash(value).to_lowercase())
+    .any(|value| blacklist.contains(&value))
+}
+
+fn is_everest_yaml_entry(entry: &str) -> bool {
+    let basename = entry.rsplit('/').next().unwrap_or(entry);
+    basename.eq_ignore_ascii_case("everest.yaml") || basename.eq_ignore_ascii_case("everest.yml")
+}
+
 struct BackupSource {
     category: &'static str,
     label: &'static str,
@@ -270,6 +418,8 @@ struct BackupSource {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
 
     #[test]
     fn manual_backup_copies_game_files() {
@@ -497,6 +647,74 @@ mod tests {
     }
 
     #[test]
+    fn backup_records_installed_mod_metadata_and_versions() {
+        let root = temp_root("mods");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        let mods = celeste.join("Mods");
+        fs::create_dir_all(&mods).expect("mods");
+        write_file(
+            &mods.join("FolderHelper").join("everest.yaml"),
+            "Name: Folder Helper\nVersion: 1.2.3\n",
+        );
+        write_zip_mod(&mods.join("ZipMap.zip"), "Name: Zip Map\nVersion: 2.0.0\n");
+        write_file(&mods.join("blacklist.txt"), "ZipMap.zip\n");
+
+        let backup = create_backup_in(&backups, &celeste, BACKUP_KIND_MANUAL).expect("backup");
+
+        let folder_mod = backup
+            .mods
+            .iter()
+            .find(|mod_item| mod_item.metadata_name == "Folder Helper")
+            .expect("folder mod");
+        assert_eq!(folder_mod.version, "1.2.3");
+        assert_eq!(folder_mod.file_name, "FolderHelper");
+        assert!(!folder_mod.is_archive);
+        assert!(folder_mod.enabled);
+
+        let zip_mod = backup
+            .mods
+            .iter()
+            .find(|mod_item| mod_item.metadata_name == "Zip Map")
+            .expect("zip mod");
+        assert_eq!(zip_mod.version, "2.0.0");
+        assert_eq!(zip_mod.file_name, "ZipMap.zip");
+        assert!(zip_mod.is_archive);
+        assert!(!zip_mod.enabled);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn old_backup_manifest_without_mods_still_loads() {
+        let root = temp_root("old-manifest");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        let backup_path = backups.join("100");
+        fs::create_dir_all(&backup_path).expect("backup dir");
+        write_file(
+            &backup_path.join("manifest.json"),
+            &format!(
+                r#"{{
+                    "id":"100",
+                    "createdAt":"100",
+                    "kind":"manual",
+                    "celestePath":"{}",
+                    "files":[]
+                }}"#,
+                normalize_slash(&celeste.to_string_lossy())
+            ),
+        );
+
+        let backups = list_backups_in(&backups);
+
+        assert_eq!(backups.len(), 1);
+        assert!(backups[0].mods.is_empty());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn backups_root_lives_under_celeste_path() {
         let celeste = PathBuf::from(r"D:\Games\Celeste");
 
@@ -531,6 +749,18 @@ mod tests {
         fs::write(path, text).expect("write");
     }
 
+    fn write_zip_mod(path: &Path, metadata: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("zip parent");
+        }
+        let file = File::create(path).expect("zip file");
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file("everest.yaml", SimpleFileOptions::default())
+            .expect("start file");
+        zip.write_all(metadata.as_bytes()).expect("write metadata");
+        zip.finish().expect("finish zip");
+    }
+
     fn create_manifest_backup(backups_root: &Path, celeste_path: &Path, id: &str, kind: &str) {
         let backup_path = backups_root.join(id);
         fs::create_dir_all(&backup_path).expect("backup dir");
@@ -542,6 +772,7 @@ mod tests {
                 kind: kind.to_string(),
                 celeste_path: celeste_path.to_string_lossy().to_string(),
                 files: vec![],
+                mods: vec![],
             },
         )
         .expect("manifest");

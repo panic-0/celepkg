@@ -125,6 +125,16 @@ export type BackupFileEntry = {
   existed: boolean;
 };
 
+export type BackupModEntry = {
+  name: string;
+  metadataName: string;
+  fileName: string;
+  relativePath: string;
+  version: string;
+  enabled: boolean;
+  isArchive: boolean;
+};
+
 export type BackupInfo = {
   id: string;
   createdAt: string;
@@ -132,6 +142,7 @@ export type BackupInfo = {
   celestePath: string;
   backupPath: string;
   files: BackupFileEntry[];
+  mods: BackupModEntry[];
 };
 
 export type RestoreScope = "game";

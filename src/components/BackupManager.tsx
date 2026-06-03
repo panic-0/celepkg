@@ -137,7 +137,7 @@ function BackupItem({
         <strong>{formatBackupTime(backup.createdAt)}</strong>
         <span>{backup.kind === "manual" ? "手动备份" : "自动备份"}</span>
         <small title={backup.celestePath}>{backup.celestePath || "未设置 Celeste 目录"}</small>
-        <small>{`游戏文件 ${gameFiles}/2`}</small>
+        <small>{`Mod ${backup.mods.length} 个，游戏文件 ${gameFiles}/2`}</small>
       </div>
       <div className="backup-actions">
         <button onClick={() => onLocationOpen(backup.backupPath)} disabled={loading}>
@@ -180,6 +180,7 @@ function BackupDeleteDialog({
         <dl className="confirm-dialog-facts">
           <FactRow label="时间" value={formatBackupTime(backup.createdAt)} />
           <FactRow label="类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
+          <FactRow label="Mod" value={`${backup.mods.length} 个`} />
           <FactRow label="游戏文件" value={`${gameFiles}/${backup.files.filter((file) => file.category === "game").length}`} />
           <FactRow label="位置" value={backup.backupPath} />
         </dl>
@@ -219,6 +220,7 @@ function BackupRestoreDialog({
         <dl className="confirm-dialog-facts">
           <FactRow label="备份时间" value={formatBackupTime(backup.createdAt)} />
           <FactRow label="备份类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
+          <FactRow label="Mod 快照" value={`${backup.mods.length} 个`} />
         </dl>
         <div className="restore-preview-list">
           {files.map((file) => (

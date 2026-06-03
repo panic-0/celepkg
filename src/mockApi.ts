@@ -1,5 +1,6 @@
 import type {
   BackupInfo,
+  BackupModEntry,
   ConfigResponse,
   MapStats,
   ModCatalogEntry,
@@ -746,12 +747,25 @@ function backup(id: string, kind: BackupInfo["kind"], backupPath: string, celest
       fileEntry("state", "扫描缓存", `${mockCelestePath}\\.celepkg\\scan-cache.json`, `${backupPath}\\scan-cache.json`, true),
       fileEntry("game", "Celeste.exe", `${mockCelestePath}\\Celeste.exe`, `${backupPath}\\game\\Celeste.exe`, celesteExeExisted),
       fileEntry("game", "Celeste.dll", `${mockCelestePath}\\Celeste.dll`, `${backupPath}\\game\\Celeste.dll`, dllExisted)
-    ]
+    ],
+    mods: backupMods()
   };
 }
 
 function fileEntry(category: "state" | "game", label: string, targetPath: string, backupPath: string, existed: boolean) {
   return { category, label, targetPath, backupPath, existed };
+}
+
+function backupMods(): BackupModEntry[] {
+  return [...scan.maps, ...scan.otherMods].slice(0, 8).map((record) => ({
+    name: record.name,
+    metadataName: record.metadata.name,
+    fileName: record.fileName,
+    relativePath: record.relativePath,
+    version: record.metadata.version,
+    enabled: record.enabled,
+    isArchive: record.isArchive
+  }));
 }
 
 function createTimings() {
