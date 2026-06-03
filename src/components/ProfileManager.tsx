@@ -1,4 +1,4 @@
-import { AlertTriangle, Copy, Gamepad2, Layers, Plus, RefreshCw, ToggleRight, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, Copy, Gamepad2, Layers, Pencil, Plus, RefreshCw, ToggleRight, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ProfileOverwriteMode } from "../hooks/useProfileDraft";
@@ -34,8 +34,10 @@ type ProfileManagerProps = {
   onModProfileCreateEmpty: () => void;
   onMapProfileOverwriteFromCurrent: () => void;
   onMapProfileOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
+  onMapProfileRename: (profile: Profile, name: string) => void;
   onModProfileOverwriteFromCurrent: () => void;
   onModProfileOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
+  onModProfileRename: (profile: Profile, name: string) => void;
 };
 
 export function ProfileManager({
@@ -67,8 +69,10 @@ export function ProfileManager({
   onModProfileCreateEmpty,
   onMapProfileOverwriteFromCurrent,
   onMapProfileOverwriteFromProfile,
+  onMapProfileRename,
   onModProfileOverwriteFromCurrent,
-  onModProfileOverwriteFromProfile
+  onModProfileOverwriteFromProfile,
+  onModProfileRename
 }: ProfileManagerProps) {
   const selectedMapProfile = mapProfiles.find((profile) => profile.id === selectedMapProfileId);
   const selectedModProfile = modProfiles.find((profile) => profile.id === selectedModProfileId);
@@ -114,6 +118,7 @@ export function ProfileManager({
           onOverwriteFromCurrent={onMapProfileOverwriteFromCurrent}
           onOverwriteFromProfile={onMapProfileOverwriteFromProfile}
           onProfileDelete={onMapProfileDelete}
+          onProfileRename={onMapProfileRename}
           onProfileSelect={onMapProfileSelect}
           scrollKey="profiles:maps"
           scrollMemory={scrollMemory}
@@ -134,6 +139,7 @@ export function ProfileManager({
           onOverwriteFromCurrent={onModProfileOverwriteFromCurrent}
           onOverwriteFromProfile={onModProfileOverwriteFromProfile}
           onProfileDelete={onModProfileDelete}
+          onProfileRename={onModProfileRename}
           onProfileSelect={onModProfileSelect}
           scrollKey="profiles:mods"
           scrollMemory={scrollMemory}
@@ -168,6 +174,7 @@ function ProfileColumn({
   onOverwriteFromCurrent,
   onOverwriteFromProfile,
   onProfileDelete,
+  onProfileRename,
   onProfileSelect,
   scrollKey,
   scrollMemory
@@ -186,11 +193,14 @@ function ProfileColumn({
   onOverwriteFromCurrent: () => void;
   onOverwriteFromProfile: (sourceProfileId: string, mode: ProfileOverwriteMode) => void;
   onProfileDelete: (profile: Profile) => void;
+  onProfileRename: (profile: Profile, name: string) => void;
   onProfileSelect: (profile: Profile) => void;
   scrollKey: string;
   scrollMemory: ScrollMemory;
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const [overwriteMode, setOverwriteMode] = useState<ProfileOverwriteMode>("enabled");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const profileListRef = useScrollMemory<HTMLDivElement>(scrollKey, scrollMemory);
@@ -244,6 +254,22 @@ function ProfileColumn({
     });
   }
 
+  function startRename(profile: Profile) {
+    setEditingProfileId(profile.id);
+    setRenameDraft(profile.name);
+  }
+
+  function cancelRename() {
+    setEditingProfileId(null);
+    setRenameDraft("");
+  }
+
+  function commitRename(profile: Profile) {
+    const nextName = renameDraft.trim();
+    cancelRename();
+    if (nextName && nextName !== profile.name) onProfileRename(profile, nextName);
+  }
+
   function confirmPendingAction() {
     const action = confirmDialog?.onConfirm;
     setConfirmDialog(null);
@@ -262,49 +288,88 @@ function ProfileColumn({
       </div>
       <div className="profile-list table-like" ref={profileListRef}>
         {profiles.length ? (
-          profiles.map((profile) => (
-            <div className={profile.id === selectedProfileId ? "profile-row active" : "profile-row"} key={profile.id}>
-              <button className="profile" onClick={() => onProfileSelect(profile)}>
-                <span>{profile.name}</span>
-                <small>{profileSummary(profile)}</small>
-              </button>
-              <div className="profile-row-actions">
-                <button
-                  className="profile-action-button"
-                  disabled={loading}
-                  title="复制 Profile"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCopy(profile);
-                  }}
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  className="profile-action-button overwrite"
-                  disabled={loading || !selectedProfile || profile.id === selectedProfileId}
-                  title={profile.id === selectedProfileId ? "不能从当前 Profile 覆盖自己" : "从此 Profile 覆盖当前 Profile"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openOverwriteFromProfileDialog(profile);
-                  }}
-                >
-                  <RefreshCw size={14} />
-                </button>
-                <button
-                  className="profile-action-button danger"
-                  disabled={loading || isDefaultProfile(profile)}
-                  title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openDeleteDialog(profile);
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
+          profiles.map((profile) => {
+            const isRenaming = editingProfileId === profile.id;
+            return (
+              <div className={profile.id === selectedProfileId ? "profile-row active" : "profile-row"} key={profile.id}>
+                {isRenaming ? (
+                  <div className="profile profile-editing">
+                    <input
+                      autoFocus
+                      className="profile-name-input"
+                      value={renameDraft}
+                      onBlur={() => commitRename(profile)}
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitRename(profile);
+                        } else if (event.key === "Escape") {
+                          cancelRename();
+                        }
+                      }}
+                    />
+                    <small>{profileSummary(profile)}</small>
+                  </div>
+                ) : (
+                  <button className="profile" onClick={() => onProfileSelect(profile)}>
+                    <span>{profile.name}</span>
+                    <small>{profileSummary(profile)}</small>
+                  </button>
+                )}
+                <div className="profile-row-actions">
+                  <button
+                    className={isRenaming ? "profile-action-button save" : "profile-action-button"}
+                    disabled={loading}
+                    title={isRenaming ? "保存名称" : "重命名 Profile"}
+                    onMouseDown={(event) => {
+                      if (isRenaming) event.preventDefault();
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (isRenaming) commitRename(profile);
+                      else startRename(profile);
+                    }}
+                  >
+                    {isRenaming ? <Check size={14} /> : <Pencil size={14} />}
+                  </button>
+                  <button
+                    className="profile-action-button"
+                    disabled={loading || isRenaming}
+                    title="复制 Profile"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCopy(profile);
+                    }}
+                  >
+                    <Copy size={14} />
+                  </button>
+                  <button
+                    className="profile-action-button overwrite"
+                    disabled={loading || isRenaming || !selectedProfile || profile.id === selectedProfileId}
+                    title={profile.id === selectedProfileId ? "不能从当前 Profile 覆盖自己" : "从此 Profile 覆盖当前 Profile"}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openOverwriteFromProfileDialog(profile);
+                    }}
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                  <button
+                    className="profile-action-button danger"
+                    disabled={loading || isRenaming || isDefaultProfile(profile)}
+                    title={isDefaultProfile(profile) ? "默认 Profile 不能删除" : "删除 Profile"}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openDeleteDialog(profile);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="empty-state compact profile-list-empty">
             <p>还没有 Profile。</p>

@@ -694,9 +694,19 @@ h1 {
 .profile {
   display: grid;
   justify-items: start;
+  align-items: start;
   gap: 1px;
   min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid #c7d0da;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #233142;
   text-align: left;
+}
+
+button.profile {
+  justify-content: start;
 }
 
 .profile-row.active .profile {
@@ -706,6 +716,30 @@ h1 {
 
 .profile small {
   color: #697786;
+}
+
+.profile.profile-editing {
+  cursor: text;
+}
+
+.profile-name-input {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  line-height: normal;
+  color: inherit;
+}
+
+.profile-name-input:focus {
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .profile-row-actions {
@@ -725,6 +759,18 @@ h1 {
 .profile-action-button:hover:not(:disabled) {
   background: #eef8fc;
   color: #0f77ad;
+}
+
+.profile-action-button.save {
+  border-color: #b9d9c7;
+  background: #f0fbf4;
+  color: #187146;
+}
+
+.profile-action-button.save:hover:not(:disabled) {
+  border-color: #69b38b;
+  background: #e4f8ec;
+  color: #0f5f38;
 }
 
 .profile-action-button.overwrite:hover:not(:disabled) {

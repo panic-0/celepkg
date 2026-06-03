@@ -350,6 +350,91 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     });
   }
 
+  async function renameMapProfile(profile: Profile, name: string) {
+    await runProfileTask(async () => {
+      const nextName = name.trim();
+      if (!nextName) {
+        notifier.showWarning("Profile 名称不能为空。");
+        return;
+      }
+      if (profileNameExists(mapProfiles, nextName, profile.id)) {
+        notifier.showWarning("同名地图 Profile 已存在。");
+        return;
+      }
+
+      mapAutoSaveReadyRef.current = false;
+      const isSelectedProfile = profile.id === selectedMapProfileId;
+      const content = isSelectedProfile
+        ? {
+            enabledMapIds: [...enabledMapDraft],
+            enabledModIds: [...enabledMapModDraft],
+            launchArgs
+          }
+        : {
+            ...resolveMapProfileContent(profile, scan),
+            launchArgs: profile.launchArgs
+          };
+      const profiles = await enqueueProfileSave(() =>
+        saveProfile({
+          id: profile.id,
+          name: nextName,
+          profileType: "maps",
+          enabledMapIds: content.enabledMapIds,
+          enabledModIds: content.enabledModIds,
+          launchArgs: content.launchArgs,
+          createdAt: profile.createdAt
+        })
+      );
+
+      if (isSelectedProfile) {
+        setMapDirty(false);
+        setSelectedMapProfileId(profile.id);
+        setLaunchArgs(content.launchArgs);
+        setEnabledMapDraft(new Set(content.enabledMapIds));
+        setEnabledMapModDraft(new Set(content.enabledModIds));
+      }
+      mapAutoSaveReadyRef.current = true;
+      setScan((value) => ({ ...value, profiles }));
+      notifier.showSuccess("地图 Profile 已重命名。");
+    });
+  }
+
+  async function renameModProfile(profile: Profile, name: string) {
+    await runProfileTask(async () => {
+      const nextName = name.trim();
+      if (!nextName) {
+        notifier.showWarning("Profile 名称不能为空。");
+        return;
+      }
+      if (profileNameExists(modProfiles, nextName, profile.id)) {
+        notifier.showWarning("同名 Mod Profile 已存在。");
+        return;
+      }
+
+      modAutoSaveReadyRef.current = false;
+      const isSelectedProfile = profile.id === selectedModProfileId;
+      const content = isSelectedProfile ? { enabledModIds: [...enabledExplicitModDraft] } : resolveModProfileContent(profile, scan);
+      const profiles = await enqueueProfileSave(() =>
+        saveProfile({
+          id: profile.id,
+          name: nextName,
+          profileType: "mods",
+          enabledModIds: content.enabledModIds,
+          createdAt: profile.createdAt
+        })
+      );
+
+      if (isSelectedProfile) {
+        setModDirty(false);
+        setSelectedModProfileId(profile.id);
+        setEnabledExplicitModDraft(new Set(content.enabledModIds));
+      }
+      modAutoSaveReadyRef.current = true;
+      setScan((value) => ({ ...value, profiles }));
+      notifier.showSuccess("Mod Profile 已重命名。");
+    });
+  }
+
   async function deleteMapProfile(profile: Profile) {
     await runProfileTask(async () => {
       const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
@@ -572,6 +657,8 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     copyModProfile,
     createEmptyMapProfile,
     createEmptyModProfile,
+    renameMapProfile,
+    renameModProfile,
     selectedMapProfileId,
     selectedModProfileId,
     setEnabledExplicitModDraft: updateEnabledExplicitModDraft,
@@ -627,6 +714,10 @@ function nextNewProfileName(base: string, profiles: Profile[]) {
     const candidate = `${base} ${index}`;
     if (!names.has(candidate)) return candidate;
   }
+}
+
+function profileNameExists(profiles: Profile[], name: string, currentProfileId: string) {
+  return profiles.some((profile) => profile.id !== currentProfileId && profile.name === name);
 }
 
 function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {

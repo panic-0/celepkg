@@ -186,6 +186,7 @@ export function App() {
             onMapProfileNameChange={profileDraft.setMapProfileName}
             onMapProfileOverwriteFromCurrent={profileDraft.overwriteMapProfileFromCurrent}
             onMapProfileOverwriteFromProfile={profileDraft.overwriteMapProfileFromProfile}
+            onMapProfileRename={profileDraft.renameMapProfile}
             onMapProfileSelect={profileDraft.setMapProfileDraft}
             onModProfileCopy={profileDraft.copyModProfile}
             onModProfileCreateEmpty={profileDraft.createEmptyModProfile}
@@ -193,6 +194,7 @@ export function App() {
             onModProfileNameChange={profileDraft.setModProfileName}
             onModProfileOverwriteFromCurrent={profileDraft.overwriteModProfileFromCurrent}
             onModProfileOverwriteFromProfile={profileDraft.overwriteModProfileFromProfile}
+            onModProfileRename={profileDraft.renameModProfile}
             onModProfileSelect={profileDraft.setModProfileDraft}
           />
         ) : workspaceView.activeView === "settings" ? (
