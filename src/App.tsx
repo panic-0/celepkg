@@ -530,10 +530,15 @@ export function App() {
   async function cancelActiveModDownload() {
     const operationId = activeDownloadOperationId.current;
     if (!operationId) return;
-    clearMockDownloadTimer();
-    setModDownloadProgress((current) => (current && current.operationId === operationId ? { ...current, phase: "error" } : current));
     try {
-      await cancelModDownload(operationId);
+      const cancelled = await cancelModDownload(operationId);
+      if (!cancelled) {
+        notifier.showInfo("下载任务已结束或不存在");
+        scheduleProgressClear(operationId, 800);
+        return;
+      }
+      clearMockDownloadTimer();
+      setModDownloadProgress((current) => (current && current.operationId === operationId ? { ...current, phase: "error" } : current));
       notifier.showInfo("已请求取消当前下载");
     } catch (error) {
       notifier.showError(readError(error));
