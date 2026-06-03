@@ -214,7 +214,8 @@ export function App() {
   }
 
   async function updateAllMods() {
-    const candidates = [...downloadableModUpdates];
+    const recordsBeforeUpdate = [...scan.maps, ...scan.otherMods];
+    const candidates = orderUpdatesByDependencyChain([...downloadableModUpdates], recordsBeforeUpdate);
     if (!candidates.length) return;
     if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
     let updatedCount = 0;
@@ -807,6 +808,50 @@ function buildInstalledDependencyIndex(records: ModRecord[]) {
     }
   }
   return index;
+}
+
+function orderUpdatesByDependencyChain(candidates: ModUpdateCandidate[], recordsBeforeUpdate: ModRecord[]) {
+  const installedIndex = buildInstalledDependencyIndex(recordsBeforeUpdate);
+  const candidateByRecordId = new Map(candidates.map((candidate) => [candidate.installed.recordId, candidate]));
+  const originalIndex = new Map(candidates.map((candidate, index) => [candidate.installed.recordId, index]));
+  const ordered: ModUpdateCandidate[] = [];
+  const state = new Map<string, "visiting" | "visited">();
+
+  function visit(candidate: ModUpdateCandidate) {
+    const recordId = candidate.installed.recordId;
+    const currentState = state.get(recordId);
+    if (currentState === "visited") return;
+    if (currentState === "visiting") {
+      ordered.push(candidate);
+      state.set(recordId, "visited");
+      return;
+    }
+
+    state.set(recordId, "visiting");
+    const record = recordsBeforeUpdate.find((item) => item.id === recordId);
+    if (record) {
+      const dependencies = record.dependencies
+        .map((dependency) => installedIndex.get(normalizeDependencyName(dependency.name)))
+        .filter((dependencyRecord): dependencyRecord is ModRecord => Boolean(dependencyRecord))
+        .map((dependencyRecord) => candidateByRecordId.get(dependencyRecord.id))
+        .filter((dependencyCandidate): dependencyCandidate is ModUpdateCandidate => Boolean(dependencyCandidate))
+        .sort((left, right) => (originalIndex.get(left.installed.recordId) ?? 0) - (originalIndex.get(right.installed.recordId) ?? 0));
+
+      for (const dependencyCandidate of dependencies) {
+        visit(dependencyCandidate);
+      }
+    }
+    if (state.get(recordId) !== "visited") {
+      state.set(recordId, "visited");
+      ordered.push(candidate);
+    }
+  }
+
+  for (const candidate of candidates) {
+    visit(candidate);
+  }
+
+  return ordered;
 }
 
 function updateCandidateFromRecord(entry: ModCatalogEntry, record: ModRecord): ModUpdateCandidate {
