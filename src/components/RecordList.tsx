@@ -1,6 +1,19 @@
-import { CircleDot, Clock, FolderOpen, LoaderCircle, Lock, Shield, Skull, Star, ToggleLeft, ToggleRight } from "lucide-react";
+import {
+  CircleDot,
+  Clock,
+  Download,
+  FolderOpen,
+  LoaderCircle,
+  Lock,
+  SearchCheck,
+  Shield,
+  Skull,
+  Star,
+  ToggleLeft,
+  ToggleRight
+} from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
-import type { ModRecord } from "../types";
+import type { ModRecord, ModUpdateCandidate } from "../types";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
 
@@ -17,14 +30,20 @@ type RecordListProps = {
   scrollMemory: ScrollMemory;
   loading: boolean;
   loadingMessage: string;
+  modUpdateCount: number;
+  modUpdatesByRecordId: Map<string, ModUpdateCandidate>;
   visibleMapCount: number;
   modCount: number;
   onDisableAll: () => void;
   onEnableAll: () => void;
+  onCheckModUpdates: () => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
   onModToggle: (record: ModRecord) => void;
+  onModUpdate: (candidate: ModUpdateCandidate) => void;
+  onRecordViewChange: (view: RecordView) => void;
+  onUpdateAllMods: () => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
   isMapEnabled: (record: ModRecord) => boolean;
@@ -42,14 +61,20 @@ export function RecordList({
   scrollMemory,
   loading,
   loadingMessage,
+  modUpdateCount,
+  modUpdatesByRecordId,
   visibleMapCount,
   modCount,
   onDisableAll,
   onEnableAll,
+  onCheckModUpdates,
   onMapSelect,
   onMapToggle,
   onModSelect,
   onModToggle,
+  onModUpdate,
+  onRecordViewChange,
+  onUpdateAllMods,
   onFavoriteToggle,
   onProtectedToggle,
   isMapEnabled,
@@ -64,7 +89,14 @@ export function RecordList({
     <section className="record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
       <div className="list-header">
         <div>
-          <h2>{activeView === "maps" ? "地图" : "其他 Mod"}</h2>
+          <div className="record-view-switch" aria-label="本地内容类型">
+            <button className={activeView === "maps" ? "active" : ""} onClick={() => onRecordViewChange("maps")}>
+              地图
+            </button>
+            <button className={activeView === "mods" ? "active" : ""} onClick={() => onRecordViewChange("mods")}>
+              其他 Mod
+            </button>
+          </div>
           <p>{`${records.length} / ${total} 个结果`}</p>
         </div>
         <button onClick={onEnableAll} disabled={!hasRecords}>
@@ -74,6 +106,19 @@ export function RecordList({
         <button onClick={onDisableAll} disabled={!hasRecords}>
           <ToggleLeft size={16} />
           全部禁用
+        </button>
+        <button onClick={onCheckModUpdates} disabled={loading} title="检查本地 zip Mod 是否有更新">
+          <SearchCheck size={16} />
+          检查更新
+        </button>
+        <button
+          className="primary-button update-all-button"
+          onClick={onUpdateAllMods}
+          disabled={loading || modUpdateCount === 0}
+          title={modUpdateCount ? `更新全部 ${modUpdateCount} 个 Mod` : "先检查更新"}
+        >
+          <Download size={16} />
+          <span>{formatUpdateAllLabel(modUpdateCount)}</span>
         </button>
       </div>
 
@@ -89,6 +134,8 @@ export function RecordList({
             showWarningColumn={showWarningColumn}
             strawberryDenominator={strawberryDenominator}
             isEnabled={isMapEnabled}
+            updatesByRecordId={modUpdatesByRecordId}
+            onUpdate={onModUpdate}
           />
         ) : (
           <ModTable
@@ -100,12 +147,20 @@ export function RecordList({
             onProtectedToggle={onProtectedToggle}
             showWarningColumn={showWarningColumn}
             isEnabled={isModEnabled}
+            updatesByRecordId={modUpdatesByRecordId}
+            onUpdate={onModUpdate}
           />
         )}
         {!hasRecords && <RecordListEmpty activeView={activeView} loading={loading} loadingMessage={loadingMessage} />}
       </div>
     </section>
   );
+}
+
+function formatUpdateAllLabel(count: number) {
+  if (!count) return "更新全部";
+  const displayCount = count > 99 ? "99+" : String(count);
+  return `更新全部 ${displayCount} 个 Mod`;
 }
 
 function RecordListEmpty({ activeView, loading, loadingMessage }: { activeView: RecordView; loading: boolean; loadingMessage: string }) {
@@ -126,7 +181,9 @@ function MapTable({
   onProtectedToggle,
   showWarningColumn,
   strawberryDenominator,
-  isEnabled
+  isEnabled,
+  updatesByRecordId,
+  onUpdate
 }: {
   maps: ModRecord[];
   selectedMap?: ModRecord;
@@ -137,6 +194,8 @@ function MapTable({
   showWarningColumn: boolean;
   strawberryDenominator: StrawberryDenominator;
   isEnabled: (record: ModRecord) => boolean;
+  updatesByRecordId: Map<string, ModUpdateCandidate>;
+  onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
     <table className={showWarningColumn ? "record-table map-table show-warning" : "record-table map-table"}>
@@ -174,6 +233,7 @@ function MapTable({
       <tbody>
         {maps.map((map) => {
           const enabled = isEnabled(map);
+          const updateCandidate = updatesByRecordId.get(map.id);
           return (
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <td className="action-cell">
@@ -206,6 +266,7 @@ function MapTable({
                       {map.metadata.version}
                     </span>
                   )}
+                  {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
                 </div>
                 <div className="inline-pills">
                   {map.readOnly && <span>官图</span>}
@@ -241,7 +302,9 @@ function ModTable({
   onFavoriteToggle,
   onProtectedToggle,
   showWarningColumn,
-  isEnabled
+  isEnabled,
+  updatesByRecordId,
+  onUpdate
 }: {
   mods: ModRecord[];
   selectedMod?: ModRecord;
@@ -251,6 +314,8 @@ function ModTable({
   onProtectedToggle: (record: ModRecord) => void;
   showWarningColumn: boolean;
   isEnabled: (id: string) => boolean;
+  updatesByRecordId: Map<string, ModUpdateCandidate>;
+  onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
     <table className={showWarningColumn ? "record-table mod-table show-warning" : "record-table mod-table"}>
@@ -275,6 +340,7 @@ function ModTable({
       <tbody>
         {mods.map((modItem) => {
           const enabled = isEnabled(modItem.id);
+          const updateCandidate = updatesByRecordId.get(modItem.id);
           return (
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
@@ -306,6 +372,7 @@ function ModTable({
                       {modItem.metadata.version}
                     </span>
                   )}
+                  {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
                 </div>
               </td>
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
@@ -319,6 +386,22 @@ function ModTable({
         })}
       </tbody>
     </table>
+  );
+}
+
+function InlineUpdateButton({ candidate, onUpdate }: { candidate: ModUpdateCandidate; onUpdate: (candidate: ModUpdateCandidate) => void }) {
+  return (
+    <button
+      className="record-update-button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onUpdate(candidate);
+      }}
+      title={`更新到 ${candidate.entry.version || "目录最新版本"}`}
+    >
+      <Download size={13} />
+      更新
+    </button>
   );
 }
 

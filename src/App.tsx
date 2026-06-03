@@ -1,5 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { checkModUpdates, updateMod } from "./api";
 import { BackupManager } from "./components/BackupManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
@@ -20,7 +21,10 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import { isDraftEnabled } from "./utils/format";
+import type { ModCatalogSourceKind, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
+import { isDraftEnabled, readError } from "./utils/format";
+
+const defaultModUpdateSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
 
 export function App() {
   const {
@@ -48,6 +52,7 @@ export function App() {
     updateSelectedSaveFiles
   } = useCelePkgData();
   const [issuesOpen, setIssuesOpen] = useState(false);
+  const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
@@ -56,6 +61,13 @@ export function App() {
     [scan.maps, scan.otherMods]
   );
   const issueCount = configWarnings.length + scan.warnings.length + itemWarnings.length;
+  const modUpdatesByRecordId = useMemo(() => {
+    const byRecordId = new Map<string, ModUpdateCandidate>();
+    for (const candidate of modUpdateResult.updates) {
+      byRecordId.set(candidate.installed.recordId, candidate);
+    }
+    return byRecordId;
+  }, [modUpdateResult.updates]);
 
   useEffect(() => {
     if (configWarnings.length && !celestePath.trim()) setIssuesOpen(true);
@@ -113,6 +125,71 @@ export function App() {
     toggleMod: profileDraft.toggleMod
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
+
+  async function checkUpdatesForMods() {
+    try {
+      setLoading(true, "正在检查 Mod 更新...");
+      const result = await checkModUpdates(celestePath, defaultModUpdateSources);
+      setModUpdateResult(result);
+      if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+      else notifier.showSuccess(result.updates.length ? `发现 ${result.updates.length} 个可更新 Mod` : "本地 Mod 已是最新");
+    } catch (error) {
+      const message = readError(error);
+      notifier.showError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateSingleMod(candidate: ModUpdateCandidate) {
+    if (!window.confirm(`更新 ${candidate.installed.name} 到 ${candidate.entry.version || "目录最新版本"}？`)) return;
+    await updateModCandidate(candidate);
+  }
+
+  async function updateAllMods() {
+    const candidates = [...modUpdateResult.updates];
+    if (!candidates.length) return;
+    if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
+    try {
+      for (const [index, candidate] of candidates.entries()) {
+        setLoading(true, `正在更新 ${candidate.installed.name} (${index + 1}/${candidates.length})...`);
+        const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath);
+        setScan(result.scan);
+        removeUpdatedCandidate(candidate);
+      }
+      notifier.showSuccess(`已更新 ${candidates.length} 个 Mod`);
+    } catch (error) {
+      const message = readError(error);
+      notifier.showError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateModCandidate(candidate: ModUpdateCandidate) {
+    try {
+      setLoading(true, `正在更新 ${candidate.installed.name}...`);
+      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath);
+      setScan(result.scan);
+      removeUpdatedCandidate(candidate);
+      notifier.showSuccess(`已更新 ${candidate.installed.name}`);
+    } catch (error) {
+      const message = readError(error);
+      notifier.showError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function removeUpdatedCandidate(candidate: ModUpdateCandidate) {
+    setModUpdateResult((current) => ({
+      ...current,
+      updates: current.updates.filter((item) => item.installed.absolutePath !== candidate.installed.absolutePath),
+      matched: current.matched.map((item) =>
+        item.installed.absolutePath === candidate.installed.absolutePath ? { ...item, updateAvailable: false, reason: "刚刚已更新" } : item
+      )
+    }));
+  }
 
   return (
     <main className="app-shell">
@@ -282,12 +359,18 @@ export function App() {
             scrollMemory={scrollMemory}
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
+            modUpdateCount={modUpdateResult.updates.length}
+            modUpdatesByRecordId={modUpdatesByRecordId}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
+            onCheckModUpdates={checkUpdatesForMods}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={workspaceView.selectMod}
             onModToggle={recordActions.toggleModRecord}
+            onModUpdate={updateSingleMod}
+            onRecordViewChange={workspaceView.changeActiveView}
+            onUpdateAllMods={updateAllMods}
             onFavoriteToggle={recordActions.updateRecordFavorite}
             onProtectedToggle={recordActions.updateRecordProtected}
             isMapEnabled={recordActions.isMapEnabled}

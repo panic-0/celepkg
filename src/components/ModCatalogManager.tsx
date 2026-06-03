@@ -1,15 +1,7 @@
-import { Download, ExternalLink, PackageCheck, RefreshCcw, Search, Server, ShieldCheck } from "lucide-react";
+import { Download, ExternalLink, PackageCheck, Search, Server } from "lucide-react";
 import { useMemo, useState } from "react";
-import { checkModUpdates, installMod, searchModCatalog, updateMod } from "../api";
-import type {
-  AppNotifier,
-  ModCatalogEntry,
-  ModCatalogSearchResult,
-  ModCatalogSourceKind,
-  ModUpdateCandidate,
-  ModUpdateCheckResult,
-  ScanResult
-} from "../types";
+import { installMod, searchModCatalog } from "../api";
+import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
 
 type ModCatalogManagerProps = {
   celestePath: string;
@@ -26,7 +18,6 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
   const [query, setQuery] = useState("");
   const [sources, setSources] = useState<ModCatalogSourceKind[]>(defaultSources);
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
-  const [updateResult, setUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const installedNames = useMemo(
     () => new Set([...scan.maps, ...scan.otherMods].map((item) => item.name.toLowerCase())),
     [scan.maps, scan.otherMods]
@@ -47,19 +38,6 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
     }
   }
 
-  async function runUpdateCheck() {
-    try {
-      setLoading(true, "检查 Mod 更新...");
-      const result = await checkModUpdates(celestePath, sourceList);
-      setUpdateResult(result);
-      notifier.showSuccess(result.updates.length ? `发现 ${result.updates.length} 个可更新 Mod` : "本地 Mod 已是最新");
-    } catch (error) {
-      notifier.showError(error instanceof Error ? error.message : "检查 Mod 更新失败。");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function installEntry(entry: ModCatalogEntry) {
     if (!window.confirm(`安装 ${entry.name}${entry.version ? ` ${entry.version}` : ""}？`)) return;
     try {
@@ -74,35 +52,12 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
     }
   }
 
-  async function updateEntry(candidate: ModUpdateCandidate) {
-    if (!window.confirm(`更新 ${candidate.installed.name} 到 ${candidate.entry.version || "目录最新版本"}？`)) return;
-    try {
-      setLoading(true, `下载并更新 ${candidate.installed.name}...`);
-      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath);
-      setScan(result.scan);
-      setUpdateResult((current) => ({
-        ...current,
-        updates: current.updates.filter((item) => item.installed.absolutePath !== candidate.installed.absolutePath),
-        matched: current.matched.map((item) =>
-          item.installed.absolutePath === candidate.installed.absolutePath
-            ? { ...item, updateAvailable: false, reason: "刚刚已更新" }
-            : item
-        )
-      }));
-      notifier.showSuccess(`已更新 ${candidate.installed.name}`);
-    } catch (error) {
-      notifier.showError(error instanceof Error ? error.message : "更新 Mod 失败。");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <section className="mod-catalog-manager">
       <div className="list-header catalog-header">
         <div>
-          <h2>Mod 获取与更新</h2>
-          <p>{`${searchResult.entries.length} 个搜索结果，${updateResult.updates.length} 个可更新`}</p>
+          <h2>搜索与下载新 Mod</h2>
+          <p>{`${searchResult.entries.length} 个搜索结果`}</p>
         </div>
         <SourcePicker sources={sources} onChange={setSources} />
         <div className="catalog-actions">
@@ -120,10 +75,6 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
           <button onClick={runSearch} disabled={loading}>
             <Search size={16} />
             搜索
-          </button>
-          <button className="primary-button" onClick={runUpdateCheck} disabled={loading || !celestePath.trim()}>
-            <RefreshCcw size={16} />
-            检查更新
           </button>
         </div>
       </div>
@@ -144,27 +95,7 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
                 onInstall={() => installEntry(entry)}
               />
             ))}
-            {!searchResult.entries.length && <EmptyCatalog text="输入关键字搜索，或直接检查本地可更新 Mod。" />}
-          </div>
-        </section>
-
-        <section className="catalog-column">
-          <div className="catalog-column-heading">
-            <ShieldCheck size={17} />
-            <h3>本地更新</h3>
-          </div>
-          <WarningStrip warnings={updateResult.warnings} />
-          <div className="catalog-list">
-            {updateResult.updates.map((candidate) => (
-              <UpdateCandidateRow
-                candidate={candidate}
-                key={`${candidate.entry.source}:${candidate.installed.absolutePath}`}
-                onUpdate={() => updateEntry(candidate)}
-              />
-            ))}
-            {!updateResult.updates.length && (
-              <EmptyCatalog text={updateResult.matched.length ? "已匹配的本地 zip 都在目录记录中。" : "还没有检查更新。"} />
-            )}
+            {!searchResult.entries.length && <EmptyCatalog text="输入关键字搜索可下载的新 Mod。" />}
           </div>
         </section>
       </div>
@@ -221,28 +152,6 @@ function CatalogEntryRow({ entry, installed, onInstall }: { entry: ModCatalogEnt
         <button onClick={onInstall} disabled={installed || !entry.downloadUrl}>
           <Download size={15} />
           {installed ? "已安装" : "安装"}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function UpdateCandidateRow({ candidate, onUpdate }: { candidate: ModUpdateCandidate; onUpdate: () => void }) {
-  return (
-    <article className="catalog-row update-row">
-      <div className="catalog-row-main">
-        <strong title={candidate.installed.name}>{candidate.installed.name}</strong>
-        <span>{sourceLabel(candidate.entry.source)}</span>
-      </div>
-      <div className="catalog-row-meta">
-        <small>{`本地 ${candidate.installed.version || "未知"}`}</small>
-        <small>{`目录 ${candidate.entry.version || "最新"}`}</small>
-        <small title={candidate.reason}>{candidate.reason}</small>
-      </div>
-      <div className="catalog-row-actions">
-        <button className="primary-button" onClick={onUpdate}>
-          <Download size={15} />
-          更新
         </button>
       </div>
     </article>

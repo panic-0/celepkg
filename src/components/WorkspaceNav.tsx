@@ -3,7 +3,6 @@ import {
   ArrowUpAZ,
   Archive,
   Gamepad2,
-  Layers,
   PackageSearch,
   Search,
   Settings2,
@@ -90,23 +89,22 @@ export function WorkspaceNav({
   return (
     <aside className="workspace-nav">
       <section className="nav-section">
-        <button className={activeView === "maps" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("maps")}>
+        <button
+          className={activeView === "maps" || activeView === "mods" ? "nav-item active" : "nav-item"}
+          onClick={() => onActiveViewChange(activeView === "mods" ? "mods" : "maps")}
+        >
           <Gamepad2 size={18} />
-          <span>地图</span>
-          <strong className="nav-count" title={`${enabledMapCount}/${totalMapCount} 地图启用`}>
-            {enabledMapCount}/{totalMapCount}
-          </strong>
-        </button>
-        <button className={activeView === "mods" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("mods")}>
-          <Layers size={18} />
-          <span>其他 Mod</span>
-          <strong className="nav-count" title={`${enabledModCount}/${totalModCount} Mod 启用`}>
-            {enabledModCount}/{totalModCount}
+          <span>地图与 Mod</span>
+          <strong
+            className="nav-count"
+            title={`${enabledMapCount}/${totalMapCount} 地图启用，${enabledModCount}/${totalModCount} Mod 启用`}
+          >
+            {enabledMapCount + enabledModCount}/{totalMapCount + totalModCount}
           </strong>
         </button>
         <button className={activeView === "catalog" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("catalog")}>
           <PackageSearch size={18} />
-          <span>获取更新</span>
+          <span>下载 Mod</span>
         </button>
         <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
           <UserRound size={18} />

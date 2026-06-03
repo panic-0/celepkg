@@ -1029,7 +1029,7 @@ button.profile {
 
 .list-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  grid-template-columns: minmax(0, 1fr) repeat(4, max-content);
   gap: 8px;
   align-items: center;
   padding: 10px;
@@ -1048,6 +1048,50 @@ button.profile {
   color: #6a7887;
   font-size: 13px;
   margin-top: 1px;
+}
+
+.record-view-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, max-content);
+  gap: 3px;
+  align-items: center;
+  border: 1px solid #d8e0e8;
+  border-radius: 6px;
+  background: #f8fafb;
+  padding: 3px;
+}
+
+.record-view-switch button {
+  min-height: 28px;
+  border-color: transparent;
+  background: transparent;
+  padding: 4px 9px;
+  color: #526273;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.record-view-switch button.active {
+  border-color: #9bc7d8;
+  background: #eaf6fb;
+  color: #075b86;
+}
+
+.update-all-button {
+  width: 204px;
+  min-width: 204px;
+  overflow: hidden;
+}
+
+.update-all-button svg {
+  flex: 0 0 auto;
+}
+
+.update-all-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-header-actions {
@@ -1151,7 +1195,7 @@ button.profile {
 .catalog-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   overflow: auto;
   padding: 10px;
@@ -1755,6 +1799,23 @@ button.profile {
 
 .name-title-row strong {
   flex: 1 1 auto;
+}
+
+.record-update-button {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 2px 7px;
+  border-color: #86c3d9;
+  background: #eef8fc;
+  color: #075b86;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.record-update-button:hover:not(:disabled) {
+  border-color: #0f77ad;
+  background: #dff2fa;
+  color: #064f75;
 }
 
 .name-title-row .version-text {

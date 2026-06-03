@@ -146,10 +146,35 @@ export const mockApi = {
           }
         ];
       });
+    const mockBulkUpdates = Array.from({ length: 109 }, (_, index) => {
+      const entry = catalogEntry(
+        index % 2 ? "wegfan" : "everestMirror",
+        `MockBulkUpdate${index + 1}`,
+        `1.${index + 1}.0`,
+        "Mod",
+        `https://gamebanana.com/mmdl/${9000 + index}`,
+        [`mock-bulk-hash-${index + 1}`]
+      );
+      return {
+        entry,
+        installed: {
+          recordId: `mock-bulk-${index + 1}`,
+          name: entry.name,
+          fileName: `${entry.name}.zip`,
+          relativePath: `Mods/${entry.name}.zip`,
+          absolutePath: `${mockCelestePath}\\Mods\\${entry.name}.zip`,
+          version: "0.1.0",
+          hash: "old-local-hash"
+        },
+        updateAvailable: true,
+        reason: "Mock：用于预览大量更新时的按钮显示"
+      };
+    });
+    const allMatched = [...matched, ...mockBulkUpdates];
     return clone({
       sources: selectedSources,
-      updates: matched.filter((item) => item.updateAvailable),
-      matched,
+      updates: allMatched.filter((item) => item.updateAvailable),
+      matched: allMatched,
       warnings: []
     });
   },
