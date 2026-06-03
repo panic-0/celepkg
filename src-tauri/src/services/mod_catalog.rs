@@ -228,6 +228,10 @@ fn download_entry(
                         .iter()
                         .any(|expected| expected.eq_ignore_ascii_case(&hash))
                 {
+                    if let Err(error) = read_zip_metadata(&temp_path) {
+                        last_error = Some(format!("{url}: {error}"));
+                        continue;
+                    }
                     return Ok((temp_path, hash));
                 }
                 last_error = Some(format!(
@@ -337,10 +341,12 @@ fn read_zip_metadata(path: &Path) -> Result<ModMetadata, String> {
             let mut text = String::new();
             file.read_to_string(&mut text)
                 .map_err(|error| format!("读取 everest.yaml 失败：{error}"))?;
+            serde_yaml::from_str::<serde_yaml::Value>(&text)
+                .map_err(|error| format!("解析 everest.yaml 失败：{error}"))?;
             return Ok(crate::parsers::everest::parse_metadata(&text));
         }
     }
-    Ok(ModMetadata::default())
+    Err("Mod 压缩包缺少 everest.yaml".to_string())
 }
 
 fn is_everest_yaml_entry(entry: &str) -> bool {
@@ -777,6 +783,8 @@ mod tests {
     use super::*;
     use crate::domain::{CompletionStatus, ModKind, ModMetadata};
     use std::fs;
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
 
     #[test]
     fn parses_everest_catalog_entries() {
@@ -950,6 +958,39 @@ Helper:
     }
 
     #[test]
+    fn read_zip_metadata_requires_valid_everest_yaml() {
+        let dir = tempfile::tempdir().unwrap();
+        let valid = dir.path().join("Valid.zip");
+        write_zip(
+            &valid,
+            &[("everest.yaml", "Name: Helper\nVersion: 1.2.3\n")],
+        );
+
+        let metadata = read_zip_metadata(&valid).unwrap();
+
+        assert_eq!(metadata.name, "Helper");
+        assert_eq!(metadata.version, "1.2.3");
+
+        let missing_yaml = dir.path().join("MissingYaml.zip");
+        write_zip(&missing_yaml, &[("readme.txt", "hello")]);
+        assert!(read_zip_metadata(&missing_yaml)
+            .unwrap_err()
+            .contains("缺少 everest.yaml"));
+
+        let bad_yaml = dir.path().join("BadYaml.zip");
+        write_zip(&bad_yaml, &[("everest.yaml", "Name: [")]);
+        assert!(read_zip_metadata(&bad_yaml)
+            .unwrap_err()
+            .contains("解析 everest.yaml 失败"));
+
+        let not_zip = dir.path().join("NotZip.zip");
+        fs::write(&not_zip, b"not a zip").unwrap();
+        assert!(read_zip_metadata(&not_zip)
+            .unwrap_err()
+            .contains("读取 Mod 压缩包失败"));
+    }
+
+    #[test]
     fn replacing_zip_restores_old_file_when_new_file_move_fails() {
         let dir = tempfile::tempdir().unwrap();
         let destination = dir.path().join("Helper.zip");
@@ -975,6 +1016,16 @@ Helper:
             last_update: None,
             xx_hash: vec![],
         }
+    }
+
+    fn write_zip(path: &Path, entries: &[(&str, &str)]) {
+        let file = File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        for (name, text) in entries {
+            zip.start_file(*name, SimpleFileOptions::default()).unwrap();
+            zip.write_all(text.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
     }
 
     fn test_record(path: &Path, metadata_name: &str, version: &str) -> ModRecord {
