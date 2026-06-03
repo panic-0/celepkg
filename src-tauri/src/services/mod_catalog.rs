@@ -1,19 +1,27 @@
 use crate::domain::{
     InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind,
-    ModInstallResult, ModRecord, ModUpdateCandidate, ModUpdateCheckResult, ProfilesState,
+    ModDownloadProgress, ModInstallResult, ModRecord, ModUpdateCandidate, ModUpdateCheckResult,
+    ProfilesState,
 };
 use crate::utils::{normalize_dependency_name, stable_id};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use xxhash_rust::xxh64::Xxh64;
 
 const EVEREST_MIRROR_UPDATE_URL: &str =
     "https://everestapi.github.io/updatermirror/everest_update.yaml";
 const EVEREST_UPDATE_POINTER_URL: &str = "https://everestapi.github.io/modupdater.txt";
 const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
+
+#[derive(Clone, Copy)]
+pub struct ModDownloadReporter<'a> {
+    pub operation_id: &'a str,
+    pub progress: Option<&'a (dyn Fn(ModDownloadProgress) + Send + Sync)>,
+}
 
 pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
     if sources.is_empty() {
@@ -135,6 +143,7 @@ pub fn download_and_install(
     profiles: ProfilesState,
     protected_record_ids: &[String],
     selected_save_files: &[String],
+    reporter: ModDownloadReporter<'_>,
 ) -> Result<ModInstallResult, String> {
     let mods_dir = celeste_path.join("Mods");
     fs::create_dir_all(&mods_dir).map_err(|error| format!("创建 Mods 目录失败：{error}"))?;
@@ -142,7 +151,8 @@ pub fn download_and_install(
         Some(path) => normalize_replace_path(&mods_dir, path)?,
         None => fresh_install_path(&mods_dir, &entry)?,
     };
-    let (temp_path, hash) = download_entry(celeste_path, &entry)?;
+    let (temp_path, hash) = download_entry(celeste_path, &entry, reporter)?;
+    emit_download_progress(reporter, &entry.name, "installing", 0, None, "");
 
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建安装目录失败：{error}"))?;
@@ -161,6 +171,7 @@ pub fn download_and_install(
         record.protected = record.read_only || protected_record_ids.contains(&record.id);
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
+    emit_download_progress(reporter, &entry.name, "done", 1, Some(1), "");
     Ok(ModInstallResult {
         entry,
         destination_path: destination.to_string_lossy().to_string(),
@@ -173,6 +184,7 @@ pub fn download_and_install(
 fn download_entry(
     celeste_path: &Path,
     entry: &ModCatalogEntry,
+    reporter: ModDownloadReporter<'_>,
 ) -> Result<(PathBuf, String), String> {
     if entry.download_url.trim().is_empty() {
         return Err("目录条目没有下载地址".to_string());
@@ -187,8 +199,9 @@ fn download_entry(
     let mut last_error = None;
     for url in mirror_urls(&entry.download_url) {
         let _ = fs::remove_file(&temp_path);
-        match download_url_to_file(&client, &url, &temp_path) {
+        match download_url_to_file(&client, &url, &temp_path, entry, reporter) {
             Ok(()) => {
+                emit_download_progress(reporter, &entry.name, "verifying", 0, None, &url);
                 let hash = xxh64_file(&temp_path)?;
                 if entry.xx_hash.is_empty()
                     || entry
@@ -219,6 +232,8 @@ fn download_url_to_file(
     client: &reqwest::blocking::Client,
     url: &str,
     destination: &Path,
+    entry: &ModCatalogEntry,
+    reporter: ModDownloadReporter<'_>,
 ) -> Result<(), String> {
     let mut response = client
         .get(url)
@@ -226,10 +241,52 @@ fn download_url_to_file(
         .map_err(|error| format!("请求失败：{error}"))?
         .error_for_status()
         .map_err(|error| format!("服务器返回错误：{error}"))?;
+    let total = response.content_length().or(entry.size);
+    emit_download_progress(reporter, &entry.name, "downloading", 0, total, url);
     let mut file =
         File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
-    io::copy(&mut response, &mut file).map_err(|error| format!("写入下载文件失败：{error}"))?;
+    let mut downloaded = 0;
+    let mut last_emit = Instant::now();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = response
+            .read(&mut buffer)
+            .map_err(|error| format!("读取下载内容失败：{error}"))?;
+        if read == 0 {
+            break;
+        }
+        file.write_all(&buffer[..read])
+            .map_err(|error| format!("写入下载文件失败：{error}"))?;
+        downloaded += read as u64;
+        let should_emit = last_emit.elapsed() >= Duration::from_millis(120)
+            || total.is_some_and(|total| downloaded >= total);
+        if should_emit {
+            emit_download_progress(reporter, &entry.name, "downloading", downloaded, total, url);
+            last_emit = Instant::now();
+        }
+    }
+    emit_download_progress(reporter, &entry.name, "downloading", downloaded, total, url);
     Ok(())
+}
+
+fn emit_download_progress(
+    reporter: ModDownloadReporter<'_>,
+    mod_name: &str,
+    phase: &str,
+    downloaded: u64,
+    total: Option<u64>,
+    url: &str,
+) {
+    if let Some(progress) = reporter.progress {
+        progress(ModDownloadProgress {
+            operation_id: reporter.operation_id.to_string(),
+            mod_name: mod_name.to_string(),
+            phase: phase.to_string(),
+            downloaded,
+            total,
+            url: url.to_string(),
+        });
+    }
 }
 
 fn mirror_urls(url: &str) -> Vec<String> {

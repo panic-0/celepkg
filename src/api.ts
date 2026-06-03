@@ -87,14 +87,23 @@ export async function checkModUpdates(celestePath: string, sources: ModCatalogSo
   return invokeChecked("check_mod_updates", validateModUpdateCheckResult, { celestePath, sources });
 }
 
-export async function installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
+export async function installMod(
+  celestePath: string,
+  entry: ModCatalogEntry,
+  operationId = createOperationId("install")
+): Promise<ModInstallResult> {
   if (isMockMode()) return mockApi.installMod(celestePath, entry);
-  return invokeChecked("install_mod", validateModInstallResult, { celestePath, entry });
+  return invokeChecked("install_mod", validateModInstallResult, { celestePath, entry, operationId });
 }
 
-export async function updateMod(celestePath: string, entry: ModCatalogEntry, installedPath: string): Promise<ModInstallResult> {
+export async function updateMod(
+  celestePath: string,
+  entry: ModCatalogEntry,
+  installedPath: string,
+  operationId = createOperationId("update")
+): Promise<ModInstallResult> {
   if (isMockMode()) return mockApi.updateMod(celestePath, entry, installedPath);
-  return invokeChecked("update_mod", validateModInstallResult, { celestePath, entry, installedPath });
+  return invokeChecked("update_mod", validateModInstallResult, { celestePath, entry, installedPath, operationId });
 }
 
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {
@@ -172,4 +181,8 @@ export async function openBackupFolder(celestePath: string): Promise<void> {
 export async function openBackupLocation(backupPath: string): Promise<void> {
   if (isMockMode()) return mockApi.openBackupLocation(backupPath);
   return invokeChecked("open_backup_location", validateVoid, { backupPath });
+}
+
+export function createOperationId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

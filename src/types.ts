@@ -189,6 +189,15 @@ export type ModInstallResult = {
   scan: ScanResult;
 };
 
+export type ModDownloadProgress = {
+  operationId: string;
+  modName: string;
+  phase: "downloading" | "verifying" | "installing" | "done" | "error";
+  downloaded: number;
+  total: number | null;
+  url: string;
+};
+
 export type ScanTiming = {
   stage: string;
   ms: number;

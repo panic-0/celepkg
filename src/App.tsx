@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { checkModUpdates, updateMod } from "./api";
+import { checkModUpdates, createOperationId, updateMod } from "./api";
 import { BackupManager } from "./components/BackupManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
@@ -21,8 +21,9 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import type { ModCatalogSourceKind, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
+import type { ModCatalogSourceKind, ModDownloadProgress, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
 import { isDraftEnabled, readError } from "./utils/format";
+import { isMockMode } from "./mockApi";
 
 const defaultModUpdateSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
 
@@ -53,7 +54,12 @@ export function App() {
   } = useCelePkgData();
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
+  const [modDownloadProgress, setModDownloadProgress] = useState<ModDownloadProgress | null>(null);
+  const [modDownloadBatchLabel, setModDownloadBatchLabel] = useState("");
+  const activeDownloadOperationId = useRef<string | null>(null);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
+  const mockDownloadTimer = useRef<number | null>(null);
+  const progressClearTimer = useRef<number | null>(null);
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
   const itemWarnings = useMemo(
@@ -76,6 +82,39 @@ export function App() {
   useEffect(() => {
     if (configWarnings.length && !celestePath.trim()) setIssuesOpen(true);
   }, [celestePath, configWarnings.length]);
+
+  useEffect(() => {
+    if (isMockMode()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen<unknown>("mod-download-progress", (event) => {
+          const progress = toModDownloadProgress(event.payload);
+          if (!progress || activeDownloadOperationId.current !== progress.operationId) return;
+          setModDownloadProgress((current) => ({
+            ...progress,
+            modName: progress.modName || current?.modName || ""
+          }));
+        })
+      )
+      .then((listener) => {
+        if (disposed) listener();
+        else unlisten = listener;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (mockDownloadTimer.current !== null) window.clearInterval(mockDownloadTimer.current);
+      if (progressClearTimer.current !== null) window.clearTimeout(progressClearTimer.current);
+    };
+  }, []);
 
   const backups = useBackups({
     celestePath,
@@ -156,14 +195,19 @@ export function App() {
     if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
     try {
       for (const [index, candidate] of candidates.entries()) {
-        setLoading(true, `正在更新 ${candidate.installed.name} (${index + 1}/${candidates.length})...`);
-        const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath);
+        const operationId = createOperationId("mod-update");
+        startModDownloadProgress(candidate, operationId, `${index + 1}/${candidates.length}`);
+        setLoading(true, `正在更新 Mod (${index + 1}/${candidates.length})...`);
+        const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId);
+        clearMockDownloadTimer();
         setScan(result.scan);
         removeUpdatedCandidate(candidate);
+        finishModDownloadProgress(operationId, index === candidates.length - 1 ? 800 : 0);
       }
       notifier.showSuccess(`已更新 ${candidates.length} 个 Mod`);
     } catch (error) {
       const message = readError(error);
+      markDownloadProgressError();
       notifier.showError(message);
     } finally {
       setLoading(false);
@@ -171,18 +215,94 @@ export function App() {
   }
 
   async function updateModCandidate(candidate: ModUpdateCandidate) {
+    const operationId = createOperationId("mod-update");
     try {
+      startModDownloadProgress(candidate, operationId);
       setLoading(true, `正在更新 ${candidate.installed.name}...`);
-      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath);
+      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId);
+      clearMockDownloadTimer();
       setScan(result.scan);
       removeUpdatedCandidate(candidate);
+      finishModDownloadProgress(operationId, 800);
       notifier.showSuccess(`已更新 ${candidate.installed.name}`);
     } catch (error) {
       const message = readError(error);
+      markDownloadProgressError();
       notifier.showError(message);
     } finally {
       setLoading(false);
     }
+  }
+
+  function startModDownloadProgress(candidate: ModUpdateCandidate, operationId: string, batchLabel = "") {
+    clearMockDownloadTimer();
+    clearProgressClearTimer();
+    activeDownloadOperationId.current = operationId;
+    setModDownloadBatchLabel(batchLabel);
+    const initialProgress: ModDownloadProgress = {
+      operationId,
+      modName: candidate.installed.name || candidate.entry.name,
+      phase: "downloading",
+      downloaded: 0,
+      total: candidate.entry.size,
+      url: candidate.entry.downloadUrl
+    };
+    setModDownloadProgress(initialProgress);
+    if (isMockMode()) runMockDownloadProgress(initialProgress);
+  }
+
+  function finishModDownloadProgress(operationId: string, clearDelay: number) {
+    clearMockDownloadTimer();
+    setModDownloadProgress((current) => {
+      if (!current || current.operationId !== operationId) return current;
+      const completedTotal = current.total ?? (current.downloaded || 1);
+      return { ...current, phase: "done", downloaded: completedTotal, total: completedTotal };
+    });
+    if (clearDelay > 0) scheduleProgressClear(operationId, clearDelay);
+  }
+
+  function markDownloadProgressError() {
+    clearMockDownloadTimer();
+    setModDownloadProgress((current) => (current ? { ...current, phase: "error" } : current));
+    const operationId = activeDownloadOperationId.current;
+    if (operationId) scheduleProgressClear(operationId, 1800);
+  }
+
+  function scheduleProgressClear(operationId: string, delay: number) {
+    clearProgressClearTimer();
+    progressClearTimer.current = window.setTimeout(() => {
+      if (activeDownloadOperationId.current !== operationId) return;
+      activeDownloadOperationId.current = null;
+      setModDownloadBatchLabel("");
+      setModDownloadProgress(null);
+    }, delay);
+  }
+
+  function clearMockDownloadTimer() {
+    if (mockDownloadTimer.current === null) return;
+    window.clearInterval(mockDownloadTimer.current);
+    mockDownloadTimer.current = null;
+  }
+
+  function clearProgressClearTimer() {
+    if (progressClearTimer.current === null) return;
+    window.clearTimeout(progressClearTimer.current);
+    progressClearTimer.current = null;
+  }
+
+  function runMockDownloadProgress(initialProgress: ModDownloadProgress) {
+    const total = initialProgress.total ?? 12 * 1024 * 1024;
+    const step = Math.max(256 * 1024, Math.floor(total / 14));
+    let downloaded = 0;
+    mockDownloadTimer.current = window.setInterval(() => {
+      downloaded = Math.min(total, downloaded + step);
+      setModDownloadProgress((current) => {
+        if (!current || current.operationId !== initialProgress.operationId || current.phase !== "downloading") return current;
+        if (downloaded >= total) return { ...current, phase: "verifying", downloaded: total, total };
+        return { ...current, downloaded, total };
+      });
+      if (downloaded >= total) clearMockDownloadTimer();
+    }, 75);
   }
 
   function removeUpdatedCandidate(candidate: ModUpdateCandidate) {
@@ -363,6 +483,8 @@ export function App() {
             scrollMemory={scrollMemory}
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
+            modDownloadBatchLabel={modDownloadBatchLabel}
+            modDownloadProgress={modDownloadProgress}
             modUpdateCount={downloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
             onDisableAll={recordActions.disableAllInCurrentView}
@@ -404,4 +526,27 @@ export function App() {
 
 function isWorkspaceLoadingMessage(message: string) {
   return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
+}
+
+const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);
+
+function toModDownloadProgress(value: unknown): ModDownloadProgress | null {
+  if (!value || typeof value !== "object") return null;
+  const object = value as Record<string, unknown>;
+  if (
+    typeof object.operationId !== "string" ||
+    typeof object.phase !== "string" ||
+    !modDownloadPhases.has(object.phase) ||
+    typeof object.downloaded !== "number"
+  ) {
+    return null;
+  }
+  return {
+    operationId: object.operationId,
+    modName: typeof object.modName === "string" ? object.modName : "",
+    phase: object.phase as ModDownloadProgress["phase"],
+    downloaded: object.downloaded,
+    total: typeof object.total === "number" ? object.total : null,
+    url: typeof object.url === "string" ? object.url : ""
+  };
 }

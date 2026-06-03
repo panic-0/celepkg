@@ -180,6 +180,7 @@ export const mockApi = {
   },
 
   async installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
+    await delay(900);
     const installed = record({
       id: `mock-installed-${entry.id}`,
       name: entry.name,
@@ -205,6 +206,7 @@ export const mockApi = {
   },
 
   async updateMod(celestePath: string, entry: ModCatalogEntry, installedPath: string): Promise<ModInstallResult> {
+    await delay(1100);
     scan = updateRecord(scan, entry.name.toLowerCase().replace(/\s+/g, "-"), (item) => ({
       ...item,
       metadata: { ...item.metadata, version: entry.version }
@@ -744,4 +746,8 @@ function updateRecord(currentScan: ScanResult, recordId: string, update: (record
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

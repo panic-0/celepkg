@@ -287,3 +287,14 @@ pub struct ModInstallResult {
     pub hash: String,
     pub scan: ScanResult,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModDownloadProgress {
+    pub operation_id: String,
+    pub mod_name: String,
+    pub phase: String,
+    pub downloaded: u64,
+    pub total: Option<u64>,
+    pub url: String,
+}

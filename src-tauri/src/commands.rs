@@ -1,6 +1,7 @@
 use crate::domain::{
-    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult, ModInstallResult,
-    ModUpdateCheckResult, ProfileInput, ProfilesState, ScanResult,
+    AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult,
+    ModDownloadProgress, ModInstallResult, ModUpdateCheckResult, ProfileInput, ProfilesState,
+    ScanResult,
 };
 use crate::services;
 use crate::storage::{
@@ -9,6 +10,7 @@ use crate::storage::{
 };
 use std::path::Path;
 use std::process::Command;
+use tauri::Emitter;
 
 #[tauri::command]
 pub fn get_config() -> Result<ConfigResponse, String> {
@@ -156,20 +158,44 @@ pub async fn check_mod_updates(
 
 #[tauri::command]
 pub async fn install_mod(
+    app: tauri::AppHandle,
     celeste_path: String,
     entry: crate::domain::ModCatalogEntry,
+    operation_id: String,
 ) -> Result<ModInstallResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        services::mod_catalog::download_and_install(
+        let app_for_progress = app.clone();
+        let emit_progress = move |progress: ModDownloadProgress| {
+            let _ = app_for_progress.emit("mod-download-progress", progress);
+        };
+        let result = services::mod_catalog::download_and_install(
             &path,
             entry,
             None,
             state.profiles_state(),
             &state.protected_record_ids,
             &state.selected_save_files,
-        )
+            services::mod_catalog::ModDownloadReporter {
+                operation_id: &operation_id,
+                progress: Some(&emit_progress),
+            },
+        );
+        if result.is_err() {
+            let _ = app.emit(
+                "mod-download-progress",
+                ModDownloadProgress {
+                    operation_id,
+                    mod_name: String::new(),
+                    phase: "error".to_string(),
+                    downloaded: 0,
+                    total: None,
+                    url: String::new(),
+                },
+            );
+        }
+        result
     })
     .await
     .map_err(|error| format!("安装 Mod 任务失败：{error}"))?
@@ -177,21 +203,45 @@ pub async fn install_mod(
 
 #[tauri::command]
 pub async fn update_mod(
+    app: tauri::AppHandle,
     celeste_path: String,
     entry: crate::domain::ModCatalogEntry,
     installed_path: String,
+    operation_id: String,
 ) -> Result<ModInstallResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        services::mod_catalog::download_and_install(
+        let app_for_progress = app.clone();
+        let emit_progress = move |progress: ModDownloadProgress| {
+            let _ = app_for_progress.emit("mod-download-progress", progress);
+        };
+        let result = services::mod_catalog::download_and_install(
             &path,
             entry,
             Some(Path::new(&installed_path)),
             state.profiles_state(),
             &state.protected_record_ids,
             &state.selected_save_files,
-        )
+            services::mod_catalog::ModDownloadReporter {
+                operation_id: &operation_id,
+                progress: Some(&emit_progress),
+            },
+        );
+        if result.is_err() {
+            let _ = app.emit(
+                "mod-download-progress",
+                ModDownloadProgress {
+                    operation_id,
+                    mod_name: String::new(),
+                    phase: "error".to_string(),
+                    downloaded: 0,
+                    total: None,
+                    url: String::new(),
+                },
+            );
+        }
+        result
     })
     .await
     .map_err(|error| format!("更新 Mod 任务失败：{error}"))?
