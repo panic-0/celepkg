@@ -31,6 +31,7 @@ import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
 import type { Dependency, ModCatalogEntry, ModDownloadProgress, ModRecord, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
+import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "./utils/dependencyUpdateDedupe";
 import { isDraftEnabled, readError } from "./utils/format";
 import { isMockMode } from "./mockApi";
 
@@ -70,6 +71,7 @@ export function App() {
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
   const activeDownloadOperationId = useRef<string | null>(null);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
+  const dependencyActionPromises = useRef<Map<string, Promise<boolean>>>(new Map());
   const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const mockDownloadTimer = useRef<number | null>(null);
@@ -316,7 +318,7 @@ export function App() {
 
   async function applyDependencyPlan(plan: DependencyUpdatePlan) {
     if (plan.choice === "none") return true;
-    const selectedIssues = plan.issues.filter((issue) => !issue.optional || plan.choice === "all");
+    const selectedIssues = dedupeDependencyIssues(plan.issues.filter((issue) => !issue.optional || plan.choice === "all"));
     const actions: DependencyUpdateAction[] = [];
     const unavailable: DependencyIssue[] = [];
     for (const issue of selectedIssues) {
@@ -328,14 +330,29 @@ export function App() {
       const text = unavailable.map(formatDependencyIssue).join("\n");
       if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续覆盖目标 Mod？`)) return false;
     }
-    for (const action of actions) {
-      const result =
-        action.kind === "update"
-          ? await performModUpdate(action.candidate, "", `正在更新依赖 ${action.name}...`)
-          : await performDependencyInstall(action.entry);
+    for (const action of dedupeDependencyActions(actions)) {
+      const result = await runDependencyAction(action);
       if (!result) return false;
     }
     return true;
+  }
+
+  async function runDependencyAction(action: DependencyUpdateAction) {
+    const key = dependencyActionKey(action);
+    const existing = dependencyActionPromises.current.get(key);
+    if (existing) return await existing;
+    const promise =
+      action.kind === "update"
+        ? performModUpdate(action.candidate, "", `正在更新依赖 ${action.name}...`)
+        : performDependencyInstall(action.entry);
+    dependencyActionPromises.current.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      if (dependencyActionPromises.current.get(key) === promise) {
+        dependencyActionPromises.current.delete(key);
+      }
+    }
   }
 
   function dependencyIssuesForMetadata(dependencies: Dependency[], optional: boolean): DependencyIssue[] {
