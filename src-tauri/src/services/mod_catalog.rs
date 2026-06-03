@@ -935,8 +935,10 @@ mod tests {
     use super::*;
     use crate::domain::{CompletionStatus, ModKind, ModMetadata};
     use std::fs;
-    use std::io::Write;
+    use std::io::{Cursor, Write};
+    use std::net::TcpListener;
     use std::sync::Mutex;
+    use std::thread;
     use zip::write::SimpleFileOptions;
 
     #[test]
@@ -1207,6 +1209,67 @@ Helper:
     }
 
     #[test]
+    fn download_url_to_file_emits_progress_during_local_slow_download() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut entry = test_catalog_entry("helper", "Helper");
+        let payload = zip_bytes(&[
+            ("everest.yaml", "Name: Helper\nVersion: 1.2.3\n"),
+            ("payload.bin", &"x".repeat(256 * 1024)),
+        ]);
+        entry.size = Some(payload.len() as u64);
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/Helper.zip", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0u8; 1024];
+            let _ = std::io::Read::read(&mut stream, &mut request);
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: application/zip\r\n\r\n",
+                payload.len()
+            )
+            .unwrap();
+            for chunk in payload.chunks(16 * 1024) {
+                stream.write_all(chunk).unwrap();
+                stream.flush().unwrap();
+                thread::sleep(Duration::from_millis(15));
+            }
+        });
+        let events = Mutex::new(Vec::new());
+        let emit = |progress: ModDownloadProgress| events.lock().unwrap().push(progress);
+
+        download_url_to_file(
+            &reqwest::blocking::Client::new(),
+            &url,
+            &dir.path().join("Helper.zip.download"),
+            &entry,
+            ModDownloadReporter {
+                operation_id: "local-progress",
+                progress: Some(&emit),
+                cancel_token: None,
+                task_index: 1,
+                task_total: 1,
+            },
+        )
+        .unwrap();
+        server.join().unwrap();
+
+        let events = events.lock().unwrap();
+        let downloading_events = events
+            .iter()
+            .filter(|event| event.phase == "downloading" && event.downloaded > 0)
+            .collect::<Vec<_>>();
+        assert!(downloading_events.len() > 3);
+        assert!(downloading_events
+            .windows(2)
+            .all(|pair| pair[0].downloaded <= pair[1].downloaded));
+        assert_eq!(
+            downloading_events.last().unwrap().downloaded,
+            entry.size.unwrap()
+        );
+    }
+
+    #[test]
     fn download_entry_cleans_staging_file_when_cancelled_between_mirrors() {
         let dir = tempfile::tempdir().unwrap();
         let mut entry = test_catalog_entry("helper", "Helper");
@@ -1326,6 +1389,18 @@ Helper:
             zip.write_all(text.as_bytes()).unwrap();
         }
         zip.finish().unwrap();
+    }
+
+    fn zip_bytes(entries: &[(&str, &str)]) -> Vec<u8> {
+        let cursor = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(cursor);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        for (name, text) in entries {
+            zip.start_file(*name, options).unwrap();
+            zip.write_all(text.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap().into_inner()
     }
 
     fn corrupt_zip_payload(path: &Path, needle: &[u8], replacement: &[u8]) {

@@ -767,9 +767,11 @@ export function App() {
           <ModCatalogManager
             loading={loading}
             notifier={notifier}
+            progress={modDownloadProgress}
             scan={scan}
             sources={modCatalogSources}
             setLoading={setLoading}
+            onCancelDownload={cancelActiveModDownload}
             onInstall={installCatalogEntry}
           />
         ) : workspaceView.activeView === "everest" ? (
