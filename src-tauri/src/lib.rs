@@ -13,6 +13,8 @@ pub fn run() {
             commands::set_auto_backup_enabled,
             commands::set_auto_backup_cleanup_enabled,
             commands::set_auto_backup_retention_count,
+            commands::set_mod_catalog_sources,
+            commands::set_auto_check_mod_updates_on_startup,
             commands::set_selected_save_files,
             commands::select_celeste_directory,
             commands::scan_celeste,

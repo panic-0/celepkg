@@ -25,6 +25,8 @@ const mockCelestePath = "D:\\Games\\Celeste";
 let autoBackupEnabled = true;
 let autoBackupCleanupEnabled = true;
 let autoBackupRetentionCount = 20;
+let modCatalogSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
+let autoCheckModUpdatesOnStartup = true;
 let selectedSaveFiles = ["0.celeste", "1.celeste"];
 let backupSequence = 4;
 
@@ -87,6 +89,16 @@ export const mockApi = {
 
   async setAutoBackupRetentionCount(count: number): Promise<ConfigResponse> {
     autoBackupRetentionCount = Math.max(1, Math.min(100, Math.trunc(count)));
+    return clone(config());
+  },
+
+  async setModCatalogSources(sources: ModCatalogSourceKind[]): Promise<ConfigResponse> {
+    modCatalogSources = sources.length ? [...sources] : ["everestMirror", "wegfan"];
+    return clone(config());
+  },
+
+  async setAutoCheckModUpdatesOnStartup(enabled: boolean): Promise<ConfigResponse> {
+    autoCheckModUpdatesOnStartup = enabled;
     return clone(config());
   },
 
@@ -347,6 +359,8 @@ function config(): ConfigResponse {
     autoBackupEnabled,
     autoBackupCleanupEnabled,
     autoBackupRetentionCount,
+    modCatalogSources,
+    autoCheckModUpdatesOnStartup,
     selectedSaveFiles,
     profiles,
     warnings: []

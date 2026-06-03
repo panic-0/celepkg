@@ -4,13 +4,15 @@ import {
   rescanCeleste,
   scanCeleste,
   setAutoBackupCleanupEnabled,
+  setAutoCheckModUpdatesOnStartup,
   selectCelesteDirectory,
   setAutoBackupEnabled,
   setAutoBackupRetentionCount,
   setCelestePath,
+  setModCatalogSources,
   setSelectedSaveFiles
 } from "../api";
-import type { AppNotice, AppNoticeTone, AppNotifier, ScanResult } from "../types";
+import type { AppNotice, AppNoticeTone, AppNotifier, ModCatalogSourceKind, ScanResult } from "../types";
 import { readError } from "../utils/format";
 
 const emptyScan: ScanResult = {
@@ -34,6 +36,8 @@ export function useCelePkgData() {
   const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
   const [autoBackupCleanupEnabled, setAutoBackupCleanupEnabledState] = useState(true);
   const [autoBackupRetentionCount, setAutoBackupRetentionCountState] = useState(20);
+  const [modCatalogSources, setModCatalogSourcesState] = useState<ModCatalogSourceKind[]>(["everestMirror", "wegfan"]);
+  const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(true);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loading, setLoadingState] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -115,6 +119,8 @@ export function useCelePkgData() {
     setAutoBackupEnabledState(config.autoBackupEnabled);
     setAutoBackupCleanupEnabledState(config.autoBackupCleanupEnabled);
     setAutoBackupRetentionCountState(config.autoBackupRetentionCount);
+    setModCatalogSourcesState(config.modCatalogSources);
+    setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
     setScan((current) => ({
       ...(config.celestePath.trim() && !config.warnings.length ? current : emptyScan),
       profiles: config.profiles,
@@ -176,6 +182,44 @@ export function useCelePkgData() {
         setAutoBackupRetentionCountState(config.autoBackupRetentionCount);
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", config.autoBackupCleanupEnabled ? "已开启自动清理旧备份。" : "已关闭自动清理旧备份。");
+      } catch (error) {
+        showNotice("error", readError(error));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearNotice, setLoading, showNotice]
+  );
+
+  const updateModCatalogSources = useCallback(
+    async (sources: ModCatalogSourceKind[]) => {
+      setLoading(true);
+      setLoadingMessage("正在更新 Mod 设置...");
+      clearNotice();
+      try {
+        const config = await setModCatalogSources(sources);
+        setModCatalogSourcesState(config.modCatalogSources);
+        setScan((current) => ({ ...current, profiles: config.profiles }));
+        showNotice("success", "已更新 Mod 数据源。");
+      } catch (error) {
+        showNotice("error", readError(error));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearNotice, setLoading, showNotice]
+  );
+
+  const updateAutoCheckModUpdatesOnStartup = useCallback(
+    async (enabled: boolean) => {
+      setLoading(true);
+      setLoadingMessage("正在更新 Mod 设置...");
+      clearNotice();
+      try {
+        const config = await setAutoCheckModUpdatesOnStartup(enabled);
+        setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
+        setScan((current) => ({ ...current, profiles: config.profiles }));
+        showNotice("success", config.autoCheckModUpdatesOnStartup ? "已开启启动时自动检查 Mod 更新。" : "已关闭启动时自动检查 Mod 更新。");
       } catch (error) {
         showNotice("error", readError(error));
       } finally {
@@ -280,12 +324,14 @@ export function useCelePkgData() {
     autoBackupCleanupEnabled,
     autoBackupEnabled,
     autoBackupRetentionCount,
+    autoCheckModUpdatesOnStartup,
     celestePath,
     clearNotice,
     configWarnings,
     loading,
     loadingMessage,
     loadConfigAndRefresh,
+    modCatalogSources,
     notice,
     notifier,
     refresh,
@@ -299,6 +345,8 @@ export function useCelePkgData() {
     updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
+    updateAutoCheckModUpdatesOnStartup,
+    updateModCatalogSources,
     updateSelectedSaveFiles
   };
 }

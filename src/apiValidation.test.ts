@@ -71,6 +71,8 @@ describe("api validation", () => {
         autoBackupEnabled: true,
         autoBackupCleanupEnabled: true,
         autoBackupRetentionCount: 20,
+        modCatalogSources: ["everestMirror", "wegfan"],
+        autoCheckModUpdatesOnStartup: true,
         selectedSaveFiles: ["0.celeste"],
         profiles,
         warnings: ["配置提示"]
@@ -80,6 +82,8 @@ describe("api validation", () => {
       autoBackupEnabled: true,
       autoBackupCleanupEnabled: true,
       autoBackupRetentionCount: 20,
+      modCatalogSources: ["everestMirror", "wegfan"],
+      autoCheckModUpdatesOnStartup: true,
       selectedSaveFiles: ["0.celeste"],
       profiles,
       warnings: ["配置提示"]
@@ -93,6 +97,8 @@ describe("api validation", () => {
         autoBackupEnabled: "yes",
         autoBackupCleanupEnabled: true,
         autoBackupRetentionCount: 20,
+        modCatalogSources: ["everestMirror", "wegfan"],
+        autoCheckModUpdatesOnStartup: true,
         selectedSaveFiles: ["0.celeste"],
         profiles,
         warnings: []

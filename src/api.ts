@@ -62,6 +62,16 @@ export async function setAutoBackupRetentionCount(autoBackupRetentionCount: numb
   return invokeChecked("set_auto_backup_retention_count", validateConfigResponse, { autoBackupRetentionCount });
 }
 
+export async function setModCatalogSources(modCatalogSources: ModCatalogSourceKind[]): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setModCatalogSources(modCatalogSources);
+  return invokeChecked("set_mod_catalog_sources", validateConfigResponse, { modCatalogSources });
+}
+
+export async function setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStartup: boolean): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStartup);
+  return invokeChecked("set_auto_check_mod_updates_on_startup", validateConfigResponse, { autoCheckModUpdatesOnStartup });
+}
+
 export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
   if (isMockMode()) return mockApi.setSelectedSaveFiles(saveFiles);
   return invokeChecked("set_selected_save_files", validateConfigResponse, { saveFiles });

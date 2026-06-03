@@ -112,7 +112,7 @@ export function WorkspaceNav({
         </button>
         <button className={activeView === "settings" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("settings")}>
           <Settings2 size={18} />
-          <span>显示设置</span>
+          <span>设置</span>
         </button>
         <button className={activeView === "backups" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("backups")}>
           <Archive size={18} />

@@ -1,4 +1,4 @@
-import { Download, ExternalLink, PackageCheck, Search, Server } from "lucide-react";
+import { Download, ExternalLink, PackageCheck, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { installMod, searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
@@ -8,15 +8,15 @@ type ModCatalogManagerProps = {
   loading: boolean;
   notifier: AppNotifier;
   scan: ScanResult;
+  sources: ModCatalogSourceKind[];
   setLoading: (loading: boolean, message?: string) => void;
   setScan: (scan: ScanResult) => void;
 };
 
 const defaultSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
 
-export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoading, setScan }: ModCatalogManagerProps) {
+export function ModCatalogManager({ celestePath, loading, notifier, scan, sources, setLoading, setScan }: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
-  const [sources, setSources] = useState<ModCatalogSourceKind[]>(defaultSources);
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const installedNames = useMemo(
     () => new Set([...scan.maps, ...scan.otherMods].map((item) => item.name.toLowerCase())),
@@ -59,7 +59,6 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
           <h2>搜索与下载新 Mod</h2>
           <p>{`${searchResult.entries.length} 个搜索结果`}</p>
         </div>
-        <SourcePicker sources={sources} onChange={setSources} />
         <div className="catalog-actions">
           <label className="search-box catalog-search">
             <Search size={17} />
@@ -100,34 +99,6 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, setLoa
         </section>
       </div>
     </section>
-  );
-}
-
-function SourcePicker({ sources, onChange }: { sources: ModCatalogSourceKind[]; onChange: (sources: ModCatalogSourceKind[]) => void }) {
-  const sourceOptions: Array<{ value: ModCatalogSourceKind; label: string }> = [
-    { value: "everestMirror", label: "Everest 镜像" },
-    { value: "wegfan", label: "WEGFan" },
-    { value: "everest", label: "Everest 官方" }
-  ];
-  return (
-    <div className="catalog-source-picker" aria-label="Mod 数据源">
-      <Server size={16} />
-      {sourceOptions.map((option) => {
-        const active = sources.includes(option.value);
-        return (
-          <button
-            className={active ? "active" : ""}
-            key={option.value}
-            onClick={() => {
-              onChange(active ? sources.filter((item) => item !== option.value) : [...sources, option.value]);
-            }}
-            title={active ? `停用 ${option.label}` : `启用 ${option.label}`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

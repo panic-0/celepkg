@@ -1,5 +1,5 @@
 import { LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { checkModUpdates, createOperationId, updateMod } from "./api";
 import { BackupManager } from "./components/BackupManager";
 import { IssueDrawer } from "./components/IssueDrawer";
@@ -21,22 +21,22 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import type { ModCatalogSourceKind, ModDownloadProgress, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
+import type { ModDownloadProgress, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
 import { isDraftEnabled, readError } from "./utils/format";
 import { isMockMode } from "./mockApi";
-
-const defaultModUpdateSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
 
 export function App() {
   const {
     autoBackupCleanupEnabled,
     autoBackupEnabled,
     autoBackupRetentionCount,
+    autoCheckModUpdatesOnStartup,
     celestePath,
     clearNotice,
     configWarnings,
     loading,
     loadingMessage,
+    modCatalogSources,
     notice,
     notifier,
     refresh,
@@ -50,6 +50,8 @@ export function App() {
     updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
+    updateAutoCheckModUpdatesOnStartup,
+    updateModCatalogSources,
     updateSelectedSaveFiles
   } = useCelePkgData();
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -57,6 +59,7 @@ export function App() {
   const [modDownloadProgress, setModDownloadProgress] = useState<ModDownloadProgress | null>(null);
   const [modDownloadBatchLabel, setModDownloadBatchLabel] = useState("");
   const activeDownloadOperationId = useRef<string | null>(null);
+  const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const mockDownloadTimer = useRef<number | null>(null);
   const progressClearTimer = useRef<number | null>(null);
@@ -169,20 +172,38 @@ export function App() {
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
 
-  async function checkUpdatesForMods() {
-    try {
-      setLoading(true, "正在检查 Mod 更新...");
-      const result = await checkModUpdates(celestePath, defaultModUpdateSources);
-      setModUpdateResult(result);
-      if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
-      else notifier.showSuccess(result.updates.length ? `发现 ${result.updates.length} 个可更新 Mod` : "本地 Mod 已是最新");
-    } catch (error) {
-      const message = readError(error);
-      notifier.showError(message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const checkUpdatesForMods = useCallback(
+    async (mode: "manual" | "startup" = "manual") => {
+      if (!celestePath.trim()) return;
+      const startupMode = mode === "startup";
+      const sources = modCatalogSources;
+      const previousLoading = loading;
+      if (!startupMode || !previousLoading) {
+        setLoading(true, "正在检查 Mod 更新...");
+      }
+      try {
+        const result = await checkModUpdates(celestePath, sources);
+        setModUpdateResult(result);
+        if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+        else if (result.updates.length) notifier.showSuccess(`发现 ${result.updates.length} 个可更新 Mod`);
+        else if (!startupMode) notifier.showSuccess("本地 Mod 已是最新");
+      } catch (error) {
+        const message = readError(error);
+        notifier.showError(message);
+      } finally {
+        if (!startupMode || !previousLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    [celestePath, loading, modCatalogSources, notifier, setLoading]
+  );
+
+  useEffect(() => {
+    if (startupModUpdateCheckDone.current || !autoCheckModUpdatesOnStartup || loading || !celestePath.trim() || !scan.modsPath) return;
+    startupModUpdateCheckDone.current = true;
+    void checkUpdatesForMods("startup");
+  }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, loading, scan.modsPath]);
 
   async function updateSingleMod(candidate: ModUpdateCandidate) {
     if (!window.confirm(`更新 ${candidate.installed.name} 到 ${candidate.entry.version || "目录最新版本"}？`)) return;
@@ -408,11 +429,21 @@ export function App() {
           />
         ) : workspaceView.activeView === "settings" ? (
           <SettingsManager
+            autoBackupCleanupEnabled={autoBackupCleanupEnabled}
+            autoBackupEnabled={autoBackupEnabled}
+            autoBackupRetentionCount={autoBackupRetentionCount}
+            autoCheckModUpdatesOnStartup={autoCheckModUpdatesOnStartup}
             loading={loading}
+            modCatalogSources={modCatalogSources}
             saveFiles={scan.availableSaveFiles}
             selectedSaveFiles={scan.selectedSaveFiles}
             showWarningColumn={uiLayout.showWarningColumn}
             strawberryDenominator={uiLayout.strawberryDenominator}
+            onAutoBackupCleanupEnabledChange={updateAutoBackupCleanupEnabled}
+            onAutoBackupEnabledChange={updateAutoBackupEnabled}
+            onAutoBackupRetentionCountChange={updateAutoBackupRetentionCount}
+            onAutoCheckModUpdatesOnStartupChange={updateAutoCheckModUpdatesOnStartup}
+            onModCatalogSourcesChange={updateModCatalogSources}
             onSelectedSaveFilesChange={updateSelectedSaveFiles}
             onShowWarningColumnChange={uiLayout.setShowWarningColumn}
             onStrawberryDenominatorChange={uiLayout.setStrawberryDenominator}
@@ -420,14 +451,9 @@ export function App() {
         ) : workspaceView.activeView === "backups" ? (
           <BackupManager
             autoBackupCleanupEnabled={autoBackupCleanupEnabled}
-            autoBackupEnabled={autoBackupEnabled}
-            autoBackupRetentionCount={autoBackupRetentionCount}
             backups={backups.backups}
             celestePath={celestePath}
             loading={loading}
-            onAutoBackupCleanupEnabledChange={updateAutoBackupCleanupEnabled}
-            onAutoBackupEnabledChange={updateAutoBackupEnabled}
-            onAutoBackupRetentionCountChange={updateAutoBackupRetentionCount}
             onBackupCreate={backups.createManualBackup}
             onBackupDelete={backups.deleteSelectedBackup}
             onBackupFolderOpen={backups.openCurrentBackupFolder}
@@ -442,6 +468,7 @@ export function App() {
             loading={loading}
             notifier={notifier}
             scan={scan}
+            sources={modCatalogSources}
             setLoading={setLoading}
             setScan={setScan}
           />

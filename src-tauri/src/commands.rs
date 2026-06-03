@@ -1,7 +1,7 @@
 use crate::domain::{
     AppConfig, BackupInfo, ConfigResponse, LaunchResult, ModCatalogSearchResult,
-    ModDownloadProgress, ModInstallResult, ModUpdateCheckResult, ProfileInput, ProfilesState,
-    ScanResult,
+    ModCatalogSourceKind, ModDownloadProgress, ModInstallResult, ModUpdateCheckResult,
+    ProfileInput, ProfilesState, ScanResult,
 };
 use crate::services;
 use crate::storage::{
@@ -57,6 +57,29 @@ pub fn set_auto_backup_retention_count(
     }
     let mut state = load_state()?;
     state.auto_backup_retention_count = auto_backup_retention_count;
+    write_state(&state)?;
+    Ok(config_response(&state, vec![]))
+}
+
+#[tauri::command]
+pub fn set_mod_catalog_sources(
+    mod_catalog_sources: Vec<ModCatalogSourceKind>,
+) -> Result<ConfigResponse, String> {
+    if mod_catalog_sources.is_empty() {
+        return Err("至少保留一个 Mod 数据源".to_string());
+    }
+    let mut state = load_state()?;
+    state.mod_catalog_sources = mod_catalog_sources;
+    write_state(&state)?;
+    Ok(config_response(&state, vec![]))
+}
+
+#[tauri::command]
+pub fn set_auto_check_mod_updates_on_startup(
+    auto_check_mod_updates_on_startup: bool,
+) -> Result<ConfigResponse, String> {
+    let mut state = load_state()?;
+    state.auto_check_mod_updates_on_startup = auto_check_mod_updates_on_startup;
     write_state(&state)?;
     Ok(config_response(&state, vec![]))
 }
@@ -477,6 +500,8 @@ fn config_response(state: &crate::storage::AppState, warnings: Vec<String>) -> C
         auto_backup_enabled: state.auto_backup_enabled,
         auto_backup_cleanup_enabled: state.auto_backup_cleanup_enabled,
         auto_backup_retention_count: state.auto_backup_retention_count,
+        mod_catalog_sources: state.mod_catalog_sources.clone(),
+        auto_check_mod_updates_on_startup: state.auto_check_mod_updates_on_startup,
         selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),
         warnings,

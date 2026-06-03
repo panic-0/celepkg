@@ -1,18 +1,13 @@
-import { AlertTriangle, Archive, FolderOpen, RefreshCw, RotateCcw, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { AlertTriangle, Archive, FolderOpen, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { BackupFileEntry, BackupInfo, RestoreScope } from "../types";
 import { formatUnixNanoseconds } from "../utils/time";
 
 type BackupManagerProps = {
   autoBackupCleanupEnabled: boolean;
-  autoBackupEnabled: boolean;
-  autoBackupRetentionCount: number;
   backups: BackupInfo[];
   celestePath: string;
   loading: boolean;
-  onAutoBackupCleanupEnabledChange: (enabled: boolean) => void;
-  onAutoBackupEnabledChange: (enabled: boolean) => void;
-  onAutoBackupRetentionCountChange: (count: number) => void;
   onBackupCreate: () => void;
   onBackupDelete: (backupId: string) => void;
   onBackupFolderOpen: () => void;
@@ -24,14 +19,9 @@ type BackupManagerProps = {
 
 export function BackupManager({
   autoBackupCleanupEnabled,
-  autoBackupEnabled,
-  autoBackupRetentionCount,
   backups,
   celestePath,
   loading,
-  onAutoBackupCleanupEnabledChange,
-  onAutoBackupEnabledChange,
-  onAutoBackupRetentionCountChange,
   onBackupCreate,
   onBackupDelete,
   onBackupFolderOpen,
@@ -40,22 +30,8 @@ export function BackupManager({
   onBackupsCleanup,
   onBackupsRefresh
 }: BackupManagerProps) {
-  const [retentionDraft, setRetentionDraft] = useState(String(autoBackupRetentionCount));
   const [deleteTarget, setDeleteTarget] = useState<BackupInfo | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<BackupInfo | null>(null);
-
-  useEffect(() => {
-    setRetentionDraft(String(autoBackupRetentionCount));
-  }, [autoBackupRetentionCount]);
-
-  function commitRetentionDraft() {
-    const value = Number.parseInt(retentionDraft, 10);
-    const nextCount = Number.isFinite(value) ? Math.max(1, Math.min(100, value)) : Math.max(1, autoBackupRetentionCount);
-    setRetentionDraft(String(nextCount));
-    if (nextCount !== autoBackupRetentionCount) {
-      onAutoBackupRetentionCountChange(nextCount);
-    }
-  }
 
   function confirmDelete() {
     if (!deleteTarget) return;
@@ -77,46 +53,6 @@ export function BackupManager({
           <p>{`${backups.length} 个备份，当前目录：${celestePath || "未设置"}`}</p>
         </div>
         <div className="backup-header-actions">
-          <button
-            className={autoBackupEnabled ? "inline-toggle active compact" : "inline-toggle compact"}
-            onClick={() => onAutoBackupEnabledChange(!autoBackupEnabled)}
-            disabled={loading}
-          >
-            {autoBackupEnabled ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-            修改前自动备份
-          </button>
-          <div className="backup-retention-segments" aria-label="自动清理策略">
-            <label
-              className={autoBackupCleanupEnabled ? "backup-retention-option active" : "backup-retention-option"}
-              onClick={() => {
-                if (!autoBackupCleanupEnabled && !loading) onAutoBackupCleanupEnabledChange(true);
-              }}
-            >
-              <span>保留最近</span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                step={1}
-                value={retentionDraft}
-                onBlur={commitRetentionDraft}
-                onChange={(event) => setRetentionDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") event.currentTarget.blur();
-                }}
-                disabled={loading || !autoBackupCleanupEnabled}
-              />
-              <span>个</span>
-            </label>
-            <button
-              className={autoBackupCleanupEnabled ? "backup-retention-option" : "backup-retention-option active"}
-              onClick={() => onAutoBackupCleanupEnabledChange(false)}
-              disabled={loading}
-              type="button"
-            >
-              不自动清理
-            </button>
-          </div>
           <button
             onClick={onBackupsCleanup}
             disabled={loading || !autoBackupCleanupEnabled}

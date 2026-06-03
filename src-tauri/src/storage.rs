@@ -1,4 +1,4 @@
-use crate::domain::{Profile, ProfileType, ProfilesState};
+use crate::domain::{ModCatalogSourceKind, Profile, ProfileType, ProfilesState};
 use crate::utils::{now_string, stable_id};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -20,6 +20,10 @@ pub struct AppState {
     pub auto_backup_cleanup_enabled: bool,
     #[serde(default = "default_auto_backup_retention_count")]
     pub auto_backup_retention_count: usize,
+    #[serde(default = "default_mod_catalog_sources")]
+    pub mod_catalog_sources: Vec<ModCatalogSourceKind>,
+    #[serde(default = "default_auto_check_mod_updates_on_startup")]
+    pub auto_check_mod_updates_on_startup: bool,
     #[serde(default = "default_selected_save_files")]
     pub selected_save_files: Vec<String>,
     #[serde(default)]
@@ -154,6 +158,8 @@ fn default_state() -> AppState {
         auto_backup_enabled: default_auto_backup_enabled(),
         auto_backup_cleanup_enabled: default_auto_backup_cleanup_enabled(),
         auto_backup_retention_count: default_auto_backup_retention_count(),
+        mod_catalog_sources: default_mod_catalog_sources(),
+        auto_check_mod_updates_on_startup: default_auto_check_mod_updates_on_startup(),
         selected_save_files: default_selected_save_files(),
         protected_record_ids: vec![],
         profiles: vec![
@@ -275,6 +281,17 @@ fn default_auto_backup_retention_count() -> usize {
     20
 }
 
+fn default_mod_catalog_sources() -> Vec<ModCatalogSourceKind> {
+    vec![
+        ModCatalogSourceKind::EverestMirror,
+        ModCatalogSourceKind::Wegfan,
+    ]
+}
+
+fn default_auto_check_mod_updates_on_startup() -> bool {
+    true
+}
+
 fn default_selected_save_files() -> Vec<String> {
     vec!["0.celeste".to_string()]
 }
@@ -368,6 +385,14 @@ mod tests {
         assert!(state.auto_backup_enabled);
         assert!(state.auto_backup_cleanup_enabled);
         assert_eq!(state.auto_backup_retention_count, 20);
+        assert_eq!(
+            state.mod_catalog_sources,
+            vec![
+                ModCatalogSourceKind::EverestMirror,
+                ModCatalogSourceKind::Wegfan
+            ]
+        );
+        assert!(state.auto_check_mod_updates_on_startup);
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);

@@ -143,6 +143,8 @@ pub struct ConfigResponse {
     pub auto_backup_enabled: bool,
     pub auto_backup_cleanup_enabled: bool,
     pub auto_backup_retention_count: usize,
+    pub mod_catalog_sources: Vec<ModCatalogSourceKind>,
+    pub auto_check_mod_updates_on_startup: bool,
     pub selected_save_files: Vec<String>,
     pub profiles: ProfilesState,
     pub warnings: Vec<String>,
