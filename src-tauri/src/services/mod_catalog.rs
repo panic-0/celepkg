@@ -20,6 +20,7 @@ const EVEREST_UPDATE_POINTER_URL: &str = "https://everestapi.github.io/modupdate
 const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+const DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(120);
 
 #[derive(Clone, Copy)]
 pub struct ModDownloadReporter<'a> {
@@ -28,6 +29,52 @@ pub struct ModDownloadReporter<'a> {
     pub cancel_token: Option<&'a AtomicBool>,
     pub task_index: usize,
     pub task_total: usize,
+}
+
+pub(crate) struct DownloadProgressThrottle {
+    total: Option<u64>,
+    last_emit: Instant,
+    last_downloaded: u64,
+    last_percent: Option<u64>,
+}
+
+impl DownloadProgressThrottle {
+    pub(crate) fn new(total: Option<u64>) -> Self {
+        Self {
+            total,
+            last_emit: Instant::now(),
+            last_downloaded: 0,
+            last_percent: progress_percent(0, total),
+        }
+    }
+
+    pub(crate) fn should_emit(&mut self, downloaded: u64) -> bool {
+        if downloaded <= self.last_downloaded {
+            return false;
+        }
+
+        let percent = progress_percent(downloaded, self.total);
+        let first_chunk = self.last_downloaded == 0;
+        let percent_changed = percent != self.last_percent;
+        let interval_elapsed = self.last_emit.elapsed() >= DOWNLOAD_PROGRESS_INTERVAL;
+        let completed = self
+            .total
+            .is_some_and(|total| total > 0 && downloaded >= total);
+
+        if first_chunk || percent_changed || interval_elapsed || completed {
+            self.last_emit = Instant::now();
+            self.last_downloaded = downloaded;
+            self.last_percent = percent;
+            return true;
+        }
+
+        false
+    }
+}
+
+fn progress_percent(downloaded: u64, total: Option<u64>) -> Option<u64> {
+    let total = total.filter(|total| *total > 0)?;
+    Some((((downloaded as u128) * 100 / (total as u128)).min(100)) as u64)
 }
 
 pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
@@ -341,7 +388,7 @@ fn download_url_to_file(
     let mut file =
         File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
     let mut downloaded = 0;
-    let mut last_emit = Instant::now();
+    let mut progress_throttle = DownloadProgressThrottle::new(total);
     let started = Instant::now();
     let mut buffer = [0u8; 64 * 1024];
     loop {
@@ -355,9 +402,7 @@ fn download_url_to_file(
         file.write_all(&buffer[..read])
             .map_err(|error| format!("写入下载文件失败：{error}"))?;
         downloaded += read as u64;
-        let should_emit = last_emit.elapsed() >= Duration::from_millis(120)
-            || total.is_some_and(|total| downloaded >= total);
-        if should_emit {
+        if progress_throttle.should_emit(downloaded) {
             emit_download_progress(
                 reporter,
                 &entry.name,
@@ -367,7 +412,6 @@ fn download_url_to_file(
                 download_speed(downloaded, started),
                 url,
             );
-            last_emit = Instant::now();
         }
     }
     emit_download_progress(
@@ -1198,6 +1242,16 @@ Helper:
         assert_eq!(events[0].speed_bytes_per_sec, 2048.0);
         assert_eq!(events[0].task_index, 2);
         assert_eq!(events[0].task_total, 4);
+    }
+
+    #[test]
+    fn progress_throttle_emits_when_percent_changes() {
+        let mut throttle = DownloadProgressThrottle::new(Some(1000));
+
+        assert!(throttle.should_emit(1));
+        assert!(!throttle.should_emit(5));
+        assert!(throttle.should_emit(10));
+        assert!(throttle.should_emit(20));
     }
 
     #[test]

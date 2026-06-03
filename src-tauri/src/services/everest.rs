@@ -1,7 +1,7 @@
 use crate::domain::{
     EverestInstallResult, EverestRelease, EverestReleaseList, ModDownloadProgress,
 };
-use crate::services::mod_catalog::ModDownloadReporter;
+use crate::services::mod_catalog::{DownloadProgressThrottle, ModDownloadReporter};
 use crate::utils::stable_id;
 use serde::Deserialize;
 use std::fs::{self, File};
@@ -220,7 +220,7 @@ fn download_url_to_file(
     let mut file =
         File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
     let mut downloaded = 0;
-    let mut last_emit = Instant::now();
+    let mut progress_throttle = DownloadProgressThrottle::new(total);
     let started = Instant::now();
     let mut buffer = [0u8; 64 * 1024];
     loop {
@@ -234,9 +234,7 @@ fn download_url_to_file(
         file.write_all(&buffer[..read])
             .map_err(|error| format!("写入下载文件失败：{error}"))?;
         downloaded += read as u64;
-        if last_emit.elapsed() >= Duration::from_millis(120)
-            || total.is_some_and(|total| downloaded >= total)
-        {
+        if progress_throttle.should_emit(downloaded) {
             emit_progress(
                 reporter,
                 "Everest",
@@ -246,7 +244,6 @@ fn download_url_to_file(
                 download_speed(downloaded, started),
                 url,
             );
-            last_emit = Instant::now();
         }
     }
     emit_progress(
