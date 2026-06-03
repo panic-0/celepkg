@@ -295,6 +295,15 @@ export function App() {
     );
   }
 
+  async function installCatalogEntry(entry: ModCatalogEntry) {
+    if (!window.confirm(`安装 ${entry.name}${entry.version ? ` ${entry.version}` : ""}？`)) return;
+    const dependencyPlan = await prepareDependencyInstall(entry);
+    if (!dependencyPlan) return false;
+    const dependenciesUpdated = await applyDependencyPlan(dependencyPlan);
+    if (!dependenciesUpdated) return false;
+    return await performCatalogInstall(entry, `正在安装 ${entry.name}...`, `已安装 ${entry.name}`);
+  }
+
   async function performModUpdate(
     candidate: ModUpdateCandidate,
     batchLabel = "",
@@ -324,15 +333,27 @@ export function App() {
   }
 
   async function prepareDependencyUpdates(candidate: ModUpdateCandidate): Promise<DependencyUpdatePlan | null> {
+    return await prepareDependencyPlan(candidate.entry, candidate.installed.name, "更新");
+  }
+
+  async function prepareDependencyInstall(entry: ModCatalogEntry): Promise<DependencyUpdatePlan | null> {
+    return await prepareDependencyPlan(entry, entry.name, "安装");
+  }
+
+  async function prepareDependencyPlan(
+    entry: ModCatalogEntry,
+    targetName: string,
+    actionLabel: DependencyActionLabel
+  ): Promise<DependencyUpdatePlan | null> {
     let metadata;
     try {
-      setLoading(true, `正在检查 ${candidate.installed.name} 的依赖...`);
-      metadata = await previewModUpdateMetadata(celestePath, candidate.entry);
+      setLoading(true, `正在检查 ${targetName} 的依赖...`);
+      metadata = await previewModUpdateMetadata(celestePath, entry);
     } catch (error) {
       const message = readError(error);
       notifier.showWarning(message);
-      if (!window.confirm(`无法预览 ${candidate.installed.name} 更新后的依赖。仍然继续更新？`)) return null;
-      return { candidate, choice: "none", issues: [] };
+      if (!window.confirm(`无法预览 ${targetName} ${actionLabel}后的依赖。仍然继续${actionLabel}？`)) return null;
+      return { actionLabel, choice: "none", issues: [], targetName };
     } finally {
       setLoading(false);
     }
@@ -340,11 +361,11 @@ export function App() {
     const issues = dependencyIssuesForMetadata(metadata.dependencies, false).concat(
       dependencyIssuesForMetadata(metadata.optionalDependencies, true)
     );
-    if (!issues.length) return { candidate, choice: "none", issues: [] };
+    if (!issues.length) return { actionLabel, choice: "none", issues: [], targetName };
 
-    const choice = await requestDependencyChoice(candidate, issues);
+    const choice = await requestDependencyChoice(targetName, actionLabel, issues);
     if (!choice) return null;
-    return { candidate, choice, issues };
+    return { actionLabel, choice, issues, targetName };
   }
 
   async function applyDependencyPlan(plan: DependencyUpdatePlan) {
@@ -359,7 +380,8 @@ export function App() {
     }
     if (unavailable.length) {
       const text = unavailable.map(formatDependencyIssue).join("\n");
-      if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续覆盖目标 Mod？`)) return false;
+      const actionText = plan.actionLabel === "安装" ? "安装" : "覆盖";
+      if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续${actionText}目标 Mod？`)) return false;
     }
     for (const action of dedupeDependencyActions(actions)) {
       const result = await runDependencyAction(action);
@@ -437,15 +459,19 @@ export function App() {
   }
 
   async function performDependencyInstall(entry: ModCatalogEntry) {
+    return await performCatalogInstall(entry, `正在安装依赖 ${entry.name}...`, `已安装依赖 ${entry.name}`);
+  }
+
+  async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {
     const operationId = createOperationId("mod-install");
     try {
       startCatalogDownloadProgress(entry, operationId);
-      setLoading(true, `正在安装依赖 ${entry.name}...`);
+      setLoading(true, message);
       const result = await installMod(celestePath, entry, operationId);
       clearMockDownloadTimer();
       setScan(result.scan);
       finishModDownloadProgress(operationId, 800);
-      notifier.showSuccess(`已安装依赖 ${entry.name}`);
+      notifier.showSuccess(successMessage);
       return true;
     } catch (error) {
       const message = readError(error);
@@ -457,9 +483,9 @@ export function App() {
     }
   }
 
-  function requestDependencyChoice(candidate: ModUpdateCandidate, issues: DependencyIssue[]) {
+  function requestDependencyChoice(targetName: string, actionLabel: DependencyActionLabel, issues: DependencyIssue[]) {
     return new Promise<DependencyUpdateChoice | null>((resolve) => {
-      setDependencyPrompt({ candidate, issues, resolve });
+      setDependencyPrompt({ actionLabel, issues, resolve, targetName });
     });
   }
 
@@ -736,13 +762,12 @@ export function App() {
           />
         ) : workspaceView.activeView === "catalog" ? (
           <ModCatalogManager
-            celestePath={celestePath}
             loading={loading}
             notifier={notifier}
             scan={scan}
             sources={modCatalogSources}
             setLoading={setLoading}
-            setScan={setScan}
+            onInstall={installCatalogEntry}
           />
         ) : workspaceView.activeView === "everest" ? (
           <EverestManager
@@ -851,6 +876,7 @@ function isWorkspaceLoadingMessage(message: string) {
 }
 
 type DependencyUpdateChoice = "none" | "required" | "all";
+type DependencyActionLabel = "安装" | "更新";
 
 type DependencyIssue = {
   dependency: Dependency;
@@ -864,15 +890,17 @@ type DependencyUpdateAction =
   | { kind: "install"; name: string; entry: ModCatalogEntry };
 
 type DependencyUpdatePlan = {
-  candidate: ModUpdateCandidate;
+  actionLabel: DependencyActionLabel;
   choice: DependencyUpdateChoice;
   issues: DependencyIssue[];
+  targetName: string;
 };
 
 type DependencyPromptState = {
-  candidate: ModUpdateCandidate;
+  actionLabel: DependencyActionLabel;
   issues: DependencyIssue[];
   resolve: (choice: DependencyUpdateChoice | null) => void;
+  targetName: string;
 };
 
 function DependencyUpdateDialog({
@@ -889,9 +917,9 @@ function DependencyUpdateDialog({
       <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dependency-update-title">
         <div className="confirm-dialog-heading">
           <LoaderCircle size={18} />
-          <h3 id="dependency-update-title">更新前依赖检查</h3>
+          <h3 id="dependency-update-title">{prompt.actionLabel}前依赖检查</h3>
         </div>
-        <p>{`${prompt.candidate.installed.name} 更新后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
+        <p>{`${prompt.targetName} ${prompt.actionLabel}后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
         <div className="dependency-preview-list">
           {prompt.issues.map((issue) => (
             <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>

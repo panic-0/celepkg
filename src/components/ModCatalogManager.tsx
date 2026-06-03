@@ -1,21 +1,20 @@
 import { Download, ExternalLink, Info, PackageCheck, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { installMod, searchModCatalog } from "../api";
+import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
 
 type ModCatalogManagerProps = {
-  celestePath: string;
   loading: boolean;
   notifier: AppNotifier;
   scan: ScanResult;
   sources: ModCatalogSourceKind[];
   setLoading: (loading: boolean, message?: string) => void;
-  setScan: (scan: ScanResult) => void;
+  onInstall: (entry: ModCatalogEntry) => void;
 };
 
 const defaultSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
 
-export function ModCatalogManager({ celestePath, loading, notifier, scan, sources, setLoading, setScan }: ModCatalogManagerProps) {
+export function ModCatalogManager({ loading, notifier, scan, sources, setLoading, onInstall }: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
@@ -34,20 +33,6 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, source
       notifier.showSuccess(`找到 ${result.entries.length} 个目录条目`);
     } catch (error) {
       notifier.showError(error instanceof Error ? error.message : "搜索 Mod 目录失败。");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function installEntry(entry: ModCatalogEntry) {
-    if (!window.confirm(`安装 ${entry.name}${entry.version ? ` ${entry.version}` : ""}？`)) return;
-    try {
-      setLoading(true, `下载并安装 ${entry.name}...`);
-      const result = await installMod(celestePath, entry);
-      setScan(result.scan);
-      notifier.showSuccess(`已安装到 ${result.destinationPath}`);
-    } catch (error) {
-      notifier.showError(error instanceof Error ? error.message : "安装 Mod 失败。");
     } finally {
       setLoading(false);
     }
@@ -92,7 +77,7 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, source
                 entry={entry}
                 installed={installedNames.has(entry.name.toLowerCase())}
                 key={`${entry.source}:${entry.id}`}
-                onInstall={() => installEntry(entry)}
+                onInstall={() => onInstall(entry)}
                 onOpenDetail={() => setDetailEntry(entry)}
               />
             ))}
@@ -106,7 +91,7 @@ export function ModCatalogManager({ celestePath, loading, notifier, scan, source
           installed={installedNames.has(detailEntry.name.toLowerCase())}
           loading={loading}
           onClose={() => setDetailEntry(null)}
-          onInstall={() => installEntry(detailEntry)}
+          onInstall={() => onInstall(detailEntry)}
         />
       )}
     </section>
