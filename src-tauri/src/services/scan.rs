@@ -1,6 +1,6 @@
 use crate::domain::{
-    CompletionStatus, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult,
-    ScanTiming, SubMapInfo,
+    CompletionStatus, Dependency, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo,
+    ScanResult, ScanTiming, SubMapInfo,
 };
 use crate::parsers::dialog::{dialog_title_for_key, dialog_title_for_sid, read_dialog_titles};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
@@ -10,7 +10,7 @@ use crate::parsers::save_stats::{
 };
 use crate::services::game::resolve_game_executable;
 use crate::storage::{read_json, scan_cache_path, write_json, write_text_file};
-use crate::utils::{normalize_slash, stable_id};
+use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -21,7 +21,7 @@ use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 13;
+const SCAN_CACHE_VERSION: u32 = 14;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -365,39 +365,20 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         vec!["没有找到 Celeste/Mods 目录。".to_string()]
     };
 
-    let available_names: HashSet<String> = records
-        .iter()
-        .flat_map(|record| {
-            [
-                record.name.clone(),
-                record.metadata.name.clone(),
-                record.file_name.trim_end_matches(".zip").to_string(),
-            ]
-        })
-        .filter(|name| !name.is_empty())
-        .map(|name| name.to_lowercase())
-        .collect();
+    let dependency_index = DependencyIndex::new(&records, celeste_path);
+    let mut unknown_builtin_dependencies = HashSet::new();
 
     let mut maps = vec![];
     let mut other_mods = vec![];
     for mut record in records {
+        let warn_missing_dependencies = record.kind == ModKind::Map;
+        record.warnings.extend(dependency_warnings(
+            &record.dependencies,
+            &dependency_index,
+            warn_missing_dependencies,
+            &mut unknown_builtin_dependencies,
+        ));
         if record.kind == ModKind::Map {
-            for dep in &record.dependencies {
-                if !dep.name.is_empty()
-                    && !is_builtin_dependency(&dep.name)
-                    && !available_names.contains(&dep.name.to_lowercase())
-                {
-                    record.warnings.push(format!(
-                        "缺少依赖：{}{}",
-                        dep.name,
-                        if dep.version.is_empty() {
-                            String::new()
-                        } else {
-                            format!(" {}", dep.version)
-                        }
-                    ));
-                }
-            }
             maps.push(record);
         } else {
             other_mods.push(record);
@@ -405,6 +386,15 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
     }
     maps.sort_by(|a, b| a.name.cmp(&b.name));
     other_mods.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut warnings = warnings;
+    if !unknown_builtin_dependencies.is_empty() {
+        let mut dependencies = unknown_builtin_dependencies.into_iter().collect::<Vec<_>>();
+        dependencies.sort();
+        warnings.push(format!(
+            "内置依赖版本无法确认：{}，无法判断本地版本",
+            dependencies.join("、")
+        ));
+    }
 
     ScanResult {
         celeste_path: celeste_path.to_string_lossy().to_string(),
@@ -420,6 +410,250 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         warnings,
         timings: vec![],
     }
+}
+
+#[derive(Debug, Clone)]
+struct DependencyCandidate {
+    version: String,
+}
+
+#[derive(Debug)]
+struct DependencyIndex {
+    mods: HashMap<String, DependencyCandidate>,
+    builtin_versions: HashMap<String, String>,
+}
+
+impl DependencyIndex {
+    fn new(records: &[ModRecord], celeste_path: &Path) -> Self {
+        let mut mods = HashMap::new();
+        for record in records {
+            let candidate = DependencyCandidate {
+                version: record.metadata.version.clone(),
+            };
+            for alias in dependency_aliases(record) {
+                let normalized = normalize_dependency_name(&alias);
+                if !normalized.is_empty() {
+                    mods.entry(normalized).or_insert_with(|| candidate.clone());
+                }
+            }
+        }
+        Self {
+            mods,
+            builtin_versions: builtin_dependency_versions(celeste_path),
+        }
+    }
+
+    fn find_mod(&self, name: &str) -> Option<&DependencyCandidate> {
+        self.mods.get(&normalize_dependency_name(name))
+    }
+
+    fn builtin_version(&self, name: &str) -> Option<&str> {
+        self.builtin_versions
+            .get(&normalize_dependency_name(name))
+            .map(String::as_str)
+    }
+}
+
+fn dependency_aliases(record: &ModRecord) -> Vec<String> {
+    vec![
+        record.id.clone(),
+        record.name.clone(),
+        record.metadata.name.clone(),
+        record.file_name.clone(),
+        record.file_name.trim_end_matches(".zip").to_string(),
+        record.relative_path.clone(),
+    ]
+}
+
+fn dependency_warnings(
+    dependencies: &[Dependency],
+    dependency_index: &DependencyIndex,
+    warn_missing_dependencies: bool,
+    unknown_builtin_dependencies: &mut HashSet<String>,
+) -> Vec<String> {
+    let mut warnings = vec![];
+    for dependency in dependencies {
+        if dependency.name.trim().is_empty() {
+            continue;
+        }
+        if is_builtin_dependency(&dependency.name) {
+            match builtin_dependency_version_warning(dependency, dependency_index) {
+                BuiltinDependencyVersionWarning::None => {}
+                BuiltinDependencyVersionWarning::TooLow(warning) => warnings.push(warning),
+                BuiltinDependencyVersionWarning::Unknown(label) => {
+                    unknown_builtin_dependencies.insert(label);
+                }
+            }
+            continue;
+        }
+        let Some(installed) = dependency_index.find_mod(&dependency.name) else {
+            if warn_missing_dependencies {
+                warnings.push(format!("缺少依赖：{}", dependency_label(dependency)));
+            }
+            continue;
+        };
+        if dependency_version_too_low(&installed.version, &dependency.version) {
+            warnings.push(format!(
+                "依赖版本可能过低：{} 需要 {}，本地 {}",
+                dependency.name, dependency.version, installed.version
+            ));
+        }
+    }
+    warnings
+}
+
+enum BuiltinDependencyVersionWarning {
+    None,
+    TooLow(String),
+    Unknown(String),
+}
+
+fn builtin_dependency_version_warning(
+    dependency: &Dependency,
+    dependency_index: &DependencyIndex,
+) -> BuiltinDependencyVersionWarning {
+    let Some(required_version) = parse_numeric_version(&dependency.version) else {
+        return BuiltinDependencyVersionWarning::None;
+    };
+    let Some(installed_version) = dependency_index.builtin_version(&dependency.name) else {
+        return BuiltinDependencyVersionWarning::Unknown(dependency_label(dependency));
+    };
+    let Some(installed_numeric_version) = parse_numeric_version(installed_version) else {
+        return BuiltinDependencyVersionWarning::None;
+    };
+    if compare_numeric_version_parts(&installed_numeric_version, &required_version)
+        == std::cmp::Ordering::Less
+    {
+        BuiltinDependencyVersionWarning::TooLow(format!(
+            "依赖版本可能过低：{} 需要 {}，本地 {}",
+            dependency.name, dependency.version, installed_version
+        ))
+    } else {
+        BuiltinDependencyVersionWarning::None
+    }
+}
+
+fn dependency_version_too_low(installed_version: &str, required_version: &str) -> bool {
+    let Some(installed) = parse_numeric_version(installed_version) else {
+        return false;
+    };
+    let Some(required) = parse_numeric_version(required_version) else {
+        return false;
+    };
+    compare_numeric_version_parts(&installed, &required) == std::cmp::Ordering::Less
+}
+
+fn parse_numeric_version(value: &str) -> Option<Vec<u64>> {
+    let mut parts = vec![];
+    let mut current = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_digit() {
+            current.push(ch);
+        } else if !current.is_empty() {
+            parts.push(current.parse().ok()?);
+            current.clear();
+        }
+    }
+    if !current.is_empty() {
+        parts.push(current.parse().ok()?);
+    }
+    (!parts.is_empty()).then_some(parts)
+}
+
+fn compare_numeric_version_parts(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
+    for index in 0..left.len().max(right.len()) {
+        let left_part = left.get(index).copied().unwrap_or_default();
+        let right_part = right.get(index).copied().unwrap_or_default();
+        match left_part.cmp(&right_part) {
+            std::cmp::Ordering::Equal => {}
+            order => return order,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+fn dependency_label(dependency: &Dependency) -> String {
+    if dependency.version.is_empty() {
+        dependency.name.clone()
+    } else {
+        format!("{} {}", dependency.name, dependency.version)
+    }
+}
+
+fn builtin_dependency_versions(celeste_path: &Path) -> HashMap<String, String> {
+    let mut versions = HashMap::new();
+    insert_builtin_dependency_version(&mut versions, "Celeste", "1.4.0.0");
+    if let Some(version) = read_everest_build_version(celeste_path) {
+        insert_builtin_dependency_version(&mut versions, "Everest", &version);
+        insert_builtin_dependency_version(&mut versions, "EverestCore", &version);
+        return versions;
+    }
+    if let Some(metadata) = read_everest_builtin_metadata(celeste_path) {
+        insert_builtin_dependency_version(&mut versions, "Everest", &metadata.version);
+        insert_builtin_dependency_version(&mut versions, "EverestCore", &metadata.version);
+        insert_builtin_dependency_version(&mut versions, &metadata.name, &metadata.version);
+    }
+    versions
+}
+
+fn insert_builtin_dependency_version(
+    versions: &mut HashMap<String, String>,
+    name: &str,
+    version: &str,
+) {
+    let normalized = normalize_dependency_name(name);
+    if !normalized.is_empty() && !version.trim().is_empty() {
+        versions.insert(normalized, version.to_string());
+    }
+}
+
+fn read_everest_build_version(celeste_path: &Path) -> Option<String> {
+    let build = [
+        celeste_path.join("Celeste.exe"),
+        celeste_path.join("Celeste.dll"),
+    ]
+    .into_iter()
+    .find_map(read_everest_build_from_file)?;
+    Some(format!("1.{build}.0"))
+}
+
+fn read_everest_build_from_file(path: PathBuf) -> Option<u64> {
+    const MAGIC: &[u8] = b"EverestBuild";
+    let data = fs::read(path).ok()?;
+    let start = data
+        .windows(MAGIC.len())
+        .position(|window| window == MAGIC)?
+        + MAGIC.len();
+    let version_bytes: Vec<u8> = data[start..]
+        .iter()
+        .copied()
+        .take_while(|byte| byte.is_ascii_digit())
+        .collect();
+    if version_bytes.is_empty() {
+        return None;
+    }
+    std::str::from_utf8(&version_bytes).ok()?.parse().ok()
+}
+
+fn read_everest_builtin_metadata(celeste_path: &Path) -> Option<ModMetadata> {
+    [
+        celeste_path.join("everest.yaml"),
+        celeste_path.join("everest.yml"),
+        celeste_path
+            .join("Mods")
+            .join("Everest")
+            .join("everest.yaml"),
+        celeste_path
+            .join("Mods")
+            .join("Everest")
+            .join("everest.yml"),
+    ]
+    .into_iter()
+    .find_map(|path| {
+        let text = fs::read_to_string(path).ok()?;
+        let metadata = parse_metadata(&text);
+        (!metadata.version.trim().is_empty()).then_some(metadata)
+    })
 }
 
 struct OfficialMapFile {
@@ -1635,6 +1869,209 @@ CompleteScreen:
     }
 
     #[test]
+    fn dependency_warning_reports_low_installed_versions() {
+        let mut helper = record("helper-id", "Helper.zip", ModKind::Mod);
+        helper.metadata.name = "Helper".to_string();
+        helper.metadata.version = "1.1.5".to_string();
+        let index = DependencyIndex::new(&[helper], Path::new(""));
+
+        let warnings =
+            dependency_warnings_for_test(&[dependency("Helper", "1.2.0")], &index, true).0;
+
+        assert_eq!(
+            warnings,
+            vec!["依赖版本可能过低：Helper 需要 1.2.0，本地 1.1.5"]
+        );
+    }
+
+    #[test]
+    fn dependency_warning_accepts_equal_or_higher_versions() {
+        let mut helper = record("helper-id", "Helper.zip", ModKind::Mod);
+        helper.metadata.name = "Helper".to_string();
+        helper.metadata.version = "1.10.0".to_string();
+        let index = DependencyIndex::new(&[helper], Path::new(""));
+
+        assert!(
+            dependency_warnings_for_test(&[dependency("Helper", "1.2.0")], &index, true)
+                .0
+                .is_empty()
+        );
+        assert!(
+            dependency_warnings_for_test(&[dependency("Helper", "1.10.0")], &index, true)
+                .0
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn dependency_warning_skips_missing_or_unparseable_versions() {
+        let mut helper = record("helper-id", "Helper.zip", ModKind::Mod);
+        helper.metadata.name = "Helper".to_string();
+        helper.metadata.version = "preview".to_string();
+        let index = DependencyIndex::new(&[helper], Path::new(""));
+
+        assert!(
+            dependency_warnings_for_test(&[dependency("Helper", "")], &index, true)
+                .0
+                .is_empty()
+        );
+        assert!(
+            dependency_warnings_for_test(&[dependency("Helper", "next")], &index, true)
+                .0
+                .is_empty()
+        );
+        assert!(
+            dependency_warnings_for_test(&[dependency("Helper", "1.2.0")], &index, true)
+                .0
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn dependency_warning_matches_normalized_aliases() {
+        let mut helper = record("helper-id", "Helper_Pack.zip", ModKind::Mod);
+        helper.metadata.version = "1.0.0".to_string();
+        let index = DependencyIndex::new(&[helper], Path::new(""));
+
+        let warnings =
+            dependency_warnings_for_test(&[dependency("Helper Pack", "1.1.0")], &index, true).0;
+
+        assert_eq!(
+            warnings,
+            vec!["依赖版本可能过低：Helper Pack 需要 1.1.0，本地 1.0.0"]
+        );
+    }
+
+    #[test]
+    fn builtin_dependency_with_unknown_local_version_gets_warning() {
+        let index = DependencyIndex::new(&[], Path::new(""));
+
+        let (warnings, unknown_builtin_versions) =
+            dependency_warnings_for_test(&[dependency("EverestCore", "1.4980.0")], &index, true);
+
+        assert!(warnings.is_empty());
+        assert_eq!(
+            unknown_builtin_versions,
+            HashSet::from(["EverestCore 1.4980.0".to_string()])
+        );
+    }
+
+    #[test]
+    fn celeste_builtin_dependency_uses_common_version() {
+        let index = DependencyIndex::new(&[], Path::new(""));
+
+        let same_version =
+            dependency_warnings_for_test(&[dependency("Celeste", "1.4.0.0")], &index, true);
+        let newer_required =
+            dependency_warnings_for_test(&[dependency("Celeste", "1.4.1.0")], &index, true);
+
+        assert!(same_version.0.is_empty());
+        assert!(same_version.1.is_empty());
+        assert_eq!(
+            newer_required.0,
+            vec!["依赖版本可能过低：Celeste 需要 1.4.1.0，本地 1.4.0.0"]
+        );
+        assert!(newer_required.1.is_empty());
+    }
+
+    #[test]
+    fn builtin_dependency_version_is_checked_when_detected() {
+        let root = temp_celeste_root("builtin-version");
+        fs::create_dir_all(&root).expect("root dir");
+        fs::write(
+            root.join("everest.yaml"),
+            "Name: EverestCore\nVersion: 1.4970.0\n",
+        )
+        .expect("everest yaml");
+        let index = DependencyIndex::new(&[], &root);
+
+        let warnings =
+            dependency_warnings_for_test(&[dependency("EverestCore", "1.4980.0")], &index, true).0;
+        let high_enough =
+            dependency_warnings_for_test(&[dependency("EverestCore", "1.4960.0")], &index, true).0;
+
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(
+            warnings,
+            vec!["依赖版本可能过低：EverestCore 需要 1.4980.0，本地 1.4970.0"]
+        );
+        assert!(high_enough.is_empty());
+    }
+
+    #[test]
+    fn everest_build_version_is_read_from_game_binary() {
+        let root = temp_celeste_root("everest-build");
+        fs::create_dir_all(&root).expect("root dir");
+        fs::write(
+            root.join("Celeste.exe"),
+            b"prefix EverestBuild4980\0 suffix",
+        )
+        .expect("game binary");
+
+        let version = read_everest_build_version(&root).expect("everest build");
+
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(version, "1.4980.0");
+    }
+
+    #[test]
+    fn everest_build_version_prefer_binary_over_yaml_fallback() {
+        let root = temp_celeste_root("everest-build-precedence");
+        fs::create_dir_all(&root).expect("root dir");
+        fs::write(
+            root.join("Celeste.exe"),
+            b"prefix EverestBuild4980\0 suffix",
+        )
+        .expect("game binary");
+        fs::write(
+            root.join("everest.yaml"),
+            "Name: EverestCore\nVersion: 1.4970.0\n",
+        )
+        .expect("everest yaml");
+        let index = DependencyIndex::new(&[], &root);
+
+        let warnings =
+            dependency_warnings_for_test(&[dependency("EverestCore", "1.4980.0")], &index, true).0;
+
+        let _ = fs::remove_dir_all(root);
+
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn unknown_builtin_versions_are_deduped_as_scan_warnings() {
+        let root = temp_celeste_root("unknown-builtin-scan-warning");
+        write_dir_mod_with_dependencies(
+            &root,
+            "FirstHelper",
+            &[dependency("EverestCore", "1.4980.0")],
+        );
+        write_dir_mod_with_dependencies(
+            &root,
+            "SecondHelper",
+            &[dependency("EverestCore", "1.4980.0")],
+        );
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let scan = full_scan_fresh(&root, empty_profiles(), &[], &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(
+            scan.warnings,
+            vec!["内置依赖版本无法确认：EverestCore 1.4980.0，无法判断本地版本"]
+        );
+        assert!(scan
+            .other_mods
+            .iter()
+            .all(|mod_item| mod_item.warnings.is_empty()));
+    }
+
+    #[test]
     fn selected_save_files_control_scanned_stats() {
         let root = temp_celeste_root("selected-save");
         write_dir_map(&root, "SaveMap", "maps/selected/save");
@@ -1818,6 +2255,28 @@ CompleteScreen:
         }
     }
 
+    fn dependency(name: &str, version: &str) -> Dependency {
+        Dependency {
+            name: name.to_string(),
+            version: version.to_string(),
+        }
+    }
+
+    fn dependency_warnings_for_test(
+        dependencies: &[Dependency],
+        dependency_index: &DependencyIndex,
+        warn_missing_dependencies: bool,
+    ) -> (Vec<String>, HashSet<String>) {
+        let mut unknown_builtin_dependencies = HashSet::new();
+        let warnings = dependency_warnings(
+            dependencies,
+            dependency_index,
+            warn_missing_dependencies,
+            &mut unknown_builtin_dependencies,
+        );
+        (warnings, unknown_builtin_dependencies)
+    }
+
     fn empty_profiles() -> ProfilesState {
         ProfilesState {
             active_map_profile_id: "default-maps".to_string(),
@@ -1848,6 +2307,25 @@ CompleteScreen:
         )
         .expect("everest yaml");
         fs::write(mod_path.join(format!("Maps/{sid}.bin")), "").expect("map bin");
+    }
+
+    fn write_dir_mod_with_dependencies(root: &Path, name: &str, dependencies: &[Dependency]) {
+        let mod_path = root.join("Mods").join(name);
+        fs::create_dir_all(&mod_path).expect("mod dir");
+        let dependency_yaml = dependencies
+            .iter()
+            .map(|dependency| {
+                format!(
+                    "  - Name: {}\n    Version: {}\n",
+                    dependency.name, dependency.version
+                )
+            })
+            .collect::<String>();
+        fs::write(
+            mod_path.join("everest.yaml"),
+            format!("Name: {name}\nVersion: 1.0.0\nDependencies:\n{dependency_yaml}"),
+        )
+        .expect("everest yaml");
     }
 
     fn save_xml(sid: &str, deaths: u64) -> String {
