@@ -36,10 +36,6 @@ pub fn normalize_dependency_name(value: &str) -> String {
         .to_lowercase()
 }
 
-pub fn path_basename(value: &str) -> String {
-    value.rsplit('/').next().unwrap_or(value).to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

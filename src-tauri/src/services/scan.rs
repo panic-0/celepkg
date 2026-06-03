@@ -2,9 +2,7 @@ use crate::domain::{
     CompletionStatus, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo, ScanResult,
     ScanTiming, SubMapInfo,
 };
-use crate::parsers::dialog::{
-    dialog_title_for_key, dialog_title_for_sid, is_dialog_file, read_dialog_titles,
-};
+use crate::parsers::dialog::{dialog_title_for_key, dialog_title_for_sid, read_dialog_titles};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
 use crate::parsers::map_bin::{read_map_summary, StrawberryCounts};
 use crate::parsers::save_stats::{
@@ -12,7 +10,7 @@ use crate::parsers::save_stats::{
 };
 use crate::services::game::resolve_game_executable;
 use crate::storage::{read_json, scan_cache_path, write_json, write_text_file};
-use crate::utils::{normalize_slash, path_basename, stable_id};
+use crate::utils::{normalize_slash, stable_id};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -789,7 +787,8 @@ pub fn set_scan_protected_state(
 }
 
 fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
-    let mut entries = vec![];
+    let mut map_ids = vec![];
+    let mut has_code = false;
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
@@ -801,6 +800,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
         let relative =
             normalize_slash(&entry.path().strip_prefix(dir_path).ok()?.to_string_lossy());
         if let Some(sid) = map_sid_from_entry(&relative) {
+            map_ids.push(sid.clone());
             if let Ok(bytes) = fs::read(entry.path()) {
                 if let Some(summary) = read_map_summary(&bytes) {
                     strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
@@ -822,25 +822,26 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
                 }
             }
         }
-        if path_basename(&relative).eq_ignore_ascii_case("everest.yaml")
-            || path_basename(&relative).eq_ignore_ascii_case("everest.yml")
-        {
+        if is_everest_yaml_entry(&relative) {
             yaml_text = fs::read_to_string(entry.path()).unwrap_or_default();
         }
-        if is_dialog_file(&relative) {
+        if is_dialog_entry(&relative) {
             dialog_texts.push((
                 relative.clone(),
                 fs::read_to_string(entry.path()).unwrap_or_default(),
             ));
         }
-        entries.push(relative);
+        if is_code_entry(&relative) {
+            has_code = true;
+        }
     }
     Some(create_mod_record(
         dir_path,
         mods_path,
         false,
         ScannedModData {
-            entries,
+            map_ids,
+            has_code,
             metadata: parse_metadata(&yaml_text),
             dialog_titles: read_dialog_titles(dialog_texts),
             strawberry_counts,
@@ -852,7 +853,8 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
 fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let file = File::open(zip_path).ok()?;
     let mut archive = ZipArchive::new(file).ok()?;
-    let mut entries = vec![];
+    let mut map_ids = vec![];
+    let mut has_code = false;
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
@@ -860,9 +862,9 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     for index in 0..archive.len() {
         let mut file = archive.by_index(index).ok()?;
         let name = normalize_slash(file.name());
-        let mut text = String::new();
         if let Some(sid) = map_sid_from_entry(&name) {
-            let mut bytes = Vec::new();
+            map_ids.push(sid.clone());
+            let mut bytes = Vec::with_capacity(file.size() as usize);
             let _ = file.read_to_end(&mut bytes);
             if let Some(summary) = read_map_summary(&bytes) {
                 strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
@@ -874,15 +876,16 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
                 }
             }
         }
-        if path_basename(&name).eq_ignore_ascii_case("everest.yaml")
-            || path_basename(&name).eq_ignore_ascii_case("everest.yml")
-        {
+        if is_everest_yaml_entry(&name) {
+            let mut text = String::new();
             let _ = file.read_to_string(&mut text);
-            yaml_text = text.clone();
-        } else if is_dialog_file(&name) {
+            yaml_text = text;
+        } else if is_dialog_entry(&name) {
+            let mut text = String::new();
             let _ = file.read_to_string(&mut text);
             dialog_texts.push((name.clone(), text));
         } else if let Some(sid) = map_meta_sid_from_entry(&name) {
+            let mut text = String::new();
             let _ = file.read_to_string(&mut text);
             if let Some(difficulty) =
                 read_meta_yaml_icon(&text).and_then(|icon| difficulty_from_map_icon(&icon))
@@ -890,14 +893,17 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
                 map_difficulties.insert(sid, difficulty);
             }
         }
-        entries.push(name);
+        if is_code_entry(&name) {
+            has_code = true;
+        }
     }
     Some(create_mod_record(
         zip_path,
         mods_path,
         true,
         ScannedModData {
-            entries,
+            map_ids,
+            has_code,
             metadata: parse_metadata(&yaml_text),
             dialog_titles: read_dialog_titles(dialog_texts),
             strawberry_counts,
@@ -907,7 +913,8 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
 }
 
 struct ScannedModData {
-    entries: Vec<String>,
+    map_ids: Vec<String>,
+    has_code: bool,
     metadata: ModMetadata,
     dialog_titles: HashMap<String, String>,
     strawberry_counts: HashMap<String, StrawberryCounts>,
@@ -921,7 +928,8 @@ fn create_mod_record(
     data: ScannedModData,
 ) -> ModRecord {
     let ScannedModData {
-        entries,
+        map_ids,
+        has_code,
         metadata,
         dialog_titles,
         strawberry_counts,
@@ -937,10 +945,6 @@ fn create_mod_record(
         .file_name()
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| relative_path.clone());
-    let map_ids: Vec<String> = entries
-        .iter()
-        .filter_map(|entry| map_sid_from_entry(entry))
-        .collect();
     let sub_maps: Vec<SubMapInfo> = map_ids
         .iter()
         .map(|sid| SubMapInfo {
@@ -972,7 +976,7 @@ fn create_mod_record(
         .iter()
         .map(|sub_map| sub_map.strawberry_total_count)
         .sum();
-    let is_map_mod = is_map_mod_record(&file_name, &relative_path, &metadata, &map_ids, &entries);
+    let is_map_mod = is_map_mod_record(&file_name, &relative_path, &metadata, &map_ids, has_code);
     let fallback_name = file_name.trim_end_matches(".zip").replace(['_', '-'], " ");
     let name = if metadata.name.is_empty() {
         fallback_name
@@ -1015,8 +1019,7 @@ fn create_mod_record(
 }
 
 fn map_sid_from_entry(entry: &str) -> Option<String> {
-    let lower = entry.to_lowercase();
-    if lower.starts_with("maps/") && lower.ends_with(".bin") {
+    if starts_with_ignore_ascii_case(entry, "maps/") && ends_with_ignore_ascii_case(entry, ".bin") {
         Some(entry[5..entry.len() - 4].to_string())
     } else {
         None
@@ -1024,8 +1027,9 @@ fn map_sid_from_entry(entry: &str) -> Option<String> {
 }
 
 fn map_meta_sid_from_entry(entry: &str) -> Option<String> {
-    let lower = entry.to_lowercase();
-    if lower.starts_with("maps/") && lower.ends_with(".meta.yaml") {
+    if starts_with_ignore_ascii_case(entry, "maps/")
+        && ends_with_ignore_ascii_case(entry, ".meta.yaml")
+    {
         Some(entry[5..entry.len() - 10].to_string())
     } else {
         None
@@ -1088,15 +1092,11 @@ fn is_map_mod_record(
     relative_path: &str,
     metadata: &ModMetadata,
     map_ids: &[String],
-    entries: &[String],
+    has_code: bool,
 ) -> bool {
     if map_ids.is_empty() {
         return false;
     }
-    let has_code = entries.iter().any(|entry| {
-        let lower = entry.to_lowercase();
-        lower.ends_with(".dll") || lower.ends_with(".exe")
-    });
     let helper_like = is_helper_like_mod(file_name, relative_path, metadata);
     let only_test_maps = map_ids.iter().all(|sid| is_test_map_sid(sid));
 
@@ -1107,6 +1107,31 @@ fn is_map_mod_record(
         return false;
     }
     true
+}
+
+fn is_code_entry(entry: &str) -> bool {
+    ends_with_ignore_ascii_case(entry, ".dll") || ends_with_ignore_ascii_case(entry, ".exe")
+}
+
+fn is_dialog_entry(entry: &str) -> bool {
+    starts_with_ignore_ascii_case(entry, "dialog/") && ends_with_ignore_ascii_case(entry, ".txt")
+}
+
+fn is_everest_yaml_entry(entry: &str) -> bool {
+    let basename = entry.rsplit('/').next().unwrap_or(entry);
+    basename.eq_ignore_ascii_case("everest.yaml") || basename.eq_ignore_ascii_case("everest.yml")
+}
+
+fn starts_with_ignore_ascii_case(value: &str, prefix: &str) -> bool {
+    value
+        .get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+}
+
+fn ends_with_ignore_ascii_case(value: &str, suffix: &str) -> bool {
+    value
+        .get(value.len().saturating_sub(suffix.len())..)
+        .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix))
 }
 
 fn is_helper_like_mod(file_name: &str, relative_path: &str, metadata: &ModMetadata) -> bool {
@@ -1244,52 +1269,39 @@ mod tests {
             "sleuter/chinatour/micnight".to_string(),
             "sleuter/chinatour/micpeach".to_string(),
         ];
-        let entries = vec![
-            "everest.yaml".to_string(),
-            "Maps/sleuter/chinatour/micnight.bin".to_string(),
-            "Maps/sleuter/chinatour/micpeach.bin".to_string(),
-        ];
 
         assert!(is_map_mod_record(
             "A_Tour_in_China.zip",
             "A_Tour_in_China.zip",
             &metadata("A Tour in China"),
             &map_ids,
-            &entries,
+            false,
         ));
     }
 
     #[test]
     fn classifies_helper_with_test_maps_as_other_mod() {
         let map_ids = vec!["leppa/AltSidesHelper/AltSidesHelperTest".to_string()];
-        let entries = vec![
-            "bin/Debug/AltSidesHelper.dll".to_string(),
-            "Maps/leppa/AltSidesHelper/AltSidesHelperTest.bin".to_string(),
-        ];
 
         assert!(!is_map_mod_record(
             "AltSidesHelper.zip",
             "AltSidesHelper.zip",
             &metadata("AltSidesHelper"),
             &map_ids,
-            &entries,
+            true,
         ));
     }
 
     #[test]
     fn classifies_code_mod_with_only_test_maps_as_other_mod() {
         let map_ids = vec!["preview/test".to_string()];
-        let entries = vec![
-            "Example.dll".to_string(),
-            "Maps/preview/test.bin".to_string(),
-        ];
 
         assert!(!is_map_mod_record(
             "Example.zip",
             "Example.zip",
             &metadata("Example"),
             &map_ids,
-            &entries,
+            true,
         ));
     }
 
@@ -1298,10 +1310,7 @@ mod tests {
         let root = temp_celeste_root("strawberry-counts");
         let mods_path = root.join("Mods");
         let mod_path = mods_path.join("BerryPack.zip");
-        let entries = vec![
-            "Maps/pack/one.bin".to_string(),
-            "Maps/pack/two.bin".to_string(),
-        ];
+        let map_ids = vec!["pack/one".to_string(), "pack/two".to_string()];
         let strawberry_counts = HashMap::from([
             (
                 "pack/one".to_string(),
@@ -1328,7 +1337,8 @@ mod tests {
             &mods_path,
             true,
             ScannedModData {
-                entries,
+                map_ids,
+                has_code: false,
                 metadata: metadata("BerryPack"),
                 dialog_titles: HashMap::new(),
                 strawberry_counts,

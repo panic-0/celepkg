@@ -1,10 +1,5 @@
 use std::collections::HashMap;
 
-pub fn is_dialog_file(relative_path: &str) -> bool {
-    let lower = relative_path.to_lowercase();
-    lower.starts_with("dialog/") && lower.ends_with(".txt")
-}
-
 pub fn read_dialog_titles(mut files: Vec<(String, String)>) -> HashMap<String, String> {
     files.sort_by(|a, b| dialog_language_score(&b.0).cmp(&dialog_language_score(&a.0)));
     let mut titles = HashMap::new();

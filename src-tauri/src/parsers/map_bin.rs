@@ -52,30 +52,29 @@ pub fn read_map_summary(bytes: &[u8]) -> Option<MapBinSummary> {
     }
     let mut lookup = Vec::with_capacity(lookup_count as usize);
     for _ in 0..lookup_count {
-        lookup.push(reader.take_string().ok()?);
+        lookup.push(LookupEntry::new(reader.take_string().ok()?));
     }
     read_element_summary(&mut reader, &lookup).ok()
 }
 
 #[cfg(test)]
 pub fn is_strawberry_entity(name: &str) -> bool {
-    is_strawberry_entity_name(&normalized_entity_name(name))
+    strawberry_kind_for_name(name) != StrawberryKind::None
 }
 
 fn read_element_summary(
     reader: &mut BinReader<'_>,
-    lookup: &[String],
+    lookup: &[LookupEntry],
 ) -> Result<MapBinSummary, ()> {
     let name = reader.take_lookup(lookup)?;
-    let is_meta = name.eq_ignore_ascii_case("meta");
     let mut moon = false;
     let mut map_icon = None;
     let attr_count = reader.take_u8()?;
     for _ in 0..attr_count {
         let key = reader.take_lookup(lookup)?;
-        if key.eq_ignore_ascii_case("moon") {
+        if key.is_moon {
             moon = reader.take_boolish_attr(lookup)?;
-        } else if is_meta && key.eq_ignore_ascii_case("Icon") {
+        } else if name.is_meta && key.is_icon {
             let value = reader.take_attr_string(lookup)?;
             if !value.trim().is_empty() {
                 map_icon = Some(value);
@@ -85,7 +84,7 @@ fn read_element_summary(
         }
     }
     let mut summary = MapBinSummary {
-        strawberry_counts: strawberry_counts_for_entity(name, moon),
+        strawberry_counts: strawberry_counts_for_kind(name.strawberry_kind, moon),
         map_icon,
     };
     let child_count = reader.take_u16()?;
@@ -101,57 +100,104 @@ fn read_element_summary(
     Ok(summary)
 }
 
-fn strawberry_counts_for_entity(name: &str, moon: bool) -> StrawberryCounts {
-    let normalized = normalized_entity_name(name);
-    let total = is_strawberry_entity_name(&normalized);
-    let visible = match normalized.as_str() {
-        "strawberry" => !moon,
-        "returnberry"
-        | "strawberrywithreturn"
-        | "multiroomstrawberry"
-        | "nonpoppingstrawberry"
-        | "explodingstrawberry"
-        | "cassettefriendlystrawberry"
-        | "diagonalwingedstrawberry"
-        | "glassberry"
-        | "customizableberry" => true,
-        _ => false,
-    };
-    StrawberryCounts {
-        visible: u64::from(total && visible),
-        total: u64::from(total),
+#[derive(Debug, Clone)]
+struct LookupEntry {
+    text: String,
+    strawberry_kind: StrawberryKind,
+    is_meta: bool,
+    is_moon: bool,
+    is_icon: bool,
+}
+
+impl LookupEntry {
+    fn new(text: String) -> Self {
+        Self {
+            strawberry_kind: strawberry_kind_for_name(&text),
+            is_meta: text.eq_ignore_ascii_case("meta"),
+            is_moon: text.eq_ignore_ascii_case("moon"),
+            is_icon: text.eq_ignore_ascii_case("Icon"),
+            text,
+        }
     }
 }
 
-fn normalized_entity_name(name: &str) -> String {
-    name.rsplit(['/', ':'])
-        .next()
-        .unwrap_or(name)
-        .replace(['_', '-'], "")
-        .to_lowercase()
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum StrawberryKind {
+    #[default]
+    None,
+    Strawberry,
+    Visible,
+    TotalOnly,
 }
 
-fn is_strawberry_entity_name(normalized: &str) -> bool {
-    matches!(
-        normalized,
-        "strawberry"
-            | "goldenberry"
-            | "moonberry"
-            | "silverberry"
-            | "memorialtextcontroller"
-            | "returnberry"
-            | "strawberrywithreturn"
-            | "rainbowberry"
-            | "multiroomstrawberry"
-            | "explodingstrawberry"
-            | "nonpoppingstrawberry"
-            | "cassettefriendlystrawberry"
-            | "diagonalwingedstrawberry"
-            | "glassberry"
-            | "customizableberry"
-            | "secretberry"
-            | "goldenstrawberrycustomconditions"
-    )
+fn strawberry_kind_for_name(name: &str) -> StrawberryKind {
+    let name = name.rsplit(['/', ':']).next().unwrap_or(name);
+    if normalized_name_eq(name, "strawberry") {
+        StrawberryKind::Strawberry
+    } else if [
+        "returnberry",
+        "strawberrywithreturn",
+        "multiroomstrawberry",
+        "nonpoppingstrawberry",
+        "explodingstrawberry",
+        "cassettefriendlystrawberry",
+        "diagonalwingedstrawberry",
+        "glassberry",
+        "customizableberry",
+    ]
+    .iter()
+    .any(|target| normalized_name_eq(name, target))
+    {
+        StrawberryKind::Visible
+    } else if [
+        "goldenberry",
+        "moonberry",
+        "silverberry",
+        "memorialtextcontroller",
+        "rainbowberry",
+        "secretberry",
+        "goldenstrawberrycustomconditions",
+    ]
+    .iter()
+    .any(|target| normalized_name_eq(name, target))
+    {
+        StrawberryKind::TotalOnly
+    } else {
+        StrawberryKind::None
+    }
+}
+
+fn normalized_name_eq(value: &str, target: &str) -> bool {
+    let mut value = value
+        .bytes()
+        .filter(|byte| !matches!(byte, b'_' | b'-'))
+        .map(|byte| byte.to_ascii_lowercase());
+    let mut target = target.bytes();
+    loop {
+        match (value.next(), target.next()) {
+            (Some(left), Some(right)) if left == right => {}
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn strawberry_counts_for_kind(kind: StrawberryKind, moon: bool) -> StrawberryCounts {
+    match kind {
+        StrawberryKind::None => StrawberryCounts::default(),
+        StrawberryKind::Strawberry => StrawberryCounts {
+            visible: u64::from(!moon),
+            total: 1,
+        },
+        StrawberryKind::Visible => StrawberryCounts {
+            visible: 1,
+            total: 1,
+        },
+        StrawberryKind::TotalOnly => StrawberryCounts {
+            visible: 0,
+            total: 1,
+        },
+    }
 }
 
 struct BinReader<'a> {
@@ -215,12 +261,18 @@ impl<'a> BinReader<'a> {
         String::from_utf8(bytes.to_vec()).map_err(|_| ())
     }
 
-    fn take_lookup<'b>(&mut self, lookup: &'b [String]) -> Result<&'b str, ()> {
-        let index = usize::from(self.take_u16()?);
-        lookup.get(index).map(String::as_str).ok_or(())
+    fn skip_string(&mut self) -> Result<usize, ()> {
+        let len = self.take_varint()?;
+        let _ = self.take_exact(len)?;
+        Ok(len)
     }
 
-    fn skip_attr(&mut self, lookup: &[String]) -> Result<(), ()> {
+    fn take_lookup<'b>(&mut self, lookup: &'b [LookupEntry]) -> Result<&'b LookupEntry, ()> {
+        let index = usize::from(self.take_u16()?);
+        lookup.get(index).ok_or(())
+    }
+
+    fn skip_attr(&mut self, lookup: &[LookupEntry]) -> Result<(), ()> {
         match self.take_u8()? {
             0 | 1 => {
                 let _ = self.take_u8()?;
@@ -235,7 +287,7 @@ impl<'a> BinReader<'a> {
                 let _ = self.take_lookup(lookup)?;
             }
             6 => {
-                let _ = self.take_string()?;
+                let _ = self.skip_string()?;
             }
             7 => {
                 let len = self.take_i16()?;
@@ -249,13 +301,13 @@ impl<'a> BinReader<'a> {
         Ok(())
     }
 
-    fn take_boolish_attr(&mut self, lookup: &[String]) -> Result<bool, ()> {
+    fn take_boolish_attr(&mut self, lookup: &[LookupEntry]) -> Result<bool, ()> {
         match self.take_u8()? {
             0 | 1 => Ok(self.take_u8()? != 0),
             2 => Ok(self.take_u16()? != 0),
             3 | 4 => Ok(self.take_u32()? != 0),
-            5 => Ok(!self.take_lookup(lookup)?.is_empty()),
-            6 => Ok(!self.take_string()?.is_empty()),
+            5 => Ok(!self.take_lookup(lookup)?.text.is_empty()),
+            6 => Ok(self.skip_string()? > 0),
             7 => {
                 let len = self.take_i16()?;
                 if len < 0 {
@@ -268,13 +320,13 @@ impl<'a> BinReader<'a> {
         }
     }
 
-    fn take_attr_string(&mut self, lookup: &[String]) -> Result<String, ()> {
+    fn take_attr_string(&mut self, lookup: &[LookupEntry]) -> Result<String, ()> {
         match self.take_u8()? {
             0 => Ok((self.take_u8()? != 0).to_string()),
             1 => Ok(self.take_u8()?.to_string()),
             2 => Ok(self.take_u16()?.to_string()),
             3 | 4 => Ok(self.take_u32()?.to_string()),
-            5 => Ok(self.take_lookup(lookup)?.to_string()),
+            5 => Ok(self.take_lookup(lookup)?.text.clone()),
             6 => self.take_string(),
             7 => {
                 let len = self.take_i16()?;
