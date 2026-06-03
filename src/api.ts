@@ -69,9 +69,12 @@ export async function setAutoBackupRetentionCount(autoBackupRetentionCount: numb
   return invokeChecked("set_auto_backup_retention_count", validateConfigResponse, { autoBackupRetentionCount });
 }
 
-export async function setModCatalogSources(modCatalogSources: ModCatalogSourceKind[]): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setModCatalogSources(modCatalogSources);
-  return invokeChecked("set_mod_catalog_sources", validateConfigResponse, { modCatalogSources });
+export async function setModCatalogSources(
+  modCatalogSourceOrder: ModCatalogSourceKind[],
+  modCatalogSourceEnabledCount: number
+): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setModCatalogSources(modCatalogSourceOrder, modCatalogSourceEnabledCount);
+  return invokeChecked("set_mod_catalog_sources", validateConfigResponse, { modCatalogSourceOrder, modCatalogSourceEnabledCount });
 }
 
 export async function setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStartup: boolean): Promise<ConfigResponse> {

@@ -34,9 +34,10 @@ export function validateConfigResponse(value: unknown): ConfigResponse {
     autoBackupEnabled: booleanAt(object.autoBackupEnabled, "config.autoBackupEnabled"),
     autoBackupCleanupEnabled: booleanAt(object.autoBackupCleanupEnabled, "config.autoBackupCleanupEnabled"),
     autoBackupRetentionCount: numberAt(object.autoBackupRetentionCount, "config.autoBackupRetentionCount"),
-    modCatalogSources: arrayAt(object.modCatalogSources, "config.modCatalogSources").map((item, index) =>
-      validateModCatalogSourceKind(item, `config.modCatalogSources[${index}]`)
+    modCatalogSourceOrder: arrayAt(object.modCatalogSourceOrder, "config.modCatalogSourceOrder").map((item, index) =>
+      validateModCatalogSourceKind(item, `config.modCatalogSourceOrder[${index}]`)
     ),
+    modCatalogSourceEnabledCount: numberAt(object.modCatalogSourceEnabledCount, "config.modCatalogSourceEnabledCount"),
     autoCheckModUpdatesOnStartup: booleanAt(object.autoCheckModUpdatesOnStartup, "config.autoCheckModUpdatesOnStartup"),
     selectedSaveFiles: stringArrayAt(object.selectedSaveFiles, "config.selectedSaveFiles"),
     profiles: validateProfilesState(object.profiles, "config.profiles"),

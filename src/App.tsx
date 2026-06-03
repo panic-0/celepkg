@@ -56,6 +56,8 @@ export function App() {
     configWarnings,
     loading,
     loadingMessage,
+    modCatalogSourceEnabledCount,
+    modCatalogSourceOrder,
     modCatalogSources,
     notice,
     notifier,
@@ -732,7 +734,8 @@ export function App() {
             autoBackupRetentionCount={autoBackupRetentionCount}
             autoCheckModUpdatesOnStartup={autoCheckModUpdatesOnStartup}
             loading={loading}
-            modCatalogSources={modCatalogSources}
+            modCatalogSourceEnabledCount={modCatalogSourceEnabledCount}
+            modCatalogSourceOrder={modCatalogSourceOrder}
             saveFiles={scan.availableSaveFiles}
             selectedSaveFiles={scan.selectedSaveFiles}
             showWarningColumn={uiLayout.showWarningColumn}

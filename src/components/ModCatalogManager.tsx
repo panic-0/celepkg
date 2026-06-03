@@ -12,7 +12,7 @@ type ModCatalogManagerProps = {
   onInstall: (entry: ModCatalogEntry) => void;
 };
 
-const defaultSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
+const defaultSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror"];
 
 export function ModCatalogManager({ loading, notifier, scan, sources, setLoading, onInstall }: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");

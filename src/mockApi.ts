@@ -30,7 +30,8 @@ const mockCelestePath = "D:\\Games\\Celeste";
 let autoBackupEnabled = true;
 let autoBackupCleanupEnabled = true;
 let autoBackupRetentionCount = 20;
-let modCatalogSources: ModCatalogSourceKind[] = ["everestMirror", "wegfan"];
+let modCatalogSourceOrder: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
+let modCatalogSourceEnabledCount = 2;
 let autoCheckModUpdatesOnStartup = true;
 let selectedSaveFiles = ["0.celeste", "1.celeste"];
 let backupSequence = 4;
@@ -97,8 +98,9 @@ export const mockApi = {
     return clone(config());
   },
 
-  async setModCatalogSources(sources: ModCatalogSourceKind[]): Promise<ConfigResponse> {
-    modCatalogSources = sources.length ? [...sources] : ["everestMirror", "wegfan"];
+  async setModCatalogSources(order: ModCatalogSourceKind[], enabledCount: number): Promise<ConfigResponse> {
+    modCatalogSourceOrder = normalizeMockSourceOrder(order);
+    modCatalogSourceEnabledCount = clampMockEnabledSourceCount(enabledCount, modCatalogSourceOrder.length);
     return clone(config());
   },
 
@@ -124,7 +126,7 @@ export const mockApi = {
   },
 
   async searchModCatalog(query: string, sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
-    const selectedSources = sources.length ? sources : (["everestMirror", "wegfan"] satisfies ModCatalogSourceKind[]);
+    const selectedSources = sources.length ? sources : (["wegfan", "everestMirror"] satisfies ModCatalogSourceKind[]);
     const needle = query.trim().toLowerCase();
     const entries = catalogEntries
       .filter((entry) => selectedSources.includes(entry.source))
@@ -138,7 +140,7 @@ export const mockApi = {
 
   async checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
     void celestePath;
-    const selectedSources = sources.length ? sources : (["everestMirror", "wegfan"] satisfies ModCatalogSourceKind[]);
+    const selectedSources = sources.length ? sources : (["wegfan", "everestMirror"] satisfies ModCatalogSourceKind[]);
     const installed = [...scan.maps, ...scan.otherMods];
     const matched = catalogEntries
       .filter((entry) => selectedSources.includes(entry.source))
@@ -394,12 +396,33 @@ function config(): ConfigResponse {
     autoBackupEnabled,
     autoBackupCleanupEnabled,
     autoBackupRetentionCount,
-    modCatalogSources,
+    modCatalogSourceOrder,
+    modCatalogSourceEnabledCount,
     autoCheckModUpdatesOnStartup,
     selectedSaveFiles,
     profiles,
     warnings: []
   };
+}
+
+function normalizeMockSourceOrder(order: ModCatalogSourceKind[]) {
+  const allSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
+  const seen = new Set<ModCatalogSourceKind>();
+  const normalized: ModCatalogSourceKind[] = [];
+  for (const source of order) {
+    if (!allSources.includes(source) || seen.has(source)) continue;
+    seen.add(source);
+    normalized.push(source);
+  }
+  for (const source of allSources) {
+    if (!seen.has(source)) normalized.push(source);
+  }
+  return normalized;
+}
+
+function clampMockEnabledSourceCount(count: number, max: number) {
+  const value = Number.isFinite(count) ? Math.trunc(count) : 2;
+  return Math.max(1, Math.min(value, max));
 }
 
 function createMockScan(): ScanResult {

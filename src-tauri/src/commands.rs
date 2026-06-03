@@ -6,8 +6,9 @@ use crate::domain::{
 };
 use crate::services;
 use crate::storage::{
-    load_state, normalize_configured_celeste_path, resolve_input_path_from_state,
-    resolve_required_celeste_path, resolve_required_celeste_path_from_state, write_state,
+    load_state, normalize_configured_celeste_path, normalize_mod_catalog_source_settings,
+    resolve_input_path_from_state, resolve_required_celeste_path,
+    resolve_required_celeste_path_from_state, write_state,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -72,13 +73,19 @@ pub fn set_auto_backup_retention_count(
 
 #[tauri::command]
 pub fn set_mod_catalog_sources(
-    mod_catalog_sources: Vec<ModCatalogSourceKind>,
+    mod_catalog_source_order: Vec<ModCatalogSourceKind>,
+    mod_catalog_source_enabled_count: usize,
 ) -> Result<ConfigResponse, String> {
-    if mod_catalog_sources.is_empty() {
+    if mod_catalog_source_order.is_empty() {
         return Err("至少保留一个 Mod 数据源".to_string());
     }
     let mut state = load_state()?;
-    state.mod_catalog_sources = mod_catalog_sources;
+    let (order, enabled_count) = normalize_mod_catalog_source_settings(
+        mod_catalog_source_order,
+        mod_catalog_source_enabled_count,
+    );
+    state.mod_catalog_source_order = order;
+    state.mod_catalog_source_enabled_count = enabled_count;
     write_state(&state)?;
     Ok(config_response(&state, vec![]))
 }
@@ -628,7 +635,8 @@ fn config_response(state: &crate::storage::AppState, warnings: Vec<String>) -> C
         auto_backup_enabled: state.auto_backup_enabled,
         auto_backup_cleanup_enabled: state.auto_backup_cleanup_enabled,
         auto_backup_retention_count: state.auto_backup_retention_count,
-        mod_catalog_sources: state.mod_catalog_sources.clone(),
+        mod_catalog_source_order: state.mod_catalog_source_order.clone(),
+        mod_catalog_source_enabled_count: state.mod_catalog_source_enabled_count,
         auto_check_mod_updates_on_startup: state.auto_check_mod_updates_on_startup,
         selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),

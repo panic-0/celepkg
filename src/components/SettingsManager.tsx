@@ -11,7 +11,8 @@ type SettingsManagerProps = {
   autoBackupRetentionCount: number;
   autoCheckModUpdatesOnStartup: boolean;
   loading: boolean;
-  modCatalogSources: ModCatalogSourceKind[];
+  modCatalogSourceEnabledCount: number;
+  modCatalogSourceOrder: ModCatalogSourceKind[];
   saveFiles: SaveFileInfo[];
   selectedSaveFiles: string[];
   showWarningColumn: boolean;
@@ -20,7 +21,7 @@ type SettingsManagerProps = {
   onAutoBackupEnabledChange: (value: boolean) => void;
   onAutoBackupRetentionCountChange: (value: number) => void;
   onAutoCheckModUpdatesOnStartupChange: (value: boolean) => void;
-  onModCatalogSourcesChange: (value: ModCatalogSourceKind[]) => void;
+  onModCatalogSourcesChange: (order: ModCatalogSourceKind[], enabledCount: number) => void;
   onSelectedSaveFilesChange: (value: string[]) => void;
   onShowWarningColumnChange: (value: boolean) => void;
   onStrawberryDenominatorChange: (value: StrawberryDenominator) => void;
@@ -32,7 +33,8 @@ export function SettingsManager({
   autoBackupRetentionCount,
   autoCheckModUpdatesOnStartup,
   loading,
-  modCatalogSources,
+  modCatalogSourceEnabledCount,
+  modCatalogSourceOrder,
   saveFiles,
   selectedSaveFiles,
   showWarningColumn,
@@ -178,7 +180,12 @@ export function SettingsManager({
               </div>
               <div className="settings-field-stack">
                 <span>数据源</span>
-                <ModSourcePicker disabled={loading} sources={modCatalogSources} onChange={onModCatalogSourcesChange} />
+                <ModSourcePicker
+                  disabled={loading}
+                  enabledCount={modCatalogSourceEnabledCount}
+                  order={modCatalogSourceOrder}
+                  onChange={onModCatalogSourcesChange}
+                />
               </div>
               <button
                 className={autoCheckModUpdatesOnStartup ? "inline-toggle active" : "inline-toggle"}

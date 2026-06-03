@@ -110,7 +110,8 @@ export type ConfigResponse = {
   autoBackupEnabled: boolean;
   autoBackupCleanupEnabled: boolean;
   autoBackupRetentionCount: number;
-  modCatalogSources: ModCatalogSourceKind[];
+  modCatalogSourceOrder: ModCatalogSourceKind[];
+  modCatalogSourceEnabledCount: number;
   autoCheckModUpdatesOnStartup: boolean;
   selectedSaveFiles: string[];
   profiles: ProfilesState;

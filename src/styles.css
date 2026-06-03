@@ -1266,31 +1266,113 @@ button.profile {
 
 .catalog-source-picker {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   border: 1px solid #d8e0e8;
   border-radius: 6px;
   background: #f8fafb;
-  padding: 3px;
+  padding: 5px 6px;
   color: #667484;
 }
 
-.catalog-source-picker button {
+.catalog-source-icon {
+  flex: 0 0 auto;
+}
+
+.catalog-source-lane {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 32px;
+  border-radius: 5px;
+  padding: 2px;
+}
+
+.catalog-source-lane.selected {
+  background: rgba(221, 242, 249, 0.55);
+}
+
+.catalog-source-lane.unselected {
+  background: rgba(239, 243, 247, 0.75);
+}
+
+.catalog-source-lane.empty::after {
+  content: "";
+  display: block;
+  width: 72px;
+  min-height: 24px;
+  border: 1px dashed #cfd9e3;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.catalog-source-lane-label {
+  color: #7a8795;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.catalog-source-divider {
+  align-self: stretch;
+  width: 1px;
+  min-height: 24px;
+  background: #d6e0ea;
+}
+
+.catalog-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   min-height: 28px;
   padding: 4px 7px;
-  border-color: transparent;
-  background: transparent;
-  color: #526273;
+  border: 1px solid transparent;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 }
 
-.catalog-source-picker button.active {
+.catalog-source-chip svg {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.catalog-source-chip.selected {
   border-color: #9bc7d8;
   background: #eaf6fb;
   color: #075b86;
+}
+
+.catalog-source-chip.unselected {
+  border-color: #d6dee7;
+  background: #ffffff;
+  color: #647283;
+}
+
+.catalog-source-chip.dragging {
+  border-color: #2d8bb7;
+  background: #dff2fa;
+  box-shadow: 0 0 0 2px rgba(45, 139, 183, 0.12);
+  cursor: grabbing;
+  opacity: 0.82;
+  transform: translateY(-1px);
+}
+
+.catalog-source-chip.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .settings-field-stack {

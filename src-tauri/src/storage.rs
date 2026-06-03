@@ -20,8 +20,10 @@ pub struct AppState {
     pub auto_backup_cleanup_enabled: bool,
     #[serde(default = "default_auto_backup_retention_count")]
     pub auto_backup_retention_count: usize,
-    #[serde(default = "default_mod_catalog_sources")]
-    pub mod_catalog_sources: Vec<ModCatalogSourceKind>,
+    #[serde(default = "default_mod_catalog_source_order")]
+    pub mod_catalog_source_order: Vec<ModCatalogSourceKind>,
+    #[serde(default)]
+    pub mod_catalog_source_enabled_count: usize,
     #[serde(default = "default_auto_check_mod_updates_on_startup")]
     pub auto_check_mod_updates_on_startup: bool,
     #[serde(default = "default_selected_save_files")]
@@ -56,6 +58,7 @@ fn load_state_from_path(file: &Path) -> Result<AppState, String> {
     if file.exists() {
         let mut state = read_state_json(file)?;
         normalize_profiles(&mut state);
+        normalize_mod_catalog_sources(&mut state);
         return Ok(state);
     }
     let state = default_state();
@@ -158,7 +161,8 @@ fn default_state() -> AppState {
         auto_backup_enabled: default_auto_backup_enabled(),
         auto_backup_cleanup_enabled: default_auto_backup_cleanup_enabled(),
         auto_backup_retention_count: default_auto_backup_retention_count(),
-        mod_catalog_sources: default_mod_catalog_sources(),
+        mod_catalog_source_order: default_mod_catalog_source_order(),
+        mod_catalog_source_enabled_count: default_mod_catalog_source_enabled_count(),
         auto_check_mod_updates_on_startup: default_auto_check_mod_updates_on_startup(),
         selected_save_files: default_selected_save_files(),
         protected_record_ids: vec![],
@@ -281,11 +285,60 @@ fn default_auto_backup_retention_count() -> usize {
     20
 }
 
-fn default_mod_catalog_sources() -> Vec<ModCatalogSourceKind> {
+fn default_mod_catalog_source_order() -> Vec<ModCatalogSourceKind> {
     vec![
-        ModCatalogSourceKind::EverestMirror,
         ModCatalogSourceKind::Wegfan,
+        ModCatalogSourceKind::EverestMirror,
+        ModCatalogSourceKind::Everest,
     ]
+}
+
+fn default_mod_catalog_source_enabled_count() -> usize {
+    2
+}
+
+fn normalize_mod_catalog_sources(state: &mut AppState) {
+    if state.mod_catalog_source_enabled_count == 0 {
+        state.mod_catalog_source_order =
+            fill_source_order(normalize_source_order(&state.mod_catalog_source_order));
+        state.mod_catalog_source_enabled_count = default_mod_catalog_source_enabled_count()
+            .clamp(1, state.mod_catalog_source_order.len());
+    } else {
+        state.mod_catalog_source_order =
+            fill_source_order(normalize_source_order(&state.mod_catalog_source_order));
+        state.mod_catalog_source_enabled_count = state
+            .mod_catalog_source_enabled_count
+            .clamp(1, state.mod_catalog_source_order.len());
+    }
+}
+
+pub fn normalize_mod_catalog_source_settings(
+    order: Vec<ModCatalogSourceKind>,
+    enabled_count: usize,
+) -> (Vec<ModCatalogSourceKind>, usize) {
+    let normalized_order = fill_source_order(normalize_source_order(&order));
+    let normalized_count = enabled_count.clamp(1, normalized_order.len());
+    (normalized_order, normalized_count)
+}
+
+fn fill_source_order(order: Vec<ModCatalogSourceKind>) -> Vec<ModCatalogSourceKind> {
+    let mut filled = normalize_source_order(&order);
+    for source in default_mod_catalog_source_order() {
+        if !filled.contains(&source) {
+            filled.push(source);
+        }
+    }
+    filled
+}
+
+fn normalize_source_order(sources: &[ModCatalogSourceKind]) -> Vec<ModCatalogSourceKind> {
+    let mut normalized = vec![];
+    for source in sources {
+        if !normalized.contains(source) {
+            normalized.push(*source);
+        }
+    }
+    normalized
 }
 
 fn default_auto_check_mod_updates_on_startup() -> bool {
@@ -386,12 +439,14 @@ mod tests {
         assert!(state.auto_backup_cleanup_enabled);
         assert_eq!(state.auto_backup_retention_count, 20);
         assert_eq!(
-            state.mod_catalog_sources,
+            state.mod_catalog_source_order,
             vec![
+                ModCatalogSourceKind::Wegfan,
                 ModCatalogSourceKind::EverestMirror,
-                ModCatalogSourceKind::Wegfan
+                ModCatalogSourceKind::Everest,
             ]
         );
+        assert_eq!(state.mod_catalog_source_enabled_count, 2);
         assert!(state.auto_check_mod_updates_on_startup);
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
@@ -434,6 +489,28 @@ mod tests {
         assert_eq!(profiles.active_map_profile_id, "next-map");
         assert_eq!(profiles.active_mod_profile_id, "next-mod");
         assert_eq!(profiles.profiles[0].launch_args, "-debug");
+    }
+
+    #[test]
+    fn mod_catalog_source_settings_keep_total_order_and_enabled_prefix() {
+        let (order, enabled_count) = normalize_mod_catalog_source_settings(
+            vec![
+                ModCatalogSourceKind::Everest,
+                ModCatalogSourceKind::Wegfan,
+                ModCatalogSourceKind::Everest,
+            ],
+            2,
+        );
+
+        assert_eq!(
+            order,
+            vec![
+                ModCatalogSourceKind::Everest,
+                ModCatalogSourceKind::Wegfan,
+                ModCatalogSourceKind::EverestMirror,
+            ]
+        );
+        assert_eq!(enabled_count, 2);
     }
 
     #[test]

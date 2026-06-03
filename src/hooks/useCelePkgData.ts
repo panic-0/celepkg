@@ -36,7 +36,12 @@ export function useCelePkgData() {
   const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
   const [autoBackupCleanupEnabled, setAutoBackupCleanupEnabledState] = useState(true);
   const [autoBackupRetentionCount, setAutoBackupRetentionCountState] = useState(20);
-  const [modCatalogSources, setModCatalogSourcesState] = useState<ModCatalogSourceKind[]>(["everestMirror", "wegfan"]);
+  const [modCatalogSourceOrder, setModCatalogSourceOrderState] = useState<ModCatalogSourceKind[]>(["wegfan", "everestMirror", "everest"]);
+  const [modCatalogSourceEnabledCount, setModCatalogSourceEnabledCountState] = useState(2);
+  const modCatalogSources = useMemo(
+    () => activeModCatalogSources(modCatalogSourceOrder, modCatalogSourceEnabledCount),
+    [modCatalogSourceEnabledCount, modCatalogSourceOrder]
+  );
   const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(true);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loading, setLoadingState] = useState(false);
@@ -119,7 +124,8 @@ export function useCelePkgData() {
     setAutoBackupEnabledState(config.autoBackupEnabled);
     setAutoBackupCleanupEnabledState(config.autoBackupCleanupEnabled);
     setAutoBackupRetentionCountState(config.autoBackupRetentionCount);
-    setModCatalogSourcesState(config.modCatalogSources);
+    setModCatalogSourceOrderState(config.modCatalogSourceOrder);
+    setModCatalogSourceEnabledCountState(config.modCatalogSourceEnabledCount);
     setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
     setScan((current) => ({
       ...(config.celestePath.trim() && !config.warnings.length ? current : emptyScan),
@@ -192,13 +198,14 @@ export function useCelePkgData() {
   );
 
   const updateModCatalogSources = useCallback(
-    async (sources: ModCatalogSourceKind[]) => {
+    async (sourceOrder: ModCatalogSourceKind[], enabledCount: number) => {
       setLoading(true);
       setLoadingMessage("正在更新 Mod 设置...");
       clearNotice();
       try {
-        const config = await setModCatalogSources(sources);
-        setModCatalogSourcesState(config.modCatalogSources);
+        const config = await setModCatalogSources(sourceOrder, enabledCount);
+        setModCatalogSourceOrderState(config.modCatalogSourceOrder);
+        setModCatalogSourceEnabledCountState(config.modCatalogSourceEnabledCount);
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", "已更新 Mod 数据源。");
       } catch (error) {
@@ -332,6 +339,8 @@ export function useCelePkgData() {
     loadingMessage,
     loadConfigAndRefresh,
     modCatalogSources,
+    modCatalogSourceEnabledCount,
+    modCatalogSourceOrder,
     notice,
     notifier,
     refresh,
@@ -349,4 +358,23 @@ export function useCelePkgData() {
     updateModCatalogSources,
     updateSelectedSaveFiles
   };
+}
+
+function activeModCatalogSources(order: ModCatalogSourceKind[], enabledCount: number) {
+  const normalizedOrder = normalizeModCatalogSourceOrder(order);
+  return normalizedOrder.slice(0, Math.max(1, Math.min(enabledCount, normalizedOrder.length)));
+}
+
+function normalizeModCatalogSourceOrder(order: ModCatalogSourceKind[]) {
+  const allSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
+  const seen = new Set<ModCatalogSourceKind>();
+  const normalized = order.filter((source) => {
+    if (!allSources.includes(source) || seen.has(source)) return false;
+    seen.add(source);
+    return true;
+  });
+  for (const source of allSources) {
+    if (!seen.has(source)) normalized.push(source);
+  }
+  return normalized;
 }
