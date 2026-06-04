@@ -1012,17 +1012,18 @@ button.profile {
   min-height: 0;
   min-width: 0;
   display: grid;
-  align-content: start;
-  grid-template-rows: auto auto;
-  overflow: auto;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   border: 1px solid #cfd8e2;
   border-radius: 7px;
   background: #ffffff;
 }
 
 .download-manager > .download-task-panel {
-  align-self: start;
+  min-height: 0;
   align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   border-bottom: 0;
 }
 
@@ -1257,10 +1258,14 @@ button.profile {
 .download-task-lists {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
+  min-height: 0;
   gap: 8px;
 }
 
 .download-task-group {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
   min-width: 0;
 }
 
@@ -1273,7 +1278,8 @@ button.profile {
 
 .download-task-group ul {
   display: grid;
-  max-height: 120px;
+  align-content: start;
+  min-height: 0;
   gap: 4px;
   margin: 0;
   padding: 0;
