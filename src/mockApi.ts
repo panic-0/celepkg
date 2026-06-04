@@ -212,7 +212,16 @@ export const mockApi = {
     });
   },
 
-  async installEverest(_celestePath: string, release: EverestRelease): Promise<EverestInstallResult> {
+  async downloadEverestToStaging(_celestePath: string, release: EverestRelease, operationId: string): Promise<StagedDownload> {
+    await delay(300);
+    const staged = stagedDownload(`everest-${release.version}-${operationId}`, "Everest", "everest", release.mainFileSize, null);
+    stagedDownloads.set(staged.stagedId, staged);
+    return clone(staged);
+  },
+
+  async installStagedEverest(_celestePath: string, stagedId: string, release: EverestRelease): Promise<EverestInstallResult> {
+    requireStagedDownload(stagedId, "everest");
+    stagedDownloads.delete(stagedId);
     await delay(1100);
     scan = {
       ...scan,
@@ -223,45 +232,6 @@ export const mockApi = {
       )
     };
     return clone({ release, scan });
-  },
-
-  async downloadEverestToStaging(_celestePath: string, release: EverestRelease, operationId: string): Promise<StagedDownload> {
-    await delay(300);
-    const staged = stagedDownload(`everest-${release.version}-${operationId}`, "Everest", "everest", release.mainFileSize, null);
-    stagedDownloads.set(staged.stagedId, staged);
-    return clone(staged);
-  },
-
-  async installStagedEverest(celestePath: string, stagedId: string, release: EverestRelease): Promise<EverestInstallResult> {
-    requireStagedDownload(stagedId, "everest");
-    stagedDownloads.delete(stagedId);
-    return await this.installEverest(celestePath, release);
-  },
-
-  async installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
-    await delay(900);
-    const installed = record({
-      id: `mock-installed-${entry.id}`,
-      name: entry.name,
-      fileName: `${entry.name}.zip`,
-      relativePath: `Mods/${entry.name}.zip`,
-      kind: entry.gameBananaType.toLowerCase() === "map" ? "map" : "mod",
-      enabled: false,
-      description: "Mock 安装的目录条目。",
-      version: entry.version
-    });
-    if (installed.kind === "map") {
-      scan = { ...scan, maps: [...scan.maps, installed] };
-    } else {
-      scan = { ...scan, otherMods: [...scan.otherMods, installed] };
-    }
-    return clone({
-      entry,
-      destinationPath: `${celestePath}\\Mods\\${entry.name}.zip`,
-      replacedPath: null,
-      hash: entry.xxHash[0] ?? "mock-hash",
-      scan
-    });
   },
 
   async downloadModToStaging(
@@ -282,25 +252,38 @@ export const mockApi = {
   async installStagedMod(celestePath: string, stagedId: string, entry: ModCatalogEntry, installedPath?: string): Promise<ModInstallResult> {
     requireStagedDownload(stagedId, "mod");
     stagedDownloads.delete(stagedId);
-    if (installedPath) return await this.updateMod(celestePath, entry, installedPath);
-    return await this.installMod(celestePath, entry);
-  },
-
-  async updateMod(celestePath: string, entry: ModCatalogEntry, installedPath: string): Promise<ModInstallResult> {
-    await delay(1100);
-    scan = updateRecord(scan, entry.name.toLowerCase().replace(/\s+/g, "-"), (item) => ({
-      ...item,
-      metadata: { ...item.metadata, version: entry.version }
-    }));
-    scan = {
-      ...scan,
-      maps: scan.maps.map((item) =>
-        item.name === entry.name ? { ...item, metadata: { ...item.metadata, version: entry.version } } : item
-      ),
-      otherMods: scan.otherMods.map((item) =>
-        item.name === entry.name ? { ...item, metadata: { ...item.metadata, version: entry.version } } : item
-      )
-    };
+    await delay(installedPath ? 1100 : 900);
+    if (installedPath) {
+      scan = updateRecord(scan, entry.name.toLowerCase().replace(/\s+/g, "-"), (item) => ({
+        ...item,
+        metadata: { ...item.metadata, version: entry.version }
+      }));
+      scan = {
+        ...scan,
+        maps: scan.maps.map((item) =>
+          item.name === entry.name ? { ...item, metadata: { ...item.metadata, version: entry.version } } : item
+        ),
+        otherMods: scan.otherMods.map((item) =>
+          item.name === entry.name ? { ...item, metadata: { ...item.metadata, version: entry.version } } : item
+        )
+      };
+    } else {
+      const installed = record({
+        id: `mock-installed-${entry.id}`,
+        name: entry.name,
+        fileName: `${entry.name}.zip`,
+        relativePath: `Mods/${entry.name}.zip`,
+        kind: entry.gameBananaType.toLowerCase() === "map" ? "map" : "mod",
+        enabled: false,
+        description: "Mock 安装的目录条目。",
+        version: entry.version
+      });
+      if (installed.kind === "map") {
+        scan = { ...scan, maps: [...scan.maps, installed] };
+      } else {
+        scan = { ...scan, otherMods: [...scan.otherMods, installed] };
+      }
+    }
     return clone({
       entry,
       destinationPath: installedPath || `${celestePath}\\Mods\\${entry.name}.zip`,
