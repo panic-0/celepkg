@@ -61,9 +61,9 @@ let scan = createMockScan();
 const catalogEntries = createMockCatalog();
 const stagedDownloads = new Map<string, StagedDownload>();
 let backups: BackupInfo[] = [
-  backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\.celepkg\\backups\\1770048600000000000-auto", true, true),
-  backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\.celepkg\\backups\\1770045000000000000-auto", true, false),
-  backup("1770037800000000000-manual", "manual", "D:\\Games\\Celeste\\.celepkg\\backups\\1770037800000000000-manual", true, true)
+  backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770048600000000000-auto", true, true),
+  backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770045000000000000-auto", true, false),
+  backup("1770037800000000000-manual", "manual", "D:\\Games\\Celeste\\celepkg\\backups\\1770037800000000000-manual", true, true)
 ];
 
 export function isMockMode() {
@@ -857,7 +857,7 @@ function profile(
   };
 }
 
-function backup(id: string, kind: BackupInfo["kind"], backupPath: string, celesteExeExisted: boolean, dllExisted: boolean): BackupInfo {
+function backup(id: string, kind: BackupInfo["kind"], backupPath: string, blacklistExisted: boolean, favoritesExisted: boolean): BackupInfo {
   return {
     id,
     createdAt: id,
@@ -865,10 +865,20 @@ function backup(id: string, kind: BackupInfo["kind"], backupPath: string, celest
     celestePath: mockCelestePath,
     backupPath,
     files: [
-      fileEntry("state", "应用状态", `${mockCelestePath}\\.celepkg\\state.json`, `${backupPath}\\state.json`, true),
-      fileEntry("state", "扫描缓存", `${mockCelestePath}\\.celepkg\\scan-cache.json`, `${backupPath}\\scan-cache.json`, true),
-      fileEntry("game", "Celeste.exe", `${mockCelestePath}\\Celeste.exe`, `${backupPath}\\game\\Celeste.exe`, celesteExeExisted),
-      fileEntry("game", "Celeste.dll", `${mockCelestePath}\\Celeste.dll`, `${backupPath}\\game\\Celeste.dll`, dllExisted)
+      fileEntry(
+        "game",
+        "Mods/blacklist.txt",
+        `${mockCelestePath}\\Mods\\blacklist.txt`,
+        `${backupPath}\\game\\Mods\\blacklist.txt`,
+        blacklistExisted
+      ),
+      fileEntry(
+        "game",
+        "Mods/favorites.txt",
+        `${mockCelestePath}\\Mods\\favorites.txt`,
+        `${backupPath}\\game\\Mods\\favorites.txt`,
+        favoritesExisted
+      )
     ],
     mods: backupMods()
   };

@@ -100,4 +100,6 @@ Profile 列表每一行右侧都有复制按钮。它会完整复制对应的 Pr
 <Celeste>/Mods/favorites.txt
 ```
 
+备份清单还会记录当时本地 Mod 列表、版本和启用状态，方便之后核对环境；它不会备份 Mod zip 或文件夹本体，不能恢复已经删除的 Mod 文件。
+
 例子：应用 Profile 后启用状态不对，可以还原应用前的备份，让 blacklist 和 favorites 回到当时状态。

@@ -21,7 +21,7 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
   - 收藏状态写入 `Mods/favorites.txt`。
   - Profile 应用会写入 `Mods/blacklist.txt`。
   - 始终启用条目可以在 Profile 中记录期望启用状态，但应用 Profile 时不会写入 blacklist，因此会保持实际启用，并会一起启用它声明的依赖。
-- 支持游戏文件备份与还原：
+- 支持受管文件备份与还原：
   - 手动备份。
   - 默认开启“修改前自动备份”。
   - 可打开备份根目录或单个备份快照目录。
@@ -33,7 +33,7 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
 
 ## 备份说明
 
-备份只覆盖 CelePkg 会修改的游戏文件：
+备份只覆盖 CelePkg 会修改的受管文件：
 
 - `Mods/blacklist.txt`
 - `Mods/favorites.txt`
@@ -49,6 +49,8 @@ CelePkg 是一个面向 Celeste 的本地 Mod / 地图管理器。它使用 Taur
 - `manifest.json`
 - `game/Mods/blacklist.txt`
 - `game/Mods/favorites.txt`
+
+`manifest.json` 会记录备份时扫描到的本地 Mod 清单，包括名称、文件名、相对路径、版本、启用状态和是否为 zip，用于查看当时环境。备份不会复制 Mod zip 或文件夹本体，因此不能用来恢复被删除或覆盖的 Mod 文件。
 
 如果备份时目标文件不存在，`manifest.json` 会记录该文件不存在；还原时不会凭空创建空文件，若目标文件后来被创建则会删除它以恢复备份时状态。
 

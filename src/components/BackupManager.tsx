@@ -129,7 +129,8 @@ function BackupItem({
   onDelete: (backup: BackupInfo) => void;
   onRestore: (backup: BackupInfo) => void;
 }) {
-  const gameFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
+  const managedFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
+  const totalManagedFiles = backup.files.filter((file) => file.category === "game").length;
 
   return (
     <article className="backup-item">
@@ -137,7 +138,7 @@ function BackupItem({
         <strong>{formatBackupTime(backup.createdAt)}</strong>
         <span>{backup.kind === "manual" ? "手动备份" : "自动备份"}</span>
         <small title={backup.celestePath}>{backup.celestePath || "未设置 Celeste 目录"}</small>
-        <small>{`Mod ${backup.mods.length} 个，游戏文件 ${gameFiles}/2`}</small>
+        <small>{`Mod 清单 ${backup.mods.length} 个，受管文件 ${managedFiles}/${totalManagedFiles}`}</small>
       </div>
       <div className="backup-actions">
         <button onClick={() => onLocationOpen(backup.backupPath)} disabled={loading}>
@@ -146,7 +147,7 @@ function BackupItem({
         </button>
         <button onClick={() => onRestore(backup)} disabled={loading}>
           <RotateCcw size={16} />
-          还原游戏文件
+          还原启用状态
         </button>
         <button className="danger-action-button" onClick={() => onDelete(backup)} disabled={loading} title="删除此备份">
           <Trash2 size={16} />
@@ -168,7 +169,8 @@ function BackupDeleteDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const gameFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
+  const managedFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
+  const totalManagedFiles = backup.files.filter((file) => file.category === "game").length;
   return (
     <div className="confirm-dialog-backdrop" role="presentation">
       <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-delete-title">
@@ -180,8 +182,8 @@ function BackupDeleteDialog({
         <dl className="confirm-dialog-facts">
           <FactRow label="时间" value={formatBackupTime(backup.createdAt)} />
           <FactRow label="类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
-          <FactRow label="Mod" value={`${backup.mods.length} 个`} />
-          <FactRow label="游戏文件" value={`${gameFiles}/${backup.files.filter((file) => file.category === "game").length}`} />
+          <FactRow label="Mod 清单" value={`${backup.mods.length} 个`} />
+          <FactRow label="受管文件" value={`${managedFiles}/${totalManagedFiles}`} />
           <FactRow label="位置" value={backup.backupPath} />
         </dl>
         <div className="confirm-dialog-actions">
@@ -214,9 +216,9 @@ function BackupRestoreDialog({
       <section className="confirm-dialog backup-restore-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-restore-title">
         <div className="confirm-dialog-heading">
           <RotateCcw size={18} />
-          <h3 id="backup-restore-title">还原游戏文件</h3>
+          <h3 id="backup-restore-title">还原启用状态</h3>
         </div>
-        <p>确认后会按下列清单覆盖或删除当前游戏文件。</p>
+        <p>确认后会按下列清单覆盖或删除 CelePkg 管理的启用状态文件。</p>
         <dl className="confirm-dialog-facts">
           <FactRow label="备份时间" value={formatBackupTime(backup.createdAt)} />
           <FactRow label="备份类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
@@ -232,7 +234,7 @@ function BackupRestoreDialog({
             取消
           </button>
           <button className="confirm-primary-button" onClick={onConfirm} disabled={loading}>
-            确认还原
+            确认还原启用状态
           </button>
         </div>
       </section>
