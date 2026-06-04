@@ -2,7 +2,7 @@ import type { ModDownloadProgress } from "../types";
 
 export const defaultDownloadConcurrencyLimit = 3;
 
-export type DownloadTaskStatus = "running" | "cancelling" | "done" | "failed" | "cancelled";
+export type DownloadTaskStatus = "running" | "done" | "failed" | "cancelled";
 export type DownloadTaskItemKind = "mod" | "everest";
 export type DownloadTaskItemStatus =
   | "queued"
@@ -31,7 +31,6 @@ export type DownloadTask = {
   id: string;
   status: DownloadTaskStatus;
   concurrencyLimit: number;
-  cancelRequested: boolean;
   downloadPaused: boolean;
   installPaused: boolean;
   items: DownloadTaskItem[];
@@ -50,7 +49,6 @@ export function createDownloadTask(id: string, items: DownloadTaskItem[], concur
     id,
     status: "running",
     concurrencyLimit: Math.max(1, concurrencyLimit),
-    cancelRequested: false,
     downloadPaused: false,
     installPaused: false,
     items
@@ -74,7 +72,7 @@ export function activeDownloadOperationIds(task: DownloadTask): string[] {
 }
 
 export function selectQueuedItemsForDownload(task: DownloadTask): DownloadTaskItem[] {
-  if (task.cancelRequested || task.status === "cancelling" || task.downloadPaused) return [];
+  if (task.downloadPaused) return [];
   const activeCount = task.items.filter((item) => item.status === "downloading").length;
   const availableSlots = Math.max(0, task.concurrencyLimit - activeCount);
   if (availableSlots === 0) return [];
@@ -82,7 +80,7 @@ export function selectQueuedItemsForDownload(task: DownloadTask): DownloadTaskIt
 }
 
 export function selectNextInstallItem(task: DownloadTask): DownloadTaskItem | null {
-  if (task.cancelRequested || task.status === "cancelling" || task.installPaused) return null;
+  if (task.installPaused) return null;
   if (task.items.some((item) => item.status === "installing")) return null;
   const installedIds = new Set(task.items.filter((item) => item.status === "installed").map((item) => item.id));
   return (
@@ -91,20 +89,6 @@ export function selectNextInstallItem(task: DownloadTask): DownloadTaskItem | nu
       return (item.dependsOn ?? []).every((dependencyId) => installedIds.has(dependencyId));
     }) ?? null
   );
-}
-
-export function markTaskCancelling(task: DownloadTask): DownloadTask {
-  return {
-    ...task,
-    status: "cancelling",
-    cancelRequested: true,
-    items: task.items.map((item) => {
-      if (item.status === "queued" || item.status === "downloaded" || item.status === "waitingInstall") {
-        return { ...item, status: "cancelled", error: "已取消" };
-      }
-      return item;
-    })
-  };
 }
 
 export function markPendingDownloadsCancelled(task: DownloadTask): DownloadTask {
@@ -165,7 +149,6 @@ export function isRetriableTaskItem(item: DownloadTaskItem) {
 }
 
 export function canRetryFailedTask(task: DownloadTask) {
-  if (task.status === "cancelling") return false;
   if (!task.items.some(isRetriableTaskItem)) return false;
   return !task.items.some((item) => item.status === "downloading" || item.status === "installing");
 }

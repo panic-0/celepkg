@@ -204,50 +204,6 @@ describe("download task runner", () => {
     expect(result.status).toBe("failed");
   });
 
-  it("cancels active downloads and does not start queued downloads", async () => {
-    const first = deferred<ReturnType<typeof staged>>();
-    const cancelledOperations: string[] = [];
-    const started: string[] = [];
-    const runner = new DownloadTaskRunner(
-      "task",
-      [
-        baseItem("mod-1", {
-          download: async () => {
-            started.push("mod-1");
-            return await first.promise;
-          }
-        }),
-        baseItem("mod-2", {
-          download: async () => {
-            started.push("mod-2");
-            return staged("mod-2");
-          }
-        })
-      ],
-      {
-        concurrencyLimit: 1,
-        createOperationId: (item) => `op-${item.id}`,
-        cancelOperation: async (operationId) => {
-          cancelledOperations.push(operationId);
-        }
-      }
-    );
-
-    const done = runner.start();
-    await Promise.resolve();
-    await runner.cancel();
-    first.reject(new Error("cancelled"));
-    const result = await done;
-
-    expect(cancelledOperations).toEqual(["op-mod-1"]);
-    expect(started).toEqual(["mod-1"]);
-    expect(result.items.map((item) => [item.id, item.status])).toEqual([
-      ["mod-1", "cancelled"],
-      ["mod-2", "cancelled"]
-    ]);
-    expect(result.status).toBe("cancelled");
-  });
-
   it("pauses downloads without failing queued or active items and resumes later", async () => {
     const first = deferred<ReturnType<typeof staged>>();
     const cancelledOperations: string[] = [];

@@ -58,7 +58,6 @@ function formatTaskStatus(status: DownloadTask["status"], task?: DownloadTask) {
     const installStatus = task?.installPaused ? "安装已停止" : "安装运行中";
     return `${downloadStatus} · ${installStatus}`;
   }
-  if (status === "cancelling") return "正在取消任务";
   if (status === "cancelled") return "任务已取消";
   if (status === "failed") return "任务已完成，有失败项目";
   return "任务已完成";

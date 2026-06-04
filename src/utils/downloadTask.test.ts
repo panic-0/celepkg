@@ -6,7 +6,6 @@ import {
   groupDownloadTaskItems,
   markPendingDownloadsCancelled,
   markPendingInstallsCancelled,
-  markTaskCancelling,
   selectNextInstallItem,
   selectQueuedItemsForDownload,
   skipItemsWithFailedDependencies,
@@ -66,30 +65,6 @@ describe("download task model", () => {
     expect(selectNextInstallItem({ ...task, installPaused: true })).toBeNull();
   });
 
-  it("cancels queued and waiting items without changing active downloads or installs", () => {
-    const task = createDownloadTask("task", [
-      { ...item("downloading", "downloading"), operationId: "op-1" },
-      item("queued", "queued"),
-      item("downloaded", "downloaded"),
-      item("installing", "installing"),
-      item("installed", "installed")
-    ]);
-
-    const cancelling = markTaskCancelling(task);
-
-    expect(cancelling.status).toBe("cancelling");
-    expect(activeDownloadOperationIds(cancelling)).toEqual(["op-1"]);
-    expect(cancelling.items.map((entry) => [entry.id, entry.status])).toEqual([
-      ["downloading", "downloading"],
-      ["queued", "cancelled"],
-      ["downloaded", "cancelled"],
-      ["installing", "installing"],
-      ["installed", "installed"]
-    ]);
-    expect(selectQueuedItemsForDownload(cancelling)).toEqual([]);
-    expect(selectNextInstallItem(cancelling)).toBeNull();
-  });
-
   it("cancels current download or install queues without pausing future work", () => {
     const task = createDownloadTask("task", [
       { ...item("downloading", "downloading"), operationId: "op-1" },
@@ -125,7 +100,6 @@ describe("download task model", () => {
 
     expect(canRetryFailedTask(task)).toBe(true);
     expect(canRetryFailedTask({ ...task, items: [item("failed", "installFailed"), item("active", "installing")] })).toBe(false);
-    expect(canRetryFailedTask({ ...task, status: "cancelling" })).toBe(false);
   });
 
   it("skips targets whose dependencies failed", () => {

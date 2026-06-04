@@ -4,7 +4,6 @@ import {
   createDownloadTask,
   markPendingDownloadsCancelled,
   markPendingInstallsCancelled,
-  markTaskCancelling,
   selectNextInstallItem,
   selectQueuedItemsForDownload,
   skipItemsWithFailedDependencies,
@@ -72,12 +71,6 @@ export class DownloadTaskRunner {
     });
   }
 
-  async cancel() {
-    this.setTask(markTaskCancelling(this.task));
-    await Promise.allSettled(activeDownloadOperationIds(this.task).map((operationId) => this.options.cancelOperation(operationId)));
-    this.resolveIfComplete();
-  }
-
   async pauseDownloads() {
     for (const item of this.task.items) {
       if (item.status === "downloading") this.pausedDownloadItemIds.add(item.id);
@@ -125,7 +118,7 @@ export class DownloadTaskRunner {
   }
 
   retryFailed(): Promise<DownloadTask> {
-    if (this.activeDownloads > 0 || this.installing || this.task.status === "cancelling") {
+    if (this.activeDownloads > 0 || this.installing) {
       return Promise.resolve(this.task);
     }
     const retryIds = new Set(this.task.items.filter(isRetriableTaskItem).map((item) => item.id));
@@ -146,7 +139,6 @@ export class DownloadTaskRunner {
     this.setTask({
       ...this.task,
       status: "running",
-      cancelRequested: false,
       items: this.task.items.map((item) =>
         retryIds.has(item.id) ? { ...item, status: "queued", operationId: undefined, progress: undefined, error: undefined } : item
       )
@@ -166,7 +158,7 @@ export class DownloadTaskRunner {
 
   private async startDownload(itemId: string) {
     const executable = this.executableItems.find((item) => item.id === itemId);
-    if (!executable || this.task.cancelRequested) return;
+    if (!executable) return;
     const operationId = this.options.createOperationId(executable);
     const taskIndex = this.executableItems.findIndex((item) => item.id === itemId) + 1;
     const taskTotal = this.executableItems.length;
@@ -179,8 +171,6 @@ export class DownloadTaskRunner {
       } else if (this.pausedDownloadItemIds.has(itemId)) {
         this.pausedDownloadItemIds.delete(itemId);
         this.updateItem(itemId, (item) => ({ ...item, status: "queued", operationId: undefined, progress: undefined }));
-      } else if (this.task.cancelRequested) {
-        this.updateItem(itemId, (item) => ({ ...item, status: "cancelled", error: "已取消" }));
       } else {
         this.stagedByItemId.set(itemId, staged);
         this.updateItem(itemId, (item) => ({ ...item, status: "downloaded" }));
@@ -194,7 +184,7 @@ export class DownloadTaskRunner {
       } else {
         this.updateItem(itemId, (item) => ({
           ...item,
-          status: this.task.cancelRequested ? "cancelled" : "downloadFailed",
+          status: "downloadFailed",
           error: readError(error)
         }));
       }

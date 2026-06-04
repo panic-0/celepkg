@@ -1128,88 +1128,6 @@ button.profile {
   white-space: nowrap;
 }
 
-.record-download-progress-slot {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 24%);
-  gap: 12px;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-bottom: 1px solid #e9eef4;
-  color: #607184;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.record-download-progress-slot.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.record-download-progress-copy {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.record-download-progress-copy span,
-.record-download-progress-copy small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.record-download-progress-copy span {
-  color: #203040;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.record-download-progress-copy small {
-  color: #7b8794;
-  font-size: 11px;
-}
-
-.record-download-cancel-button {
-  display: inline-grid;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 1px solid #d5dee8;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #6a7785;
-}
-
-.record-download-cancel-button:hover {
-  border-color: #b9c6d4;
-  color: #203040;
-}
-
-.record-download-bar {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e7edf3;
-}
-
-.record-download-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #0f77ad;
-  transition: width 140ms ease;
-}
-
-.record-download-bar.indeterminate span {
-  width: 36%;
-  animation: download-progress-slide 1.1s ease-in-out infinite;
-}
-
 .download-task-panel {
   display: grid;
   gap: 10px;
@@ -1338,15 +1256,6 @@ button.profile {
   font-style: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@keyframes download-progress-slide {
-  0% {
-    transform: translateX(-110%);
-  }
-  100% {
-    transform: translateX(280%);
-  }
 }
 
 .profile-header-actions {
