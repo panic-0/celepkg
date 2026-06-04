@@ -217,58 +217,6 @@ pub async fn list_everest_releases() -> Result<EverestReleaseList, String> {
 }
 
 #[tauri::command]
-pub async fn install_everest(
-    app: tauri::AppHandle,
-    celeste_path: String,
-    release: EverestRelease,
-    operation_id: String,
-) -> Result<EverestInstallResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        let app_for_progress = app.clone();
-        let emit_progress = move |progress: ModDownloadProgress| {
-            let _ = app_for_progress.emit("mod-download-progress", progress);
-        };
-        let cancel_flag = register_mod_download(&operation_id);
-        let result = services::everest::install_release(
-            &path,
-            release,
-            state.profiles_state(),
-            &state.protected_record_ids,
-            &state.selected_save_files,
-            services::mod_catalog::ModDownloadReporter {
-                operation_id: &operation_id,
-                progress: Some(&emit_progress),
-                cancel_token: Some(&cancel_flag),
-                task_index: 1,
-                task_total: 1,
-            },
-        );
-        unregister_mod_download(&operation_id);
-        if result.is_err() {
-            let _ = app.emit(
-                "mod-download-progress",
-                ModDownloadProgress {
-                    operation_id,
-                    mod_name: "Everest".to_string(),
-                    phase: "error".to_string(),
-                    downloaded: 0,
-                    total: None,
-                    speed_bytes_per_sec: 0.0,
-                    task_index: 1,
-                    task_total: 1,
-                    url: String::new(),
-                },
-            );
-        }
-        result
-    })
-    .await
-    .map_err(|error| format!("安装 Everest 任务失败：{error}"))?
-}
-
-#[tauri::command]
 pub async fn download_everest_to_staging(
     app: tauri::AppHandle,
     celeste_path: String,
@@ -325,61 +273,6 @@ pub async fn install_staged_everest(
     })
     .await
     .map_err(|error| format!("安装 staged Everest 任务失败：{error}"))?
-}
-
-#[tauri::command]
-pub async fn install_mod(
-    app: tauri::AppHandle,
-    celeste_path: String,
-    entry: crate::domain::ModCatalogEntry,
-    operation_id: String,
-    task_index: usize,
-    task_total: usize,
-) -> Result<ModInstallResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        let app_for_progress = app.clone();
-        let emit_progress = move |progress: ModDownloadProgress| {
-            let _ = app_for_progress.emit("mod-download-progress", progress);
-        };
-        let cancel_flag = register_mod_download(&operation_id);
-        let result = services::mod_catalog::download_and_install(
-            &path,
-            entry,
-            None,
-            state.profiles_state(),
-            &state.protected_record_ids,
-            &state.selected_save_files,
-            services::mod_catalog::ModDownloadReporter {
-                operation_id: &operation_id,
-                progress: Some(&emit_progress),
-                cancel_token: Some(&cancel_flag),
-                task_index,
-                task_total,
-            },
-        );
-        unregister_mod_download(&operation_id);
-        if result.is_err() {
-            let _ = app.emit(
-                "mod-download-progress",
-                ModDownloadProgress {
-                    operation_id,
-                    mod_name: String::new(),
-                    phase: "error".to_string(),
-                    downloaded: 0,
-                    total: None,
-                    speed_bytes_per_sec: 0.0,
-                    task_index,
-                    task_total,
-                    url: String::new(),
-                },
-            );
-        }
-        result
-    })
-    .await
-    .map_err(|error| format!("安装 Mod 任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -443,62 +336,6 @@ pub async fn install_staged_mod(
     })
     .await
     .map_err(|error| format!("安装 staged Mod 任务失败：{error}"))?
-}
-
-#[tauri::command]
-pub async fn update_mod(
-    app: tauri::AppHandle,
-    celeste_path: String,
-    entry: crate::domain::ModCatalogEntry,
-    installed_path: String,
-    operation_id: String,
-    task_index: usize,
-    task_total: usize,
-) -> Result<ModInstallResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        let app_for_progress = app.clone();
-        let emit_progress = move |progress: ModDownloadProgress| {
-            let _ = app_for_progress.emit("mod-download-progress", progress);
-        };
-        let cancel_flag = register_mod_download(&operation_id);
-        let result = services::mod_catalog::download_and_install(
-            &path,
-            entry,
-            Some(Path::new(&installed_path)),
-            state.profiles_state(),
-            &state.protected_record_ids,
-            &state.selected_save_files,
-            services::mod_catalog::ModDownloadReporter {
-                operation_id: &operation_id,
-                progress: Some(&emit_progress),
-                cancel_token: Some(&cancel_flag),
-                task_index,
-                task_total,
-            },
-        );
-        unregister_mod_download(&operation_id);
-        if result.is_err() {
-            let _ = app.emit(
-                "mod-download-progress",
-                ModDownloadProgress {
-                    operation_id,
-                    mod_name: String::new(),
-                    phase: "error".to_string(),
-                    downloaded: 0,
-                    total: None,
-                    speed_bytes_per_sec: 0.0,
-                    task_index,
-                    task_total,
-                    url: String::new(),
-                },
-            );
-        }
-        result
-    })
-    .await
-    .map_err(|error| format!("更新 Mod 任务失败：{error}"))?
 }
 
 #[tauri::command]

@@ -49,26 +49,6 @@ pub fn list_releases() -> EverestReleaseList {
     }
 }
 
-pub fn install_release(
-    celeste_path: &Path,
-    release: EverestRelease,
-    profiles: crate::domain::ProfilesState,
-    protected_record_ids: &[String],
-    selected_save_files: &[String],
-    reporter: ModDownloadReporter<'_>,
-) -> Result<EverestInstallResult, String> {
-    let staged = download_to_staging(celeste_path, &release, reporter)?;
-    install_staged_release(
-        celeste_path,
-        &staged.staged_id,
-        release,
-        profiles,
-        protected_record_ids,
-        selected_save_files,
-        Some(reporter),
-    )
-}
-
 pub fn download_to_staging(
     celeste_path: &Path,
     release: &EverestRelease,

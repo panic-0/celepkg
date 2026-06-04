@@ -211,28 +211,6 @@ pub fn preview_update_metadata(
     metadata
 }
 
-pub fn download_and_install(
-    celeste_path: &Path,
-    entry: ModCatalogEntry,
-    replace_path: Option<&Path>,
-    profiles: ProfilesState,
-    protected_record_ids: &[String],
-    selected_save_files: &[String],
-    reporter: ModDownloadReporter<'_>,
-) -> Result<ModInstallResult, String> {
-    let staged = download_to_staging(celeste_path, &entry, reporter)?;
-    install_staged(
-        celeste_path,
-        &staged.staged_id,
-        entry,
-        replace_path,
-        profiles,
-        protected_record_ids,
-        selected_save_files,
-        Some(reporter),
-    )
-}
-
 pub fn download_to_staging(
     celeste_path: &Path,
     entry: &ModCatalogEntry,
