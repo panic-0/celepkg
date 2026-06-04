@@ -899,7 +899,10 @@ button.profile {
 .confirm-dialog {
   display: grid;
   gap: 12px;
+  grid-template-rows: auto minmax(0, auto) auto;
   width: min(440px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: hidden;
   border: 1px solid #cfd8e2;
   border-radius: 8px;
   background: #ffffff;
@@ -915,8 +918,17 @@ button.profile {
 }
 
 .confirm-dialog-heading h3 {
+  min-width: 0;
   margin: 0;
   font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.confirm-dialog-content {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .confirm-dialog p {
@@ -958,9 +970,15 @@ button.profile {
 
 .confirm-dialog-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding-top: 2px;
+}
+
+.dialog-close-button {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .confirm-primary-button {
@@ -1771,23 +1789,16 @@ button.profile {
   width: min(620px, calc(100vw - 28px));
 }
 
-.catalog-detail-dialog .confirm-dialog-heading {
-  min-height: 36px;
-  padding-right: 36px;
-}
-
-.catalog-detail-close-button {
-  position: absolute;
-  top: 16px;
-  right: 14px;
-}
-
-.catalog-detail-facts {
+.catalog-detail-dialog .confirm-dialog-facts {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.catalog-detail-facts div:nth-last-child(-n + 2) {
+.catalog-detail-dialog .confirm-dialog-facts div:nth-last-child(-n + 2) {
   grid-column: 1 / -1;
+}
+
+.catalog-detail-source-link {
+  justify-self: end;
 }
 
 .button-like {

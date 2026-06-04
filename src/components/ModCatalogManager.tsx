@@ -1,7 +1,8 @@
-import { Download, ExternalLink, Info, PackageCheck, Search, X } from "lucide-react";
+import { Download, ExternalLink, Info, PackageCheck, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
+import { DialogFacts, DialogShell } from "./common";
 
 type ModCatalogManagerProps = {
   loading: boolean;
@@ -152,54 +153,47 @@ function CatalogEntryDetailDialog({
   onInstall: () => void;
 }) {
   return (
-    <div className="confirm-dialog-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="confirm-dialog catalog-detail-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="catalog-detail-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="confirm-dialog-heading">
-          <PackageCheck size={18} />
-          <h3 id="catalog-detail-title">{entry.name}</h3>
-          <button className="icon-button catalog-detail-close-button" onClick={onClose} disabled={loading} title="关闭详情">
-            <X size={16} />
-          </button>
-        </div>
-        <dl className="confirm-dialog-facts catalog-detail-facts">
-          <FactRow label="版本" value={entry.version || "无版本号"} />
-          <FactRow label="来源" value={sourceLabel(entry.source)} />
-          <FactRow label="类型" value={entry.gameBananaType || "Mod"} />
-          <FactRow label="大小" value={formatSize(entry.size)} />
-          <FactRow label="更新" value={formatCatalogTime(entry.lastUpdate)} />
-          <FactRow label="GameBanana" value={formatGameBananaInfo(entry)} />
-          <FactRow label="下载地址" value={entry.downloadUrl || "无下载地址"} />
-          <FactRow label="来源页面" value={entry.pageUrl || "无来源页面"} />
-        </dl>
-        <div className="confirm-dialog-actions">
-          {entry.pageUrl && (
-            <a className="button-like" href={entry.pageUrl} target="_blank" rel="noreferrer">
-              <ExternalLink size={15} />
-              来源页面
-            </a>
-          )}
-          <button className="confirm-primary-button" onClick={onInstall} disabled={loading || installed || !entry.downloadUrl}>
-            <Download size={15} />
-            {installed ? "已安装" : "安装"}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function FactRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
-    </div>
+    <DialogShell
+      actions={[
+        {
+          label: (
+            <>
+              <Download size={15} />
+              {installed ? "已安装" : "安装"}
+            </>
+          ),
+          onClick: onInstall,
+          disabled: loading || installed || !entry.downloadUrl,
+          variant: "primary"
+        }
+      ]}
+      className="catalog-detail-dialog"
+      closeDisabled={loading}
+      closeOnBackdrop
+      icon={<PackageCheck size={18} />}
+      onClose={onClose}
+      showCloseButton
+      title={entry.name}
+    >
+      <DialogFacts
+        facts={[
+          { label: "版本", value: entry.version || "无版本号" },
+          { label: "来源", value: sourceLabel(entry.source) },
+          { label: "类型", value: entry.gameBananaType || "Mod" },
+          { label: "大小", value: formatSize(entry.size) },
+          { label: "更新", value: formatCatalogTime(entry.lastUpdate) },
+          { label: "GameBanana", value: formatGameBananaInfo(entry) },
+          { label: "下载地址", value: entry.downloadUrl || "无下载地址" },
+          { label: "来源页面", value: entry.pageUrl || "无来源页面" }
+        ]}
+      />
+      {entry.pageUrl && (
+        <a className="button-like catalog-detail-source-link" href={entry.pageUrl} target="_blank" rel="noreferrer">
+          <ExternalLink size={15} />
+          来源页面
+        </a>
+      )}
+    </DialogShell>
   );
 }
 

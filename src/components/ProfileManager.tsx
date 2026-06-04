@@ -4,6 +4,7 @@ import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ProfileOverwriteMode } from "../hooks/useProfileDraft";
 import type { Profile } from "../types";
 import { profileSummary } from "../utils/format";
+import { ConfirmDialog, type DialogFact } from "./common";
 
 type ProfileManagerProps = {
   dependencyModCount: number;
@@ -215,7 +216,7 @@ function ProfileColumn({
           ? "这会覆盖目标 Profile 的名称、启用情况和启动参数，但不会改变 Profile id，也不会改变 Favorite / 始终启用标记。"
           : "这只会复制来源 Profile 的启用情况，目标 Profile 的名称和启动参数不变，Favorite / 始终启用标记不会改变。",
       actionLabel: "确认覆盖",
-      rows: [
+      facts: [
         { label: "目标 Profile", value: selectedProfile.name },
         { label: "来源 Profile", value: sourceProfile.name },
         { label: "覆盖范围", value: overwriteModeLabel }
@@ -230,7 +231,7 @@ function ProfileColumn({
       title: "确认覆盖 Profile",
       description: "Profile 名称和启动参数不变，始终启用条目会保留当前 Profile 选择。",
       actionLabel: "确认覆盖",
-      rows: [
+      facts: [
         { label: "目标 Profile", value: selectedProfile.name || title },
         { label: "来源 Profile", value: "当前游戏启用情况" },
         { label: "覆盖范围", value: "只覆盖启用情况" }
@@ -245,7 +246,7 @@ function ProfileColumn({
       description: "删除后无法从 CelePkg 内直接恢复。默认 Profile 不能删除。",
       actionLabel: "确认删除",
       danger: true,
-      rows: [
+      facts: [
         { label: "目标 Profile", value: profile.name },
         { label: "来源 Profile", value: "不适用" },
         { label: "覆盖范围", value: "删除整个 Profile" }
@@ -400,7 +401,17 @@ function ProfileColumn({
         从当前游戏覆盖启用情况
       </button>
       {confirmDialog && (
-        <ConfirmDialog dialog={confirmDialog} loading={loading} onCancel={() => setConfirmDialog(null)} onConfirm={confirmPendingAction} />
+        <ConfirmDialog
+          confirmLabel={confirmDialog.actionLabel}
+          description={confirmDialog.description}
+          facts={confirmDialog.facts}
+          icon={<AlertTriangle size={18} />}
+          loading={loading}
+          onCancel={() => setConfirmDialog(null)}
+          onConfirm={confirmPendingAction}
+          title={confirmDialog.title}
+          variant={confirmDialog.danger ? "danger" : "primary"}
+        />
       )}
     </aside>
   );
@@ -410,50 +421,10 @@ type ConfirmDialogState = {
   actionLabel: string;
   danger?: boolean;
   description: string;
-  rows: Array<{ label: string; value: string }>;
+  facts: DialogFact[];
   title: string;
   onConfirm: () => void;
 };
-
-function ConfirmDialog({
-  dialog,
-  loading,
-  onCancel,
-  onConfirm
-}: {
-  dialog: ConfirmDialogState;
-  loading: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className="confirm-dialog-backdrop" role="presentation">
-      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
-        <div className="confirm-dialog-heading">
-          <AlertTriangle size={18} />
-          <h3 id="confirm-dialog-title">{dialog.title}</h3>
-        </div>
-        <p>{dialog.description}</p>
-        <dl className="confirm-dialog-facts">
-          {dialog.rows.map((row) => (
-            <div key={row.label}>
-              <dt>{row.label}</dt>
-              <dd title={row.value}>{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="confirm-dialog-actions">
-          <button onClick={onCancel} disabled={loading}>
-            取消
-          </button>
-          <button className={dialog.danger ? "confirm-danger-button" : "confirm-primary-button"} onClick={onConfirm} disabled={loading}>
-            {dialog.actionLabel}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
 
 function isDefaultProfile(profile: Profile) {
   return profile.id === "default-maps" || profile.id === "default-mods";

@@ -25,6 +25,7 @@ import { SettingsManager } from "./components/SettingsManager";
 import { AppToolbar } from "./components/AppToolbar";
 import { ToastHost } from "./components/ToastHost";
 import { WorkspaceNav } from "./components/WorkspaceNav";
+import { DialogShell } from "./components/common";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
@@ -1000,23 +1001,19 @@ function EverestDependencyDialog({
   const installedVersion = prompt.installedBuild === null ? "未识别" : formatEverestBuildVersion(prompt.installedBuild);
   const updateVersion = formatEverestBuildVersion(prompt.release.version);
   return (
-    <div className="confirm-dialog-backdrop" role="presentation">
-      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="everest-dependency-title">
-        <div className="confirm-dialog-heading">
-          <LoaderCircle size={18} />
-          <h3 id="everest-dependency-title">需要更新 Everest</h3>
-        </div>
-        <p>{`${prompt.targetName} 需要 Everest ${requiredVersion} 或更高版本，当前版本 ${installedVersion}。`}</p>
-        <p>{`可以先更新到 Everest ${updateVersion} 后继续，也可以忽略此检查继续。`}</p>
-        <div className="confirm-dialog-actions">
-          <button onClick={() => onClose(null)}>取消</button>
-          <button onClick={() => onClose("ignore")}>忽略继续</button>
-          <button className="confirm-primary-button" onClick={() => onClose("update")}>
-            更新 Everest 后继续
-          </button>
-        </div>
-      </section>
-    </div>
+    <DialogShell
+      actions={[
+        { label: "取消", onClick: () => onClose(null) },
+        { label: "忽略继续", onClick: () => onClose("ignore") },
+        { label: "更新 Everest 后继续", onClick: () => onClose("update"), variant: "primary" }
+      ]}
+      icon={<LoaderCircle size={18} />}
+      onClose={() => onClose(null)}
+      title="需要更新 Everest"
+    >
+      <p>{`${prompt.targetName} 需要 Everest ${requiredVersion} 或更高版本，当前版本 ${installedVersion}。`}</p>
+      <p>{`可以先更新到 Everest ${updateVersion} 后继续，也可以忽略此检查继续。`}</p>
+    </DialogShell>
   );
 }
 
@@ -1030,34 +1027,28 @@ function DependencyUpdateDialog({
   const requiredCount = prompt.issues.filter((issue) => !issue.optional).length;
   const optionalCount = prompt.issues.length - requiredCount;
   return (
-    <div className="confirm-dialog-backdrop" role="presentation">
-      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dependency-update-title">
-        <div className="confirm-dialog-heading">
-          <LoaderCircle size={18} />
-          <h3 id="dependency-update-title">{prompt.actionLabel}前依赖检查</h3>
-        </div>
-        <p>{`${prompt.targetName} ${prompt.actionLabel}后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
-        <div className="dependency-preview-list">
-          {prompt.issues.map((issue) => (
-            <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>
-              <strong>{issue.dependency.name}</strong>
-              <span>{issue.optional ? "可选依赖" : "必需依赖"}</span>
-              <small>{formatDependencyIssue(issue)}</small>
-            </div>
-          ))}
-        </div>
-        <div className="confirm-dialog-actions">
-          <button onClick={() => onClose(null)}>取消</button>
-          <button onClick={() => onClose("none")}>不更新依赖</button>
-          <button className="confirm-primary-button" onClick={() => onClose("required")}>
-            更新必须
-          </button>
-          <button className="confirm-primary-button" onClick={() => onClose("all")}>
-            更新全部
-          </button>
-        </div>
-      </section>
-    </div>
+    <DialogShell
+      actions={[
+        { label: "取消", onClick: () => onClose(null) },
+        { label: "不更新依赖", onClick: () => onClose("none") },
+        { label: "更新必须", onClick: () => onClose("required"), variant: "primary" },
+        { label: "更新全部", onClick: () => onClose("all"), variant: "primary" }
+      ]}
+      icon={<LoaderCircle size={18} />}
+      onClose={() => onClose(null)}
+      title={`${prompt.actionLabel}前依赖检查`}
+    >
+      <p>{`${prompt.targetName} ${prompt.actionLabel}后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
+      <div className="dependency-preview-list">
+        {prompt.issues.map((issue) => (
+          <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>
+            <strong>{issue.dependency.name}</strong>
+            <span>{issue.optional ? "可选依赖" : "必需依赖"}</span>
+            <small>{formatDependencyIssue(issue)}</small>
+          </div>
+        ))}
+      </div>
+    </DialogShell>
   );
 }
 

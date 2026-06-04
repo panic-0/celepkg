@@ -2,6 +2,7 @@ import { AlertTriangle, Archive, FolderOpen, RefreshCw, RotateCcw, Trash2 } from
 import { useState } from "react";
 import type { BackupFileEntry, BackupInfo, RestoreScope } from "../types";
 import { formatUnixNanoseconds } from "../utils/time";
+import { ConfirmDialog } from "./common";
 
 type BackupManagerProps = {
   autoBackupCleanupEnabled: boolean;
@@ -172,30 +173,23 @@ function BackupDeleteDialog({
   const managedFiles = backup.files.filter((file) => file.category === "game" && file.existed).length;
   const totalManagedFiles = backup.files.filter((file) => file.category === "game").length;
   return (
-    <div className="confirm-dialog-backdrop" role="presentation">
-      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-delete-title">
-        <div className="confirm-dialog-heading">
-          <AlertTriangle size={18} />
-          <h3 id="backup-delete-title">删除备份</h3>
-        </div>
-        <p>此操作会删除这个备份目录，删除后不能在应用内还原。</p>
-        <dl className="confirm-dialog-facts">
-          <FactRow label="时间" value={formatBackupTime(backup.createdAt)} />
-          <FactRow label="类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
-          <FactRow label="Mod 清单" value={`${backup.mods.length} 个`} />
-          <FactRow label="受管文件" value={`${managedFiles}/${totalManagedFiles}`} />
-          <FactRow label="位置" value={backup.backupPath} />
-        </dl>
-        <div className="confirm-dialog-actions">
-          <button onClick={onCancel} disabled={loading}>
-            取消
-          </button>
-          <button className="confirm-danger-button" onClick={onConfirm} disabled={loading}>
-            删除
-          </button>
-        </div>
-      </section>
-    </div>
+    <ConfirmDialog
+      confirmLabel="删除"
+      description="此操作会删除这个备份目录，删除后不能在应用内还原。"
+      facts={[
+        { label: "时间", value: formatBackupTime(backup.createdAt) },
+        { label: "类型", value: backup.kind === "manual" ? "手动备份" : "自动备份" },
+        { label: "Mod 清单", value: `${backup.mods.length} 个` },
+        { label: "受管文件", value: `${managedFiles}/${totalManagedFiles}` },
+        { label: "位置", value: backup.backupPath }
+      ]}
+      icon={<AlertTriangle size={18} />}
+      loading={loading}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      title="删除备份"
+      variant="danger"
+    />
   );
 }
 
@@ -212,33 +206,27 @@ function BackupRestoreDialog({
 }) {
   const files = backup.files.filter((file) => file.category === "game");
   return (
-    <div className="confirm-dialog-backdrop" role="presentation">
-      <section className="confirm-dialog backup-restore-dialog" role="dialog" aria-modal="true" aria-labelledby="backup-restore-title">
-        <div className="confirm-dialog-heading">
-          <RotateCcw size={18} />
-          <h3 id="backup-restore-title">还原启用状态</h3>
-        </div>
-        <p>确认后会按下列清单覆盖或删除 CelePkg 管理的启用状态文件。</p>
-        <dl className="confirm-dialog-facts">
-          <FactRow label="备份时间" value={formatBackupTime(backup.createdAt)} />
-          <FactRow label="备份类型" value={backup.kind === "manual" ? "手动备份" : "自动备份"} />
-          <FactRow label="Mod 快照" value={`${backup.mods.length} 个`} />
-        </dl>
-        <div className="restore-preview-list">
-          {files.map((file) => (
-            <RestorePreviewRow file={file} key={`${file.category}:${file.label}`} />
-          ))}
-        </div>
-        <div className="confirm-dialog-actions">
-          <button onClick={onCancel} disabled={loading}>
-            取消
-          </button>
-          <button className="confirm-primary-button" onClick={onConfirm} disabled={loading}>
-            确认还原启用状态
-          </button>
-        </div>
-      </section>
-    </div>
+    <ConfirmDialog
+      className="backup-restore-dialog"
+      confirmLabel="确认还原启用状态"
+      description="确认后会按下列清单覆盖或删除 CelePkg 管理的启用状态文件。"
+      facts={[
+        { label: "备份时间", value: formatBackupTime(backup.createdAt) },
+        { label: "备份类型", value: backup.kind === "manual" ? "手动备份" : "自动备份" },
+        { label: "Mod 快照", value: `${backup.mods.length} 个` }
+      ]}
+      icon={<RotateCcw size={18} />}
+      loading={loading}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      title="还原启用状态"
+    >
+      <div className="restore-preview-list">
+        {files.map((file) => (
+          <RestorePreviewRow file={file} key={`${file.category}:${file.label}`} />
+        ))}
+      </div>
+    </ConfirmDialog>
   );
 }
 
@@ -249,15 +237,6 @@ function RestorePreviewRow({ file }: { file: BackupFileEntry }) {
       <span>{file.existed ? "覆盖或创建目标文件" : "删除当前目标文件"}</span>
       <small>{file.existed ? "备份时存在" : "备份时不存在"}</small>
       <code title={file.targetPath}>{file.targetPath}</code>
-    </div>
-  );
-}
-
-function FactRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd title={value}>{value}</dd>
     </div>
   );
 }
