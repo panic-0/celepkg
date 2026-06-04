@@ -1324,8 +1324,8 @@ button.profile {
 }
 
 .catalog-source-picker {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(52px, max-content);
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -1334,10 +1334,6 @@ button.profile {
   background: #f8fafb;
   padding: 5px 6px;
   color: #667484;
-}
-
-.catalog-source-icon {
-  flex: 0 0 auto;
 }
 
 .catalog-source-lane {
@@ -1362,7 +1358,7 @@ button.profile {
 .catalog-source-lane.empty::after {
   content: "";
   display: block;
-  width: 72px;
+  width: 32px;
   min-height: 24px;
   border: 1px dashed #cfd9e3;
   border-radius: 5px;
@@ -1395,6 +1391,7 @@ button.profile {
   font-weight: 800;
   white-space: nowrap;
   cursor: grab;
+  touch-action: none;
   user-select: none;
   transition:
     background-color 120ms ease,

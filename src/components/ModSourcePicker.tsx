@@ -1,5 +1,5 @@
-import { GripVertical, Server } from "lucide-react";
-import { useRef, useState } from "react";
+import { GripVertical } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { ModCatalogSourceKind } from "../types";
 
 type SourceLane = "selected" | "unselected";
@@ -17,6 +17,12 @@ type SourceLayout = {
 type DragState = {
   source: ModCatalogSourceKind;
   from: SourceLane;
+};
+
+type DragTarget = {
+  insertAfter?: boolean;
+  lane: SourceLane;
+  source?: ModCatalogSourceKind;
 };
 
 const sourceOptions: SourceOption[] = [
@@ -39,42 +45,52 @@ export function ModSourcePicker({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [draftLayout, setDraftLayout] = useState<SourceLayout | null>(null);
   const draftLayoutRef = useRef<SourceLayout | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const lastDragTargetRef = useRef<DragTarget | null>(null);
+  const previewPointerMoveRef = useRef<(clientX: number, clientY: number) => void>(() => undefined);
+  const commitPointerDragRef = useRef<(clientX: number, clientY: number) => void>(() => undefined);
   const baseLayout = sourceLayout(order, enabledCount);
   const layout = draftLayout ?? baseLayout;
 
   function startDrag(source: ModCatalogSourceKind, from: SourceLane) {
     if (disabled) return;
-    setDragState({ source, from });
+    const nextDragState = { source, from };
+    dragStateRef.current = nextDragState;
+    lastDragTargetRef.current = { lane: from, source };
+    setDragState(nextDragState);
     draftLayoutRef.current = baseLayout;
     setDraftLayout(baseLayout);
   }
 
   function previewMove(targetLane: SourceLane, targetIndex: number) {
-    if (!dragState || disabled) return;
+    const activeDragState = dragStateRef.current;
+    if (!activeDragState || disabled) return;
     const currentLayout = draftLayoutRef.current ?? draftLayout ?? baseLayout;
-    const next = moveInLayout(currentLayout, dragState.source, targetLane, targetIndex);
+    const next = moveInLayout(currentLayout, activeDragState.source, targetLane, targetIndex);
     if (sameLayout(currentLayout, next)) return;
     draftLayoutRef.current = next;
     setDraftLayout(next);
   }
 
   function previewMoveToSource(targetLane: SourceLane, targetSource: ModCatalogSourceKind, insertAfter: boolean) {
-    if (!dragState || targetSource === dragState.source) return;
+    const activeDragState = dragStateRef.current;
+    if (!activeDragState || targetSource === activeDragState.source) return;
     const currentLayout = draftLayoutRef.current ?? draftLayout ?? baseLayout;
-    const targetItems = currentLayout[targetLane].filter((source) => source !== dragState.source);
+    const targetItems = currentLayout[targetLane].filter((source) => source !== activeDragState.source);
     const targetIndex = targetItems.indexOf(targetSource);
     if (targetIndex < 0) return;
     previewMove(targetLane, targetIndex + (insertAfter ? 1 : 0));
   }
 
   function commitDrag(targetLane?: SourceLane) {
+    const activeDragState = dragStateRef.current;
     let latestLayout = draftLayoutRef.current ?? draftLayout;
-    if (!dragState || !latestLayout) {
+    if (!activeDragState || !latestLayout) {
       resetDrag();
       return;
     }
-    if (targetLane && !latestLayout[targetLane].includes(dragState.source)) {
-      latestLayout = moveInLayout(latestLayout, dragState.source, targetLane, latestLayout[targetLane].length);
+    if (targetLane && !latestLayout[targetLane].includes(activeDragState.source)) {
+      latestLayout = moveInLayout(latestLayout, activeDragState.source, targetLane, latestLayout[targetLane].length);
     }
     const latestOrder = [...latestLayout.selected, ...latestLayout.unselected];
     const latestEnabledCount = latestLayout.selected.length;
@@ -84,24 +100,61 @@ export function ModSourcePicker({
     resetDrag();
   }
 
+  function previewPointerMove(clientX: number, clientY: number) {
+    const target = dragTargetAtPoint(clientX, clientY);
+    if (!target) return;
+    lastDragTargetRef.current = target;
+    if (target.source) {
+      previewMoveToSource(target.lane, target.source, target.insertAfter === true);
+      return;
+    }
+    previewMove(target.lane, (draftLayoutRef.current ?? layout)[target.lane].length);
+  }
+
+  function commitPointerDrag(clientX: number, clientY: number) {
+    const target = dragTargetAtPoint(clientX, clientY) ?? lastDragTargetRef.current;
+    commitDrag(target?.lane);
+  }
+
+  previewPointerMoveRef.current = previewPointerMove;
+  commitPointerDragRef.current = commitPointerDrag;
+
   function resetDrag() {
+    dragStateRef.current = null;
+    lastDragTargetRef.current = null;
     setDragState(null);
     draftLayoutRef.current = null;
     setDraftLayout(null);
   }
 
+  useEffect(() => {
+    if (!dragState) return;
+    const handlePointerMove = (event: PointerEvent) => previewPointerMoveRef.current(event.clientX, event.clientY);
+    const handlePointerUp = (event: PointerEvent) => commitPointerDragRef.current(event.clientX, event.clientY);
+    const handleMouseUp = (event: MouseEvent) => commitPointerDragRef.current(event.clientX, event.clientY);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", resetDrag);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", resetDrag);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [dragState]);
+
   return (
     <div className="catalog-source-picker" aria-label="Mod 数据源">
-      <Server className="catalog-source-icon" size={16} />
       <SourceLaneView
         disabled={disabled}
         dragState={dragState}
-        label="已启用，按优先级使用"
+        label="启用"
         lane="selected"
         sources={layout.selected}
         onCommitDrag={commitDrag}
-        onPreviewMove={previewMove}
-        onPreviewMoveToSource={previewMoveToSource}
+        onPointerMove={previewPointerMove}
+        onPointerUp={commitPointerDrag}
         onResetDrag={resetDrag}
         onStartDrag={startDrag}
       />
@@ -109,12 +162,12 @@ export function ModSourcePicker({
       <SourceLaneView
         disabled={disabled}
         dragState={dragState}
-        label="未启用"
+        label="禁用"
         lane="unselected"
         sources={layout.unselected}
         onCommitDrag={commitDrag}
-        onPreviewMove={previewMove}
-        onPreviewMoveToSource={previewMoveToSource}
+        onPointerMove={previewPointerMove}
+        onPointerUp={commitPointerDrag}
         onResetDrag={resetDrag}
         onStartDrag={startDrag}
       />
@@ -129,8 +182,8 @@ function SourceLaneView({
   lane,
   sources,
   onCommitDrag,
-  onPreviewMove,
-  onPreviewMoveToSource,
+  onPointerMove,
+  onPointerUp,
   onResetDrag,
   onStartDrag
 }: {
@@ -140,24 +193,27 @@ function SourceLaneView({
   lane: SourceLane;
   sources: ModCatalogSourceKind[];
   onCommitDrag: (targetLane?: SourceLane) => void;
-  onPreviewMove: (targetLane: SourceLane, targetIndex: number) => void;
-  onPreviewMoveToSource: (targetLane: SourceLane, targetSource: ModCatalogSourceKind, insertAfter: boolean) => void;
+  onPointerMove: (clientX: number, clientY: number) => void;
+  onPointerUp: (clientX: number, clientY: number) => void;
   onResetDrag: () => void;
   onStartDrag: (source: ModCatalogSourceKind, from: SourceLane) => void;
 }) {
   return (
     <div
       className={`catalog-source-lane ${lane}${sources.length ? "" : " empty"}`}
+      data-source-lane={lane}
       aria-label={`${label}数据源`}
-      onDragOver={(event) => {
+      onPointerMove={(event) => {
         if (!disabled && dragState) {
           event.preventDefault();
-          onPreviewMove(lane, sources.length);
+          onPointerMove(event.clientX, event.clientY);
         }
       }}
-      onDrop={(event) => {
-        event.preventDefault();
-        onCommitDrag(lane);
+      onPointerUp={(event) => {
+        if (!disabled && dragState) {
+          event.preventDefault();
+          onPointerUp(event.clientX, event.clientY);
+        }
       }}
     >
       <span className="catalog-source-lane-label">{label}</span>
@@ -169,7 +225,8 @@ function SourceLaneView({
           lane={lane}
           source={source}
           onCommitDrag={onCommitDrag}
-          onPreviewMove={(insertAfter) => onPreviewMoveToSource(lane, source, insertAfter)}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
           onResetDrag={onResetDrag}
           onStartDrag={() => onStartDrag(source, lane)}
         />
@@ -184,7 +241,8 @@ function SourceChip({
   lane,
   source,
   onCommitDrag,
-  onPreviewMove,
+  onPointerMove,
+  onPointerUp,
   onResetDrag,
   onStartDrag
 }: {
@@ -193,7 +251,8 @@ function SourceChip({
   lane: SourceLane;
   source: ModCatalogSourceKind;
   onCommitDrag: (targetLane?: SourceLane) => void;
-  onPreviewMove: (insertAfter: boolean) => void;
+  onPointerMove: (clientX: number, clientY: number) => void;
+  onPointerUp: (clientX: number, clientY: number) => void;
   onResetDrag: () => void;
   onStartDrag: () => void;
 }) {
@@ -201,25 +260,28 @@ function SourceChip({
   return (
     <div
       className={`catalog-source-chip ${lane}${dragging ? " dragging" : ""}${disabled ? " disabled" : ""}`}
-      draggable={!disabled}
-      onDragEnd={onResetDrag}
-      onDragOver={(event) => {
-        if (!disabled) {
+      data-source-chip={source}
+      data-source-lane={lane}
+      onPointerCancel={onResetDrag}
+      onPointerDown={(event) => {
+        if (disabled || event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        onStartDrag();
+      }}
+      onPointerMove={(event) => {
+        if (dragging) {
           event.preventDefault();
-          event.stopPropagation();
-          if (dragging) return;
-          const rect = event.currentTarget.getBoundingClientRect();
-          onPreviewMove(event.clientX > rect.left + rect.width / 2);
+          onPointerMove(event.clientX, event.clientY);
         }
       }}
-      onDragStart={(event) => {
-        onStartDrag();
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", source);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
+      onPointerUp={(event) => {
+        if (dragging) {
+          event.preventDefault();
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+          onPointerUp(event.clientX, event.clientY);
+          return;
+        }
         onCommitDrag(lane);
       }}
       role="button"
@@ -230,6 +292,26 @@ function SourceChip({
       {option.label}
     </div>
   );
+}
+
+function dragTargetAtPoint(clientX: number, clientY: number): DragTarget | null {
+  const element = document.elementFromPoint(clientX, clientY);
+  const laneElement = element?.closest<HTMLElement>("[data-source-lane]");
+  const lane = laneElement?.dataset.sourceLane;
+  if (!isSourceLane(lane)) return null;
+  const chipElement = element?.closest<HTMLElement>("[data-source-chip]");
+  const source = chipElement?.dataset.sourceChip;
+  if (!chipElement || !isModCatalogSource(source)) return { lane };
+  const rect = chipElement.getBoundingClientRect();
+  return { insertAfter: clientX > rect.left + rect.width / 2, lane, source };
+}
+
+function isSourceLane(value: unknown): value is SourceLane {
+  return value === "selected" || value === "unselected";
+}
+
+function isModCatalogSource(value: unknown): value is ModCatalogSourceKind {
+  return sourceOptions.some((option) => option.value === value);
 }
 
 function sourceLayout(order: ModCatalogSourceKind[], enabledCount: number): SourceLayout {
