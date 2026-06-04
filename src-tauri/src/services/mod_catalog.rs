@@ -1,3 +1,4 @@
+use crate::domain::StagedDownload;
 use crate::domain::{
     InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind,
     ModDownloadProgress, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
@@ -219,14 +220,71 @@ pub fn download_and_install(
     selected_save_files: &[String],
     reporter: ModDownloadReporter<'_>,
 ) -> Result<ModInstallResult, String> {
+    let staged = download_to_staging(celeste_path, &entry, reporter)?;
+    install_staged(
+        celeste_path,
+        &staged.staged_id,
+        entry,
+        replace_path,
+        profiles,
+        protected_record_ids,
+        selected_save_files,
+        Some(reporter),
+    )
+}
+
+pub fn download_to_staging(
+    celeste_path: &Path,
+    entry: &ModCatalogEntry,
+    reporter: ModDownloadReporter<'_>,
+) -> Result<StagedDownload, String> {
+    let (temp_path, hash) = download_entry(celeste_path, entry, reporter)?;
+    let size = fs::metadata(&temp_path).ok().map(|metadata| metadata.len());
+    Ok(StagedDownload {
+        staged_id: staged_id_from_path(&temp_path)?,
+        name: entry.name.clone(),
+        kind: "mod".to_string(),
+        size,
+        hash: Some(hash),
+    })
+}
+
+pub fn install_staged(
+    celeste_path: &Path,
+    staged_id: &str,
+    entry: ModCatalogEntry,
+    replace_path: Option<&Path>,
+    profiles: ProfilesState,
+    protected_record_ids: &[String],
+    selected_save_files: &[String],
+    reporter: Option<ModDownloadReporter<'_>>,
+) -> Result<ModInstallResult, String> {
     let mods_dir = celeste_path.join("Mods");
     fs::create_dir_all(&mods_dir).map_err(|error| format!("创建 Mods 目录失败：{error}"))?;
     let destination = match replace_path {
         Some(path) => normalize_replace_path(&mods_dir, path)?,
         None => fresh_install_path(&mods_dir, &entry)?,
     };
-    let (temp_path, hash) = download_entry(celeste_path, &entry, reporter)?;
-    emit_download_progress(reporter, &entry.name, "installing", 0, None, 0.0, "");
+    let temp_path = resolve_staged_download_path(celeste_path, staged_id)?;
+    let hash = xxh64_file(&temp_path)?;
+    if !entry.xx_hash.is_empty()
+        && !entry
+            .xx_hash
+            .iter()
+            .any(|expected| expected.eq_ignore_ascii_case(&hash))
+    {
+        return Err(format!(
+            "校验失败，目录记录为 {}，实际为 {hash}",
+            entry.xx_hash.join("、")
+        ));
+    }
+    if entry.xx_hash.is_empty() {
+        validate_zip_full_read(&temp_path)?;
+    }
+    read_zip_metadata(&temp_path)?;
+    if let Some(reporter) = reporter {
+        emit_download_progress(reporter, &entry.name, "installing", 0, None, 0.0, "");
+    }
 
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建安装目录失败：{error}"))?;
@@ -245,7 +303,9 @@ pub fn download_and_install(
         record.protected = record.read_only || protected_record_ids.contains(&record.id);
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
-    emit_download_progress(reporter, &entry.name, "done", 1, Some(1), 0.0, "");
+    if let Some(reporter) = reporter {
+        emit_download_progress(reporter, &entry.name, "done", 1, Some(1), 0.0, "");
+    }
     Ok(ModInstallResult {
         entry,
         destination_path: destination.to_string_lossy().to_string(),
@@ -367,6 +427,38 @@ fn staging_download_path(
         .join("downloads")
         .join("staging")
         .join(format!("{}.zip.download", stable_id(&key)))
+}
+
+fn staged_id_from_path(path: &Path) -> Result<String, String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.trim().is_empty())
+        .ok_or_else(|| "生成 staging id 失败".to_string())
+}
+
+fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<PathBuf, String> {
+    if staged_id.trim().is_empty()
+        || staged_id.contains('/')
+        || staged_id.contains('\\')
+        || staged_id.contains("..")
+    {
+        return Err("无效的 staging id".to_string());
+    }
+    let staging_dir = celeste_path
+        .join(".celepkg")
+        .join("downloads")
+        .join("staging");
+    let path = staging_dir.join(staged_id);
+    let canonical_dir = staging_dir
+        .canonicalize()
+        .map_err(|error| format!("读取 staging 目录失败：{error}"))?;
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|error| format!("读取 staging 文件失败：{error}"))?;
+    if !canonical_path.starts_with(&canonical_dir) {
+        return Err("staging 文件不在下载目录中".to_string());
+    }
+    Ok(canonical_path)
 }
 
 fn download_url_to_file(
@@ -1110,6 +1202,49 @@ Helper:
         assert!(replaced.is_none());
         assert!(!staged.exists());
         assert_eq!(fs::read(&destination).unwrap(), b"new zip");
+    }
+
+    #[test]
+    fn staged_download_path_rejects_path_traversal_ids() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let error = resolve_staged_download_path(dir.path(), "../outside.zip").unwrap_err();
+
+        assert_eq!(error, "无效的 staging id");
+    }
+
+    #[test]
+    fn staged_download_path_accepts_file_inside_staging_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let staged = dir
+            .path()
+            .join(".celepkg")
+            .join("downloads")
+            .join("staging")
+            .join("Helper.zip.download");
+        fs::create_dir_all(staged.parent().unwrap()).unwrap();
+        fs::write(&staged, b"staged").unwrap();
+
+        let resolved =
+            resolve_staged_download_path(dir.path(), staged.file_name().unwrap().to_str().unwrap())
+                .unwrap();
+
+        assert_eq!(resolved, staged.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn staged_download_path_rejects_non_staging_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = dir.path().join("Helper.zip.download");
+        fs::write(&outside, b"not staging").unwrap();
+
+        let error = resolve_staged_download_path(
+            dir.path(),
+            outside.file_name().unwrap().to_str().unwrap(),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("读取 staging"));
     }
 
     #[test]

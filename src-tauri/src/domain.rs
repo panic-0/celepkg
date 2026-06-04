@@ -306,6 +306,16 @@ pub struct ModInstallResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StagedDownload {
+    pub staged_id: String,
+    pub name: String,
+    pub kind: String,
+    pub size: Option<u64>,
+    pub hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModDownloadProgress {
     pub operation_id: String,
     pub mod_name: String,

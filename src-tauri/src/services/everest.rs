@@ -1,5 +1,5 @@
 use crate::domain::{
-    EverestInstallResult, EverestRelease, EverestReleaseList, ModDownloadProgress,
+    EverestInstallResult, EverestRelease, EverestReleaseList, ModDownloadProgress, StagedDownload,
 };
 use crate::services::mod_catalog::{DownloadProgressThrottle, ModDownloadReporter};
 use crate::utils::stable_id;
@@ -57,6 +57,23 @@ pub fn install_release(
     selected_save_files: &[String],
     reporter: ModDownloadReporter<'_>,
 ) -> Result<EverestInstallResult, String> {
+    let staged = download_to_staging(celeste_path, &release, reporter)?;
+    install_staged_release(
+        celeste_path,
+        &staged.staged_id,
+        release,
+        profiles,
+        protected_record_ids,
+        selected_save_files,
+        Some(reporter),
+    )
+}
+
+pub fn download_to_staging(
+    celeste_path: &Path,
+    release: &EverestRelease,
+    reporter: ModDownloadReporter<'_>,
+) -> Result<StagedDownload, String> {
     let download_url = if release.mirror_download.trim().is_empty() {
         release.main_download.clone()
     } else {
@@ -85,12 +102,57 @@ pub fn install_release(
         &download_url,
     );
     validate_everest_zip(staging_guard.path())?;
-    ensure_install_targets_available(celeste_path)?;
-    emit_progress(reporter, "Everest", "installing", 0, None, 0.0, "");
-    extract_everest_zip(staging_guard.path(), celeste_path, reporter)?;
-    run_mini_installer(celeste_path, reporter)?;
-    let _ = fs::remove_file(staging_guard.path());
+    let size = fs::metadata(staging_guard.path())
+        .ok()
+        .map(|metadata| metadata.len());
+    let staged_id = staged_id_from_path(staging_guard.path())?;
     staging_guard.keep();
+    Ok(StagedDownload {
+        staged_id,
+        name: "Everest".to_string(),
+        kind: "everest".to_string(),
+        size,
+        hash: None,
+    })
+}
+
+pub fn install_staged_release(
+    celeste_path: &Path,
+    staged_id: &str,
+    release: EverestRelease,
+    profiles: crate::domain::ProfilesState,
+    protected_record_ids: &[String],
+    selected_save_files: &[String],
+    reporter: Option<ModDownloadReporter<'_>>,
+) -> Result<EverestInstallResult, String> {
+    let staging = resolve_staged_download_path(celeste_path, staged_id)?;
+    emit_progress(
+        reporter.unwrap_or(ModDownloadReporter {
+            operation_id: "",
+            progress: None,
+            cancel_token: None,
+            task_index: 1,
+            task_total: 1,
+        }),
+        "Everest",
+        "installing",
+        0,
+        None,
+        0.0,
+        "",
+    );
+    validate_everest_zip(&staging)?;
+    ensure_install_targets_available(celeste_path)?;
+    let install_reporter = reporter.unwrap_or(ModDownloadReporter {
+        operation_id: "",
+        progress: None,
+        cancel_token: None,
+        task_index: 1,
+        task_total: 1,
+    });
+    extract_everest_zip(&staging, celeste_path, install_reporter)?;
+    run_mini_installer(celeste_path, install_reporter)?;
+    let _ = fs::remove_file(&staging);
 
     let mut timings = vec![];
     let mut scan = crate::services::scan::full_scan(
@@ -104,7 +166,9 @@ pub fn install_release(
         record.protected = record.read_only || protected_record_ids.contains(&record.id);
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
-    emit_progress(reporter, "Everest", "done", 1, Some(1), 0.0, "");
+    if let Some(reporter) = reporter {
+        emit_progress(reporter, "Everest", "done", 1, Some(1), 0.0, "");
+    }
     Ok(EverestInstallResult { release, scan })
 }
 
@@ -199,6 +263,38 @@ fn staging_download_path(
         .join("downloads")
         .join("staging")
         .join(format!("{}.zip.download", stable_id(&key)))
+}
+
+fn staged_id_from_path(path: &Path) -> Result<String, String> {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.trim().is_empty())
+        .ok_or_else(|| "生成 staging id 失败".to_string())
+}
+
+fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<PathBuf, String> {
+    if staged_id.trim().is_empty()
+        || staged_id.contains('/')
+        || staged_id.contains('\\')
+        || staged_id.contains("..")
+    {
+        return Err("无效的 staging id".to_string());
+    }
+    let staging_dir = celeste_path
+        .join(".celepkg")
+        .join("downloads")
+        .join("staging");
+    let path = staging_dir.join(staged_id);
+    let canonical_dir = staging_dir
+        .canonicalize()
+        .map_err(|error| format!("读取 staging 目录失败：{error}"))?;
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|error| format!("读取 staging 文件失败：{error}"))?;
+    if !canonical_path.starts_with(&canonical_dir) {
+        return Err("staging 文件不在下载目录中".to_string());
+    }
+    Ok(canonical_path)
 }
 
 fn download_url_to_file(
