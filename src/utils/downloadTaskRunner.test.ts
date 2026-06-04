@@ -256,6 +256,40 @@ describe("download task runner", () => {
     expect(started).toEqual(["mod-1", "mod-1", "mod-2"]);
   });
 
+  it("honors initial paused downloads before starting a new task", async () => {
+    const started: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          download: async () => {
+            started.push("mod-1");
+            return staged("mod-1");
+          }
+        })
+      ],
+      {
+        concurrencyLimit: 1,
+        initialDownloadPaused: true,
+        createOperationId: (item) => `op-${item.id}`,
+        cancelOperation: async () => undefined
+      }
+    );
+
+    const done = runner.start();
+    await Promise.resolve();
+
+    expect(started).toEqual([]);
+    expect(runner.snapshot().downloadPaused).toBe(true);
+    expect(runner.snapshot().items[0].status).toBe("queued");
+
+    runner.resumeDownloads();
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(started).toEqual(["mod-1"]);
+  });
+
   it("resumes downloads cleanly when the cancelled operation settles after resume", async () => {
     const first = deferred<ReturnType<typeof staged>>();
     const started: string[] = [];
@@ -302,6 +336,40 @@ describe("download task runner", () => {
 
     const done = runner.start();
     runner.pauseInstalls();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(runner.snapshot().installPaused).toBe(true);
+    expect(runner.snapshot().items[0].status).toBe("downloaded");
+    expect(installed).toEqual([]);
+
+    runner.resumeInstalls();
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(installed).toEqual(["mod-1"]);
+  });
+
+  it("honors initial paused installs before starting a new task", async () => {
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          install: async () => {
+            installed.push("mod-1");
+          }
+        })
+      ],
+      {
+        concurrencyLimit: 1,
+        initialInstallPaused: true,
+        createOperationId: (item) => `op-${item.id}`,
+        cancelOperation: async () => undefined
+      }
+    );
+
+    const done = runner.start();
     await Promise.resolve();
     await Promise.resolve();
 

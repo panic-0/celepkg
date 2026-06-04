@@ -97,9 +97,11 @@ export function App() {
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
+  const [downloadControls, setDownloadControls] = useState<DownloadControlState>({ downloadPaused: false, installPaused: false });
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
   const [everestDependencyPrompt, setEverestDependencyPrompt] = useState<EverestDependencyPromptState | null>(null);
   const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
+  const downloadControlsRef = useRef<DownloadControlState>(downloadControls);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
   const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
@@ -274,6 +276,8 @@ export function App() {
     const items = descriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
     const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
       concurrencyLimit: 3,
+      initialDownloadPaused: downloadControlsRef.current.downloadPaused,
+      initialInstallPaused: downloadControlsRef.current.installPaused,
       createOperationId: () => createOperationId("mod-update"),
       cancelOperation: cancelModDownload,
       onChange: setDownloadTask
@@ -544,6 +548,8 @@ export function App() {
   async function runExecutableDownloadTask(taskId: string, items: ExecutableDownloadTaskItem[], message: string, successMessage: string) {
     const runner = new DownloadTaskRunner(taskId, items, {
       concurrencyLimit: 3,
+      initialDownloadPaused: downloadControlsRef.current.downloadPaused,
+      initialInstallPaused: downloadControlsRef.current.installPaused,
       createOperationId: () => createOperationId("mod-task"),
       cancelOperation: cancelModDownload,
       onChange: setDownloadTask
@@ -583,36 +589,43 @@ export function App() {
     });
   }
 
+  function updateDownloadControls(update: (current: DownloadControlState) => DownloadControlState) {
+    setDownloadControls((current) => {
+      const next = update(current);
+      downloadControlsRef.current = next;
+      return next;
+    });
+  }
+
   async function pauseTaskDownloads() {
+    updateDownloadControls((current) => ({ ...current, downloadPaused: true }));
     const runner = downloadTaskRunner.current;
-    if (runner) {
-      try {
-        await runner.pauseDownloads();
-        notifier.showInfo("已停止下载，新项目会停在待下载列表");
-      } catch (error) {
-        notifier.showError(readError(error));
-      }
+    try {
+      if (runner) await runner.pauseDownloads();
+      notifier.showInfo("已停止下载，新项目会停在待下载列表");
+    } catch (error) {
+      notifier.showError(readError(error));
     }
   }
 
   function resumeTaskDownloads() {
+    updateDownloadControls((current) => ({ ...current, downloadPaused: false }));
     const runner = downloadTaskRunner.current;
-    if (!runner) return;
-    runner.resumeDownloads();
+    if (runner) runner.resumeDownloads();
     notifier.showInfo("已恢复下载");
   }
 
   function pauseTaskInstalls() {
+    updateDownloadControls((current) => ({ ...current, installPaused: true }));
     const runner = downloadTaskRunner.current;
-    if (!runner) return;
-    runner.pauseInstalls();
+    if (runner) runner.pauseInstalls();
     notifier.showInfo("已停止安装，新下载完成的项目会停在等待安装列表");
   }
 
   function resumeTaskInstalls() {
+    updateDownloadControls((current) => ({ ...current, installPaused: false }));
     const runner = downloadTaskRunner.current;
-    if (!runner) return;
-    runner.resumeInstalls();
+    if (runner) runner.resumeInstalls();
     notifier.showInfo("已恢复安装");
   }
 
@@ -798,6 +811,8 @@ export function App() {
         ) : workspaceView.activeView === "downloads" ? (
           <DownloadManager
             task={downloadTask}
+            downloadPaused={downloadControls.downloadPaused}
+            installPaused={downloadControls.installPaused}
             onPauseDownloads={pauseTaskDownloads}
             onResumeDownloads={resumeTaskDownloads}
             onPauseInstalls={pauseTaskInstalls}
@@ -923,6 +938,11 @@ function isWorkspaceLoadingMessage(message: string) {
 type DependencyUpdateChoice = "none" | "required" | "all";
 type DependencyActionLabel = "安装" | "更新";
 type EverestDependencyChoice = "update" | "ignore";
+
+type DownloadControlState = {
+  downloadPaused: boolean;
+  installPaused: boolean;
+};
 
 type DependencyIssue = {
   dependency: Dependency;

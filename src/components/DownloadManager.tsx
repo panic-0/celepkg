@@ -1,9 +1,10 @@
-import { DownloadCloud } from "lucide-react";
 import { DownloadTaskPanel } from "./DownloadTaskPanel";
 import type { DownloadTask } from "../utils/downloadTask";
 
 type DownloadManagerProps = {
   task: DownloadTask | null;
+  downloadPaused: boolean;
+  installPaused: boolean;
   onPauseDownloads: () => void;
   onResumeDownloads: () => void;
   onPauseInstalls: () => void;
@@ -15,6 +16,8 @@ type DownloadManagerProps = {
 
 export function DownloadManager({
   task,
+  downloadPaused,
+  installPaused,
   onPauseDownloads,
   onResumeDownloads,
   onPauseInstalls,
@@ -23,31 +26,33 @@ export function DownloadManager({
   onCancelInstalls,
   onRetryFailed
 }: DownloadManagerProps) {
+  const displayTask: DownloadTask = task ?? {
+    id: "download-controls",
+    status: "running",
+    concurrencyLimit: 3,
+    downloadPaused,
+    installPaused,
+    items: []
+  };
+
   return (
     <section className="download-manager">
       <div className="list-header">
         <div>
           <h2>下载管理</h2>
-          <p>{task ? formatTaskStatus(task.status, task) : "暂无下载任务"}</p>
+          <p>{formatTaskStatus(displayTask.status, displayTask)}</p>
         </div>
       </div>
-      {task ? (
-        <DownloadTaskPanel
-          task={task}
-          onPauseDownloads={onPauseDownloads}
-          onResumeDownloads={onResumeDownloads}
-          onPauseInstalls={onPauseInstalls}
-          onResumeInstalls={onResumeInstalls}
-          onCancelDownloads={onCancelDownloads}
-          onCancelInstalls={onCancelInstalls}
-          onRetryFailed={onRetryFailed}
-        />
-      ) : (
-        <div className="empty-state download-manager-empty">
-          <DownloadCloud size={30} />
-          <p>没有正在进行或最近完成的下载任务。</p>
-        </div>
-      )}
+      <DownloadTaskPanel
+        task={displayTask}
+        onPauseDownloads={onPauseDownloads}
+        onResumeDownloads={onResumeDownloads}
+        onPauseInstalls={onPauseInstalls}
+        onResumeInstalls={onResumeInstalls}
+        onCancelDownloads={onCancelDownloads}
+        onCancelInstalls={onCancelInstalls}
+        onRetryFailed={onRetryFailed}
+      />
     </section>
   );
 }

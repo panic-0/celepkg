@@ -20,6 +20,8 @@ export type ExecutableDownloadTaskItem = DownloadTaskItem & {
 
 export type DownloadTaskRunnerOptions = {
   concurrencyLimit?: number;
+  initialDownloadPaused?: boolean;
+  initialInstallPaused?: boolean;
   createOperationId: (item: DownloadTaskItem) => string;
   cancelOperation: (operationId: string) => Promise<unknown>;
   onChange?: (task: DownloadTask) => void;
@@ -52,6 +54,11 @@ export class DownloadTaskRunner {
       }),
       options.concurrencyLimit
     );
+    this.task = {
+      ...this.task,
+      downloadPaused: Boolean(options.initialDownloadPaused),
+      installPaused: Boolean(options.initialInstallPaused)
+    };
   }
 
   snapshot() {
