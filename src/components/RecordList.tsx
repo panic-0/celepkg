@@ -82,13 +82,18 @@ export function RecordList({
 }: RecordListProps) {
   const records = activeView === "maps" ? filteredMaps : filteredMods;
   const total = activeView === "maps" ? visibleMapCount : modCount;
+  const title = activeView === "maps" ? "地图" : "其他 Mod";
   const hasRecords = records.length > 0;
   const tableScrollRef = useScrollMemory<HTMLDivElement>(`records:${activeView}`, scrollMemory);
 
   return (
     <section className="record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
       <div className="list-header">
-        <div>
+        <div className="record-list-heading">
+          <div className="record-list-title">
+            <h2>{title}</h2>
+            <p>{`${records.length} / ${total} 个结果`}</p>
+          </div>
           <div className="record-view-switch" aria-label="本地内容类型">
             <button className={activeView === "maps" ? "active" : ""} onClick={() => onRecordViewChange("maps")}>
               地图
@@ -97,7 +102,6 @@ export function RecordList({
               其他 Mod
             </button>
           </div>
-          <p>{`${records.length} / ${total} 个结果`}</p>
         </div>
         <button onClick={onEnableAll} disabled={!hasRecords} title="只启用当前筛选结果中的条目">
           <ToggleRight size={16} />

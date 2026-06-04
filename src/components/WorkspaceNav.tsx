@@ -76,6 +76,7 @@ export function WorkspaceNav({
 }: WorkspaceNavProps) {
   const showsRecordFilters = activeView === "maps" || activeView === "mods";
   const showsSubMapFilters = activeView === "maps" && mainMode === "detail" && mapDetailTab === "submaps";
+  const filterTitle = showsSubMapFilters ? "小图筛选" : activeView === "maps" ? "地图筛选" : "Mod 筛选";
   const filterCount = showsSubMapFilters
     ? Number(mapDetailControls.subMapQuery.trim().length > 0) +
       Number(mapDetailControls.subMapSortKey !== "file") +
@@ -96,7 +97,7 @@ export function WorkspaceNav({
           onClick={() => onActiveViewChange(activeView === "mods" ? "mods" : "maps")}
         >
           <Gamepad2 size={18} />
-          <span>地图与 Mod</span>
+          <span>本地内容</span>
           <strong
             className="nav-count"
             title={`${enabledMapCount}/${totalMapCount} 地图启用，${enabledModCount}/${totalModCount} Mod 启用`}
@@ -147,7 +148,7 @@ export function WorkspaceNav({
         <section className="nav-section filter-dock">
           <div className="filter-heading">
             <SlidersHorizontal size={17} />
-            <span>{showsSubMapFilters ? "小图筛选" : "筛选"}</span>
+            <span>{filterTitle}</span>
             {filterCount > 0 && <small>{filterCount}</small>}
           </div>
           {showsSubMapFilters ? (
