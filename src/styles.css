@@ -1446,6 +1446,13 @@ button.profile {
   font-weight: 800;
 }
 
+.catalog-source-hint {
+  color: #7a8795;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .settings-section .catalog-source-picker {
   flex-wrap: wrap;
   justify-content: flex-start;

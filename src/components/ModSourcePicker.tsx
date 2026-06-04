@@ -96,7 +96,7 @@ export function ModSourcePicker({
       <SourceLaneView
         disabled={disabled}
         dragState={dragState}
-        label="已选"
+        label="已启用，按优先级使用"
         lane="selected"
         sources={layout.selected}
         onCommitDrag={commitDrag}
@@ -109,7 +109,7 @@ export function ModSourcePicker({
       <SourceLaneView
         disabled={disabled}
         dragState={dragState}
-        label="未选"
+        label="未启用"
         lane="unselected"
         sources={layout.unselected}
         onCommitDrag={commitDrag}

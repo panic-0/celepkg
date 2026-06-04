@@ -186,6 +186,7 @@ export function SettingsManager({
                   order={modCatalogSourceOrder}
                   onChange={onModCatalogSourcesChange}
                 />
+                <small className="catalog-source-hint">已启用数据源从左到右优先使用，拖到未启用会停用该源。</small>
               </div>
               <button
                 className={autoCheckModUpdatesOnStartup ? "inline-toggle active" : "inline-toggle"}
