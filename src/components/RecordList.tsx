@@ -99,13 +99,13 @@ export function RecordList({
           </div>
           <p>{`${records.length} / ${total} 个结果`}</p>
         </div>
-        <button onClick={onEnableAll} disabled={!hasRecords}>
+        <button onClick={onEnableAll} disabled={!hasRecords} title="只启用当前筛选结果中的条目">
           <ToggleRight size={16} />
-          全部启用
+          启用当前结果
         </button>
-        <button onClick={onDisableAll} disabled={!hasRecords}>
+        <button onClick={onDisableAll} disabled={!hasRecords} title="只禁用当前筛选结果中的条目">
           <ToggleLeft size={16} />
-          全部禁用
+          禁用当前结果
         </button>
         <button onClick={onCheckModUpdates} disabled={loading} title="检查本地 zip Mod 是否有更新">
           <SearchCheck size={16} />
