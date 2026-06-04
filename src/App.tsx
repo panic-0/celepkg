@@ -1,4 +1,4 @@
-import { LoaderCircle } from "lucide-react";
+import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelModDownload,
@@ -25,7 +25,7 @@ import { SettingsManager } from "./components/SettingsManager";
 import { AppToolbar } from "./components/AppToolbar";
 import { ToastHost } from "./components/ToastHost";
 import { WorkspaceNav } from "./components/WorkspaceNav";
-import { DialogShell } from "./components/common";
+import { DialogFacts, DialogShell, type DialogFact } from "./components/common";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
@@ -100,6 +100,7 @@ export function App() {
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
   const [downloadControls, setDownloadControls] = useState<DownloadControlState>({ downloadPaused: false, installPaused: false });
+  const [confirmPrompt, setConfirmPrompt] = useState<AppConfirmPromptState | null>(null);
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
   const [everestDependencyPrompt, setEverestDependencyPrompt] = useState<EverestDependencyPromptState | null>(null);
   const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
@@ -250,13 +251,35 @@ export function App() {
   }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, loading, scan.modsPath, startupAutoCheckModUpdatesOnStartup]);
 
   async function updateSingleMod(candidate: ModUpdateCandidate) {
-    if (!window.confirm(`更新 ${candidate.installed.name} 到 ${candidate.entry.version || "目录最新版本"}？`)) return;
+    const confirmed = await requestAppConfirm({
+      title: "更新 Mod",
+      description: "确认后会下载目录中的版本，并覆盖这个本地 Mod 文件。",
+      confirmLabel: "更新",
+      facts: [
+        { label: "目标", value: candidate.installed.name },
+        { label: "当前版本", value: candidate.installed.version || "未知版本" },
+        { label: "目标版本", value: candidate.entry.version || "目录最新版本" },
+        { label: "本地文件", value: candidate.installed.relativePath }
+      ],
+      variant: "danger"
+    });
+    if (!confirmed) return;
     await updateModCandidate(candidate);
   }
 
   async function installEverestRelease(release: EverestRelease) {
     const version = `1.${release.version}.0`;
-    if (!window.confirm(`安装 Everest ${version}？安装器会覆盖游戏目录中的 Everest 相关文件。`)) return;
+    const confirmed = await requestAppConfirm({
+      title: "安装 Everest",
+      description: "安装器会覆盖游戏目录中的 Everest 相关文件。请确认目标版本无误。",
+      confirmLabel: "安装 Everest",
+      facts: [
+        { label: "目标版本", value: version },
+        { label: "游戏目录", value: celestePath }
+      ],
+      variant: "danger"
+    });
+    if (!confirmed) return;
     await performEverestInstall(release, `正在安装 Everest ${version}...`, `已安装 Everest ${version}`);
   }
 
@@ -283,7 +306,18 @@ export function App() {
     const recordsBeforeUpdate = [...scan.maps, ...scan.otherMods];
     const descriptors = createModUpdateTaskDescriptors(downloadableModUpdates, recordsBeforeUpdate);
     if (!descriptors.length) return;
-    if (!window.confirm(`更新全部 ${descriptors.length} 个 Mod？`)) return;
+    const confirmed = await requestAppConfirm({
+      title: "批量更新 Mod",
+      description: "确认后会按依赖顺序下载并覆盖这些本地 Mod 文件。",
+      confirmLabel: "更新全部",
+      facts: [
+        { label: "更新数量", value: `${descriptors.length} 个` },
+        { label: "可下载更新", value: `${downloadableModUpdates.length} 个` }
+      ],
+      details: descriptors.map((descriptor) => `${descriptor.candidate.installed.name} -> ${descriptor.candidate.entry.version || "目录最新版本"}`),
+      variant: "danger"
+    });
+    if (!confirmed) return;
     completedModUpdatePaths.current.clear();
     const items = descriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
     const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
@@ -322,7 +356,18 @@ export function App() {
   }
 
   async function installCatalogEntry(entry: ModCatalogEntry) {
-    if (!window.confirm(`安装 ${entry.name}${entry.version ? ` ${entry.version}` : ""}？`)) return;
+    const confirmed = await requestAppConfirm({
+      title: "安装 Mod",
+      description: "确认后会下载并安装此 Mod。若安装过程中发现依赖问题，会继续进入依赖检查流程。",
+      confirmLabel: "安装",
+      facts: [
+        { label: "目标", value: entry.name },
+        { label: "版本", value: entry.version || "无版本号" },
+        { label: "来源", value: entry.source },
+        { label: "下载地址", value: entry.downloadUrl || "无下载地址" }
+      ]
+    });
+    if (!confirmed) return;
     return await performCatalogInstall(entry, `正在安装 ${entry.name}...`, `已安装 ${entry.name}`);
   }
 
@@ -415,7 +460,18 @@ export function App() {
     } catch (error) {
       const message = readError(error);
       notifier.showWarning(message);
-      if (!window.confirm(`无法预览 ${targetName} ${actionLabel}后的依赖。仍然继续${actionLabel}？`)) return null;
+      const confirmed = await requestAppConfirm({
+        title: "无法预览依赖",
+        description: `无法预览 ${targetName} ${actionLabel}后的依赖。继续后可能遗漏必需依赖。`,
+        confirmLabel: `继续${actionLabel}`,
+        facts: [
+          { label: "目标", value: targetName },
+          { label: "操作", value: actionLabel },
+          { label: "错误", value: message }
+        ],
+        variant: "danger"
+      });
+      if (!confirmed) return null;
       return [];
     } finally {
       setLoading(false);
@@ -463,9 +519,17 @@ export function App() {
     if (!release) {
       const requiredVersion = formatEverestBuildVersion(requiredBuild);
       const installedVersion = installedBuild === null ? "未识别" : formatEverestBuildVersion(installedBuild);
-      return window.confirm(
-        `${targetName} ${actionLabel}需要 Everest ${requiredVersion} 或更高版本，当前版本 ${installedVersion}。\n\n未找到可自动更新的 Everest 版本，仍然继续${actionLabel}？`
-      )
+      return (await requestAppConfirm({
+        title: "Everest 无法自动更新",
+        description: `未找到可自动更新的 Everest 版本。继续${actionLabel}后，目标 Mod 可能无法正常运行。`,
+        confirmLabel: `继续${actionLabel}`,
+        facts: [
+          { label: "目标", value: targetName },
+          { label: "需要 Everest", value: `${requiredVersion} 或更高版本` },
+          { label: "当前 Everest", value: installedVersion }
+        ],
+        variant: "danger"
+      }))
         ? null
         : false;
     }
@@ -491,9 +555,20 @@ export function App() {
       else unavailable.push(issue);
     }
     if (unavailable.length) {
-      const text = unavailable.map(formatDependencyIssue).join("\n");
       const actionText = plan.actionLabel === "安装" ? "安装" : "覆盖";
-      if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续${actionText}目标 Mod？`)) return null;
+      const confirmed = await requestAppConfirm({
+        title: "依赖无法自动处理",
+        description: `以下依赖无法自动更新或安装。继续后，目标 Mod 可能缺少依赖或版本不足。`,
+        confirmLabel: `继续${actionText}`,
+        facts: [
+          { label: "目标", value: plan.targetName },
+          { label: "操作", value: plan.actionLabel },
+          { label: "无法处理", value: `${unavailable.length} 个` }
+        ],
+        details: unavailable.map(formatDependencyIssue),
+        variant: "danger"
+      });
+      if (!confirmed) return null;
     }
     return dedupeDependencyActions(actions);
   }
@@ -598,6 +673,12 @@ export function App() {
   function requestEverestDependencyChoice(prompt: Omit<EverestDependencyPromptState, "resolve">) {
     return new Promise<EverestDependencyChoice | null>((resolve) => {
       setEverestDependencyPrompt({ ...prompt, resolve });
+    });
+  }
+
+  function requestAppConfirm(prompt: Omit<AppConfirmPromptState, "resolve">) {
+    return new Promise<boolean>((resolve) => {
+      setConfirmPrompt({ ...prompt, resolve });
     });
   }
 
@@ -938,6 +1019,15 @@ export function App() {
           }}
         />
       )}
+      {confirmPrompt && (
+        <AppConfirmDialog
+          prompt={confirmPrompt}
+          onClose={(confirmed) => {
+            confirmPrompt.resolve(confirmed);
+            setConfirmPrompt(null);
+          }}
+        />
+      )}
       <ToastHost notice={notice} onClose={clearNotice} />
     </main>
   );
@@ -954,6 +1044,17 @@ type EverestDependencyChoice = "update" | "ignore";
 type DownloadControlState = {
   downloadPaused: boolean;
   installPaused: boolean;
+};
+
+type AppConfirmPromptState = {
+  cancelLabel?: string;
+  confirmLabel: string;
+  description: string;
+  details?: string[];
+  facts?: DialogFact[];
+  resolve: (confirmed: boolean) => void;
+  title: string;
+  variant?: "primary" | "danger";
 };
 
 type DependencyIssue = {
@@ -989,6 +1090,38 @@ type EverestDependencyPromptState = {
   resolve: (choice: EverestDependencyChoice | null) => void;
   targetName: string;
 };
+
+function AppConfirmDialog({
+  prompt,
+  onClose
+}: {
+  prompt: AppConfirmPromptState;
+  onClose: (confirmed: boolean) => void;
+}) {
+  return (
+    <DialogShell
+      actions={[
+        { label: prompt.cancelLabel ?? "取消", onClick: () => onClose(false) },
+        { label: prompt.confirmLabel, onClick: () => onClose(true), variant: prompt.variant ?? "primary" }
+      ]}
+      icon={<AlertTriangle size={18} />}
+      onClose={() => onClose(false)}
+      title={prompt.title}
+    >
+      <p>{prompt.description}</p>
+      {prompt.facts && prompt.facts.length > 0 && <DialogFacts facts={prompt.facts} />}
+      {prompt.details && prompt.details.length > 0 && (
+        <div className="dependency-preview-list">
+          {prompt.details.map((detail) => (
+            <div className="dependency-preview-row" key={detail}>
+              <span>{detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </DialogShell>
+  );
+}
 
 function EverestDependencyDialog({
   prompt,
