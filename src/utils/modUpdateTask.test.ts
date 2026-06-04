@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
-import { createModUpdateTaskDescriptors } from "./modUpdateTask";
+import { createCatalogInstallTaskDescriptor, createModUpdateTaskDescriptors, createSingleModUpdateTaskDescriptor } from "./modUpdateTask";
 
 function entry(name: string): ModCatalogEntry {
   return {
@@ -84,5 +84,30 @@ describe("mod update task descriptors", () => {
 
     expect(descriptors).toHaveLength(1);
     expect(descriptors[0].candidate.entry.name).toBe("Helper");
+  });
+
+  it("creates a single update descriptor for one installed mod", () => {
+    const helper = record("helper", "Helper");
+    const descriptor = createSingleModUpdateTaskDescriptor(candidate(helper));
+
+    expect(descriptor).toMatchObject({
+      id: `mod-update:${helper.absolutePath}`,
+      name: "Helper",
+      kind: "mod",
+      status: "queued",
+      dependsOn: []
+    });
+  });
+
+  it("creates a catalog install descriptor from the catalog entry", () => {
+    const descriptor = createCatalogInstallTaskDescriptor(entry("NewHelper"));
+
+    expect(descriptor).toMatchObject({
+      id: "mod-install:wegfan:NewHelper",
+      name: "NewHelper",
+      kind: "mod",
+      status: "queued",
+      dependsOn: []
+    });
   });
 });

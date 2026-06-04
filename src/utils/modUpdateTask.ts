@@ -1,9 +1,13 @@
-import type { ModRecord, ModUpdateCandidate } from "../types";
+import type { ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
 import type { DownloadTaskItem } from "./downloadTask";
 import { normalizeDependencyName } from "./dependencies";
 
 export type ModUpdateTaskDescriptor = Pick<DownloadTaskItem, "id" | "name" | "kind" | "status" | "dependsOn"> & {
   candidate: ModUpdateCandidate;
+};
+
+export type ModInstallTaskDescriptor = Pick<DownloadTaskItem, "id" | "name" | "kind" | "status" | "dependsOn"> & {
+  entry: ModCatalogEntry;
 };
 
 export function createModUpdateTaskDescriptors(
@@ -31,6 +35,28 @@ export function createModUpdateTaskDescriptors(
       candidate
     };
   });
+}
+
+export function createSingleModUpdateTaskDescriptor(candidate: ModUpdateCandidate): ModUpdateTaskDescriptor {
+  return {
+    id: createModUpdateTaskId(candidate),
+    name: candidate.installed.name || candidate.entry.name,
+    kind: "mod",
+    status: "queued",
+    dependsOn: [],
+    candidate
+  };
+}
+
+export function createCatalogInstallTaskDescriptor(entry: ModCatalogEntry): ModInstallTaskDescriptor {
+  return {
+    id: `mod-install:${entry.source}:${entry.id || entry.downloadUrl || entry.name}`,
+    name: entry.name,
+    kind: "mod",
+    status: "queued",
+    dependsOn: [],
+    entry
+  };
 }
 
 export function createModUpdateTaskId(candidate: ModUpdateCandidate) {

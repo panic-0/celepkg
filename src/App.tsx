@@ -6,11 +6,9 @@ import {
   createOperationId,
   downloadModToStaging,
   installEverest,
-  installMod,
   installStagedMod,
   previewModUpdateMetadata,
-  searchModCatalog,
-  updateMod
+  searchModCatalog
 } from "./api";
 import { BackupManager } from "./components/BackupManager";
 import { EverestManager } from "./components/EverestManager";
@@ -48,7 +46,11 @@ import type { DownloadTask } from "./utils/downloadTask";
 import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
 import { dependenciesIncludeEverest, isEverestDependencyName } from "./utils/everestDependency";
 import { isDraftEnabled, readError } from "./utils/format";
-import { createModUpdateTaskDescriptors } from "./utils/modUpdateTask";
+import {
+  createCatalogInstallTaskDescriptor,
+  createModUpdateTaskDescriptors,
+  createSingleModUpdateTaskDescriptor
+} from "./utils/modUpdateTask";
 import { isMockMode } from "./mockApi";
 
 export function App() {
@@ -339,32 +341,26 @@ export function App() {
     return await performCatalogInstall(entry, `正在安装 ${entry.name}...`, `已安装 ${entry.name}`);
   }
 
-  async function performModUpdate(
-    candidate: ModUpdateCandidate,
-    batchLabel = "",
-    message = `正在更新 ${candidate.installed.name}...`,
-    taskIndex = 1,
-    taskTotal = 1
-  ) {
-    const operationId = createOperationId("mod-update");
-    try {
-      startModDownloadProgress(candidate, operationId, batchLabel, taskIndex, taskTotal);
-      setLoading(true, message);
-      const result = await updateMod(celestePath, candidate.entry, candidate.installed.absolutePath, operationId, taskIndex, taskTotal);
-      clearMockDownloadTimer();
-      setScan(result.scan);
-      removeUpdatedCandidate(candidate);
-      finishModDownloadProgress(operationId, 800);
-      notifier.showSuccess(`已更新 ${candidate.installed.name}`);
-      return true;
-    } catch (error) {
-      const message = readError(error);
-      markDownloadProgressError();
-      notifier.showError(message);
-      return false;
-    } finally {
-      setLoading(false);
-    }
+  async function performModUpdate(candidate: ModUpdateCandidate, batchLabel = "", message = `正在更新 ${candidate.installed.name}...`) {
+    void batchLabel;
+    const descriptor = createSingleModUpdateTaskDescriptor(candidate);
+    return await runExecutableDownloadTask(
+      createOperationId("mod-update-task"),
+      [
+        {
+          ...descriptor,
+          download: (operationId, taskIndex, taskTotal) =>
+            downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
+          install: async (staged) => {
+            const result = await installStagedMod(celestePath, staged.stagedId, candidate.entry, candidate.installed.absolutePath);
+            setScan(result.scan);
+            removeUpdatedCandidate(candidate);
+          }
+        }
+      ],
+      message,
+      `已更新 ${candidate.installed.name}`
+    );
   }
 
   async function prepareDependencyUpdates(candidate: ModUpdateCandidate): Promise<DependencyUpdatePlan | null> {
@@ -498,22 +494,56 @@ export function App() {
   }
 
   async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {
-    const operationId = createOperationId("mod-install");
+    const descriptor = createCatalogInstallTaskDescriptor(entry);
+    return await runExecutableDownloadTask(
+      createOperationId("mod-install-task"),
+      [
+        {
+          ...descriptor,
+          download: (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
+          install: async (staged) => {
+            const result = await installStagedMod(celestePath, staged.stagedId, entry);
+            setScan(result.scan);
+          }
+        }
+      ],
+      message,
+      successMessage
+    );
+  }
+
+  async function runExecutableDownloadTask(taskId: string, items: ExecutableDownloadTaskItem[], message: string, successMessage: string) {
+    clearMockDownloadTimer();
+    clearProgressClearTimer();
+    activeDownloadOperationId.current = null;
+    setModDownloadBatchLabel("");
+    setModDownloadProgress(null);
+    const runner = new DownloadTaskRunner(taskId, items, {
+      concurrencyLimit: 3,
+      createOperationId: () => createOperationId("mod-task"),
+      cancelOperation: cancelModDownload,
+      onChange: setDownloadTask
+    });
+    downloadTaskRunner.current = runner;
     try {
-      startCatalogDownloadProgress(entry, operationId);
       setLoading(true, message);
-      const result = await installMod(celestePath, entry, operationId);
-      clearMockDownloadTimer();
-      setScan(result.scan);
-      finishModDownloadProgress(operationId, 800);
+      const result = await runner.start();
+      if (result.status === "cancelled") {
+        notifier.showInfo("已取消下载任务");
+        return false;
+      }
+      if (result.status !== "done") {
+        const failedItem = result.items.find((item) => item.error);
+        notifier.showError(failedItem?.error ?? "下载或安装失败");
+        return false;
+      }
       notifier.showSuccess(successMessage);
       return true;
     } catch (error) {
-      const message = readError(error);
-      markDownloadProgressError();
-      notifier.showError(message);
+      notifier.showError(readError(error));
       return false;
     } finally {
+      if (downloadTaskRunner.current === runner) downloadTaskRunner.current = null;
       setLoading(false);
     }
   }
@@ -522,46 +552,6 @@ export function App() {
     return new Promise<DependencyUpdateChoice | null>((resolve) => {
       setDependencyPrompt({ actionLabel, issues, resolve, targetName });
     });
-  }
-
-  function startModDownloadProgress(candidate: ModUpdateCandidate, operationId: string, batchLabel = "", taskIndex = 1, taskTotal = 1) {
-    clearMockDownloadTimer();
-    clearProgressClearTimer();
-    activeDownloadOperationId.current = operationId;
-    setModDownloadBatchLabel(batchLabel);
-    const initialProgress: ModDownloadProgress = {
-      operationId,
-      modName: candidate.installed.name || candidate.entry.name,
-      phase: "downloading",
-      downloaded: 0,
-      total: candidate.entry.size,
-      speedBytesPerSec: 0,
-      taskIndex,
-      taskTotal,
-      url: candidate.entry.downloadUrl
-    };
-    setModDownloadProgress(initialProgress);
-    if (isMockMode()) runMockDownloadProgress(initialProgress);
-  }
-
-  function startCatalogDownloadProgress(entry: ModCatalogEntry, operationId: string) {
-    clearMockDownloadTimer();
-    clearProgressClearTimer();
-    activeDownloadOperationId.current = operationId;
-    setModDownloadBatchLabel("");
-    const initialProgress: ModDownloadProgress = {
-      operationId,
-      modName: entry.name,
-      phase: "downloading",
-      downloaded: 0,
-      total: entry.size,
-      speedBytesPerSec: 0,
-      taskIndex: 1,
-      taskTotal: 1,
-      url: entry.downloadUrl
-    };
-    setModDownloadProgress(initialProgress);
-    if (isMockMode()) runMockDownloadProgress(initialProgress);
   }
 
   function startEverestDownloadProgress(release: EverestRelease, operationId: string) {
