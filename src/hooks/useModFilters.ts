@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
 import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
@@ -10,47 +10,13 @@ type ModFiltersOptions = {
   scan: ScanResult;
 };
 
-type SavedModFilters = {
-  enabledFilter: EnabledFilter;
-  progressFilter: ProgressFilter;
-  query: string;
-  referenceFilter: ReferenceFilter;
-  showHelperMaps: boolean;
-  showOnlyUnreferencedMods: boolean;
-  sortKey: SortKey;
-};
-
-const STORAGE_KEY = "celepkg.ui.filters";
-const defaultFilters: SavedModFilters = {
-  enabledFilter: "all",
-  progressFilter: "all",
-  query: "",
-  referenceFilter: "all",
-  showHelperMaps: false,
-  showOnlyUnreferencedMods: false,
-  sortKey: "name"
-};
-
 export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFiltersOptions) {
-  const savedFilters = useMemo(() => readSavedFilters(), []);
-  const [query, setQuery] = useState(savedFilters.query);
-  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>(savedFilters.enabledFilter);
-  const [progressFilter, setProgressFilter] = useState<ProgressFilter>(savedFilters.progressFilter);
-  const [referenceFilter, setReferenceFilter] = useState<ReferenceFilter>(savedFilters.referenceFilter);
-  const [sortKey, setSortKey] = useState<SortKey>(savedFilters.sortKey);
-  const [showHelperMaps, setShowHelperMaps] = useState(savedFilters.showHelperMaps);
-
-  useEffect(() => {
-    writeSavedFilters({
-      enabledFilter,
-      progressFilter,
-      query,
-      referenceFilter,
-      showHelperMaps,
-      showOnlyUnreferencedMods: referenceFilter !== "all",
-      sortKey
-    });
-  }, [enabledFilter, progressFilter, query, referenceFilter, showHelperMaps, sortKey]);
+  const [query, setQuery] = useState("");
+  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>("all");
+  const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
+  const [referenceFilter, setReferenceFilter] = useState<ReferenceFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [showHelperMaps, setShowHelperMaps] = useState(false);
 
   const helperMapMods = useMemo(() => scan.otherMods.filter((modItem) => modItem.subMaps.length > 0), [scan.otherMods]);
   const visibleMapRecords = useMemo(
@@ -127,55 +93,8 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
   };
 }
 
-function readSavedFilters(): SavedModFilters {
-  try {
-    const text = window.localStorage.getItem(STORAGE_KEY);
-    if (!text) return defaultFilters;
-    const value = JSON.parse(text) as Partial<SavedModFilters>;
-    return {
-      enabledFilter: isEnabledFilter(value.enabledFilter) ? value.enabledFilter : defaultFilters.enabledFilter,
-      progressFilter: isProgressFilter(value.progressFilter) ? value.progressFilter : defaultFilters.progressFilter,
-      query: typeof value.query === "string" ? value.query : defaultFilters.query,
-      referenceFilter: isReferenceFilter(value.referenceFilter)
-        ? value.referenceFilter
-        : value.showOnlyUnreferencedMods === true
-          ? "unreferenced"
-          : defaultFilters.referenceFilter,
-      showHelperMaps: value.showHelperMaps === true,
-      showOnlyUnreferencedMods: value.showOnlyUnreferencedMods === true,
-      sortKey: isSortKey(value.sortKey) ? value.sortKey : defaultFilters.sortKey
-    };
-  } catch {
-    return defaultFilters;
-  }
-}
-
-function writeSavedFilters(filters: SavedModFilters) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
-  } catch {
-    // Filter preferences are local UI state; ignore storage failures.
-  }
-}
-
 function strawberrySortValue(record: { stats: { strawberries: number; strawberriesKnown: boolean } | null }) {
   return record.stats?.strawberriesKnown ? record.stats.strawberries : -1;
-}
-
-function isEnabledFilter(value: unknown): value is EnabledFilter {
-  return value === "all" || value === "enabled" || value === "disabled";
-}
-
-function isProgressFilter(value: unknown): value is ProgressFilter {
-  return value === "all" || value === "completed" || value === "unfinished" || value === "withStats" || value === "warnings";
-}
-
-function isReferenceFilter(value: unknown): value is ReferenceFilter {
-  return value === "all" || value === "unreferenced" || value === "unreferencedAndOptional";
-}
-
-function isSortKey(value: unknown): value is SortKey {
-  return value === "name" || value === "deaths" || value === "time" || value === "strawberries";
 }
 
 function findReferencedModIds(scan: ScanResult) {
