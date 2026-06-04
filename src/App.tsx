@@ -4,8 +4,9 @@ import {
   cancelModDownload,
   checkModUpdates,
   createOperationId,
+  downloadEverestToStaging,
   downloadModToStaging,
-  installEverest,
+  installStagedEverest,
   installStagedMod,
   previewModUpdateMetadata,
   searchModCatalog
@@ -44,6 +45,7 @@ import { normalizeDependencyName } from "./utils/dependencies";
 import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "./utils/dependencyUpdateDedupe";
 import type { DownloadTask } from "./utils/downloadTask";
 import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
+import { createEverestInstallTaskDescriptor } from "./utils/everestTask";
 import { dependenciesIncludeEverest, isEverestDependencyName } from "./utils/everestDependency";
 import { isDraftEnabled, readError } from "./utils/format";
 import {
@@ -250,22 +252,22 @@ export function App() {
   async function installEverestRelease(release: EverestRelease) {
     const version = `1.${release.version}.0`;
     if (!window.confirm(`安装 Everest ${version}？安装器会覆盖游戏目录中的 Everest 相关文件。`)) return;
-    const operationId = createOperationId("everest");
-    try {
-      startEverestDownloadProgress(release, operationId);
-      setLoading(true, `正在安装 Everest ${version}...`);
-      const result = await installEverest(celestePath, release, operationId);
-      clearMockDownloadTimer();
-      setScan(result.scan);
-      finishModDownloadProgress(operationId, 1200);
-      notifier.showSuccess(`已安装 Everest ${version}`);
-    } catch (error) {
-      const message = readError(error);
-      markDownloadProgressError();
-      notifier.showError(message);
-    } finally {
-      setLoading(false);
-    }
+    const descriptor = createEverestInstallTaskDescriptor(release);
+    await runExecutableDownloadTask(
+      createOperationId("everest-task"),
+      [
+        {
+          ...descriptor,
+          download: (operationId) => downloadEverestToStaging(celestePath, release, operationId),
+          install: async (staged) => {
+            const result = await installStagedEverest(celestePath, staged.stagedId, release);
+            setScan(result.scan);
+          }
+        }
+      ],
+      `正在安装 Everest ${version}...`,
+      `已安装 Everest ${version}`
+    );
   }
 
   async function updateAllMods() {
@@ -554,43 +556,6 @@ export function App() {
     });
   }
 
-  function startEverestDownloadProgress(release: EverestRelease, operationId: string) {
-    clearMockDownloadTimer();
-    clearProgressClearTimer();
-    activeDownloadOperationId.current = operationId;
-    setModDownloadBatchLabel("");
-    const initialProgress: ModDownloadProgress = {
-      operationId,
-      modName: "Everest",
-      phase: "downloading",
-      downloaded: 0,
-      total: release.mainFileSize,
-      speedBytesPerSec: 0,
-      taskIndex: 1,
-      taskTotal: 1,
-      url: release.mirrorDownload || release.mainDownload
-    };
-    setModDownloadProgress(initialProgress);
-    if (isMockMode()) runMockDownloadProgress(initialProgress);
-  }
-
-  function finishModDownloadProgress(operationId: string, clearDelay: number) {
-    clearMockDownloadTimer();
-    setModDownloadProgress((current) => {
-      if (!current || current.operationId !== operationId) return current;
-      const completedTotal = current.total ?? (current.downloaded || 1);
-      return { ...current, phase: "done", downloaded: completedTotal, total: completedTotal };
-    });
-    if (clearDelay > 0) scheduleProgressClear(operationId, clearDelay);
-  }
-
-  function markDownloadProgressError() {
-    clearMockDownloadTimer();
-    setModDownloadProgress((current) => (current ? { ...current, phase: "error" } : current));
-    const operationId = activeDownloadOperationId.current;
-    if (operationId) scheduleProgressClear(operationId, 1800);
-  }
-
   function scheduleProgressClear(operationId: string, delay: number) {
     clearProgressClearTimer();
     progressClearTimer.current = window.setTimeout(() => {
@@ -611,22 +576,6 @@ export function App() {
     if (progressClearTimer.current === null) return;
     window.clearTimeout(progressClearTimer.current);
     progressClearTimer.current = null;
-  }
-
-  function runMockDownloadProgress(initialProgress: ModDownloadProgress) {
-    const total = initialProgress.total ?? 12 * 1024 * 1024;
-    const step = Math.max(256 * 1024, Math.floor(total / 14));
-    let downloaded = 0;
-    mockDownloadTimer.current = window.setInterval(() => {
-      downloaded = Math.min(total, downloaded + step);
-      setModDownloadProgress((current) => {
-        if (!current || current.operationId !== initialProgress.operationId || current.phase !== "downloading") return current;
-        const speedBytesPerSec = step / 0.075;
-        if (downloaded >= total) return { ...current, phase: "verifying", downloaded: total, total, speedBytesPerSec: 0 };
-        return { ...current, downloaded, total, speedBytesPerSec };
-      });
-      if (downloaded >= total) clearMockDownloadTimer();
-    }, 75);
   }
 
   async function cancelActiveModDownload() {
@@ -798,21 +747,25 @@ export function App() {
           />
         ) : workspaceView.activeView === "catalog" ? (
           <ModCatalogManager
+            downloadTask={downloadTask}
             loading={loading}
             notifier={notifier}
             progress={modDownloadProgress}
             scan={scan}
             sources={modCatalogSources}
             setLoading={setLoading}
+            onCancelDownloadTask={cancelActiveModDownload}
             onCancelDownload={cancelActiveModDownload}
             onInstall={installCatalogEntry}
           />
         ) : workspaceView.activeView === "everest" ? (
           <EverestManager
+            downloadTask={downloadTask}
             loading={loading}
             mods={scan.otherMods}
             notifier={notifier}
             progress={modDownloadProgress}
+            onCancelDownloadTask={cancelActiveModDownload}
             onCancelDownload={cancelActiveModDownload}
             onInstall={installEverestRelease}
           />

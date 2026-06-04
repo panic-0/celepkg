@@ -980,7 +980,7 @@ button.profile {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto 28px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .profile-manager {

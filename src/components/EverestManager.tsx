@@ -1,14 +1,18 @@
 import { Download, LoaderCircle, RefreshCw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listEverestReleases } from "../api";
+import { DownloadTaskPanel } from "./DownloadTaskPanel";
 import type { AppNotifier, EverestRelease, EverestReleaseList, ModDownloadProgress, ModRecord } from "../types";
+import type { DownloadTask } from "../utils/downloadTask";
 import { readError } from "../utils/format";
 
 type EverestManagerProps = {
+  downloadTask: DownloadTask | null;
   loading: boolean;
   mods: ModRecord[];
   notifier: AppNotifier;
   progress: ModDownloadProgress | null;
+  onCancelDownloadTask: () => void;
   onCancelDownload: () => void;
   onInstall: (release: EverestRelease) => void;
 };
@@ -19,7 +23,16 @@ const channels = [
   { key: "dev", label: "Dev" }
 ];
 
-export function EverestManager({ loading, mods, notifier, progress, onCancelDownload, onInstall }: EverestManagerProps) {
+export function EverestManager({
+  downloadTask,
+  loading,
+  mods,
+  notifier,
+  progress,
+  onCancelDownloadTask,
+  onCancelDownload,
+  onInstall
+}: EverestManagerProps) {
   const [releaseList, setReleaseList] = useState<EverestReleaseList>({ releases: [], warnings: [] });
   const [activeChannel, setActiveChannel] = useState("stable");
   const [loadingReleases, setLoadingReleases] = useState(false);
@@ -89,7 +102,11 @@ export function EverestManager({ loading, mods, notifier, progress, onCancelDown
             </div>
           </div>
 
-          <EverestProgress progress={progress} onCancel={onCancelDownload} />
+          {downloadTask ? (
+            <DownloadTaskPanel task={downloadTask} onCancel={onCancelDownloadTask} />
+          ) : (
+            <EverestProgress progress={progress} onCancel={onCancelDownload} />
+          )}
 
           <div className="everest-release-list">
             {loadingReleases ? (

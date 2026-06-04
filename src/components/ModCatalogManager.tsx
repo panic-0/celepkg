@@ -1,23 +1,38 @@
 import { Download, ExternalLink, Info, PackageCheck, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { searchModCatalog } from "../api";
+import { DownloadTaskPanel } from "./DownloadTaskPanel";
 import { DownloadProgressStrip } from "./DownloadProgressStrip";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModDownloadProgress, ScanResult } from "../types";
+import type { DownloadTask } from "../utils/downloadTask";
 
 type ModCatalogManagerProps = {
+  downloadTask: DownloadTask | null;
   loading: boolean;
   notifier: AppNotifier;
   scan: ScanResult;
   sources: ModCatalogSourceKind[];
   setLoading: (loading: boolean, message?: string) => void;
   progress: ModDownloadProgress | null;
+  onCancelDownloadTask: () => void;
   onCancelDownload: () => void;
   onInstall: (entry: ModCatalogEntry) => void;
 };
 
 const defaultSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror"];
 
-export function ModCatalogManager({ loading, notifier, scan, sources, setLoading, progress, onCancelDownload, onInstall }: ModCatalogManagerProps) {
+export function ModCatalogManager({
+  downloadTask,
+  loading,
+  notifier,
+  scan,
+  sources,
+  setLoading,
+  progress,
+  onCancelDownloadTask,
+  onCancelDownload,
+  onInstall
+}: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
@@ -73,13 +88,17 @@ export function ModCatalogManager({ loading, notifier, scan, sources, setLoading
             <PackageCheck size={17} />
             <h3>目录结果</h3>
           </div>
-          <DownloadProgressStrip
-            className="catalog-download-progress"
-            doneLabel="已安装"
-            errorLabel="安装失败"
-            progress={progress}
-            onCancel={onCancelDownload}
-          />
+          {downloadTask ? (
+            <DownloadTaskPanel task={downloadTask} onCancel={onCancelDownloadTask} />
+          ) : (
+            <DownloadProgressStrip
+              className="catalog-download-progress"
+              doneLabel="已安装"
+              errorLabel="安装失败"
+              progress={progress}
+              onCancel={onCancelDownload}
+            />
+          )}
           <WarningStrip warnings={searchResult.warnings} />
           <div className="catalog-list">
             {searchResult.entries.map((entry) => (
