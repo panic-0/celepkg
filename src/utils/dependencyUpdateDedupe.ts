@@ -1,4 +1,4 @@
-import type { Dependency, ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
+import type { Dependency, EverestRelease, ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
 import { normalizeDependencyName } from "./dependencies";
 
 export type DependencyIssueForDedupe = {
@@ -9,6 +9,7 @@ export type DependencyIssueForDedupe = {
 };
 
 export type DependencyUpdateActionForDedupe =
+  | { kind: "everest"; name: string; release: EverestRelease }
   | { kind: "update"; name: string; candidate: ModUpdateCandidate }
   | { kind: "install"; name: string; entry: ModCatalogEntry };
 
@@ -40,6 +41,9 @@ export function dedupeDependencyActions<T extends DependencyUpdateActionForDedup
 }
 
 export function dependencyActionKey(action: DependencyUpdateActionForDedupe) {
+  if (action.kind === "everest") {
+    return `everest:${action.release.branch}:${action.release.version}`;
+  }
   if (action.kind === "update") {
     return `update:${action.candidate.installed.absolutePath.toLowerCase()}`;
   }
@@ -63,6 +67,7 @@ function stricterDependency(left: Dependency, right: Dependency) {
 }
 
 function actionPriority(action: DependencyUpdateActionForDedupe) {
+  if (action.kind === "everest") return 0;
   return action.kind === "update" ? 0 : 1;
 }
 

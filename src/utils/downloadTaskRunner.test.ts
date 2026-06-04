@@ -83,13 +83,45 @@ describe("download task runner", () => {
     expect(result.status).toBe("done");
   });
 
+  it("adds dependencies during install preparation before installing the target", async () => {
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("target", {
+          prepareInstall: async () => [
+            baseItem("helper", {
+              install: async () => {
+                installed.push("helper");
+              }
+            })
+          ],
+          install: async () => {
+            installed.push("target");
+          }
+        })
+      ],
+      { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const result = await runner.start();
+
+    expect(installed).toEqual(["helper", "target"]);
+    expect(result.items.map((item) => [item.id, item.status])).toEqual([
+      ["target", "installed"],
+      ["helper", "installed"]
+    ]);
+  });
+
   it("skips targets when a dependency install fails", async () => {
     const runner = new DownloadTaskRunner(
       "task",
       [
-        baseItem("helper", { install: async () => {
-          throw new Error("helper failed");
-        } }),
+        baseItem("helper", {
+          install: async () => {
+            throw new Error("helper failed");
+          }
+        }),
         baseItem("map", { dependsOn: ["helper"] })
       ],
       { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }

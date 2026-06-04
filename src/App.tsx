@@ -8,6 +8,7 @@ import {
   downloadModToStaging,
   installStagedEverest,
   installStagedMod,
+  listEverestReleases,
   previewModUpdateMetadata,
   searchModCatalog
 } from "./api";
@@ -43,11 +44,17 @@ import type {
   ModUpdateCheckResult
 } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
-import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "./utils/dependencyUpdateDedupe";
+import { dedupeDependencyActions, dedupeDependencyIssues } from "./utils/dependencyUpdateDedupe";
 import type { DownloadTask } from "./utils/downloadTask";
 import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
 import { createEverestInstallTaskDescriptor } from "./utils/everestTask";
-import { dependenciesIncludeEverest, isEverestDependencyName } from "./utils/everestDependency";
+import {
+  formatEverestBuildVersion,
+  installedEverestBuild,
+  isEverestDependencyName,
+  requiredEverestBuild,
+  selectEverestReleaseForBuild
+} from "./utils/everestDependency";
 import { isDraftEnabled, readError } from "./utils/format";
 import {
   createCatalogInstallTaskDescriptor,
@@ -91,9 +98,9 @@ export function App() {
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
+  const [everestDependencyPrompt, setEverestDependencyPrompt] = useState<EverestDependencyPromptState | null>(null);
   const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
-  const dependencyActionPromises = useRef<Map<string, Promise<boolean>>>(new Map());
   const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
@@ -236,8 +243,12 @@ export function App() {
   async function installEverestRelease(release: EverestRelease) {
     const version = `1.${release.version}.0`;
     if (!window.confirm(`安装 Everest ${version}？安装器会覆盖游戏目录中的 Everest 相关文件。`)) return;
+    await performEverestInstall(release, `正在安装 Everest ${version}...`, `已安装 Everest ${version}`);
+  }
+
+  async function performEverestInstall(release: EverestRelease, message: string, successMessage: string) {
     const descriptor = createEverestInstallTaskDescriptor(release);
-    await runExecutableDownloadTask(
+    return await runExecutableDownloadTask(
       createOperationId("everest-task"),
       [
         {
@@ -249,8 +260,8 @@ export function App() {
           }
         }
       ],
-      `正在安装 Everest ${version}...`,
-      `已安装 Everest ${version}`
+      message,
+      successMessage
     );
   }
 
@@ -260,21 +271,9 @@ export function App() {
     if (!candidates.length) return;
     if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
     completedModUpdatePaths.current.clear();
-    const items = createModUpdateTaskDescriptors(candidates, recordsBeforeUpdate).map<ExecutableDownloadTaskItem>((descriptor) => ({
-      ...descriptor,
-      download: (operationId, taskIndex, taskTotal) =>
-        downloadModToStaging(celestePath, descriptor.candidate.entry, operationId, taskIndex, taskTotal),
-      install: async (staged) => {
-        const result = await installStagedMod(
-          celestePath,
-          staged.stagedId,
-          descriptor.candidate.entry,
-          descriptor.candidate.installed.absolutePath
-        );
-        setScan(result.scan);
-        removeUpdatedCandidate(descriptor.candidate);
-      }
-    }));
+    const items = createModUpdateTaskDescriptors(candidates, recordsBeforeUpdate).map((descriptor) =>
+      createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn)
+    );
     const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
       concurrencyLimit: 3,
       createOperationId: () => createOperationId("mod-update"),
@@ -282,7 +281,6 @@ export function App() {
       onChange: setDownloadTask
     });
     downloadTaskRunner.current = runner;
-    workspaceView.changeActiveView("downloads");
     try {
       setLoading(true, `正在更新 ${items.length} 个 Mod...`);
       const result = await runner.start();
@@ -303,10 +301,6 @@ export function App() {
   }
 
   async function updateModCandidate(candidate: ModUpdateCandidate, batchLabel = "") {
-    const dependencyPlan = await prepareDependencyUpdates(candidate);
-    if (!dependencyPlan) return false;
-    const dependenciesUpdated = await applyDependencyPlan(dependencyPlan);
-    if (!dependenciesUpdated) return false;
     return await performModUpdate(
       candidate,
       batchLabel,
@@ -316,48 +310,78 @@ export function App() {
 
   async function installCatalogEntry(entry: ModCatalogEntry) {
     if (!window.confirm(`安装 ${entry.name}${entry.version ? ` ${entry.version}` : ""}？`)) return;
-    const dependencyPlan = await prepareDependencyInstall(entry);
-    if (!dependencyPlan) return false;
-    const dependenciesUpdated = await applyDependencyPlan(dependencyPlan);
-    if (!dependenciesUpdated) return false;
     return await performCatalogInstall(entry, `正在安装 ${entry.name}...`, `已安装 ${entry.name}`);
   }
 
   async function performModUpdate(candidate: ModUpdateCandidate, batchLabel = "", message = `正在更新 ${candidate.installed.name}...`) {
     void batchLabel;
-    const descriptor = createSingleModUpdateTaskDescriptor(candidate);
     return await runExecutableDownloadTask(
       createOperationId("mod-update-task"),
-      [
-        {
-          ...descriptor,
-          download: (operationId, taskIndex, taskTotal) =>
-            downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
-          install: async (staged) => {
-            const result = await installStagedMod(celestePath, staged.stagedId, candidate.entry, candidate.installed.absolutePath);
-            setScan(result.scan);
-            removeUpdatedCandidate(candidate);
-          }
-        }
-      ],
+      [createModUpdateExecutableItem(candidate)],
       message,
       `已更新 ${candidate.installed.name}`
     );
   }
 
-  async function prepareDependencyUpdates(candidate: ModUpdateCandidate): Promise<DependencyUpdatePlan | null> {
-    return await prepareDependencyPlan(candidate.entry, candidate.installed.name, "更新");
+  function createModUpdateExecutableItem(candidate: ModUpdateCandidate, dependsOn: string[] = []): ExecutableDownloadTaskItem {
+    const descriptor = createSingleModUpdateTaskDescriptor(candidate);
+    return {
+      ...descriptor,
+      dependsOn,
+      download: (operationId, taskIndex, taskTotal) =>
+        downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
+      prepareInstall: async () => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新"),
+      install: async (staged) => {
+        const result = await installStagedMod(celestePath, staged.stagedId, candidate.entry, candidate.installed.absolutePath);
+        setScan(result.scan);
+        removeUpdatedCandidate(candidate);
+      }
+    };
   }
 
-  async function prepareDependencyInstall(entry: ModCatalogEntry): Promise<DependencyUpdatePlan | null> {
-    return await prepareDependencyPlan(entry, entry.name, "安装");
+  function createCatalogInstallExecutableItem(entry: ModCatalogEntry, dependsOn: string[] = []): ExecutableDownloadTaskItem {
+    const descriptor = createCatalogInstallTaskDescriptor(entry);
+    return {
+      ...descriptor,
+      dependsOn,
+      download: (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
+      prepareInstall: async () => await prepareDependencyItems(entry, entry.name, "安装"),
+      install: async (staged) => {
+        const result = await installStagedMod(celestePath, staged.stagedId, entry);
+        setScan(result.scan);
+      }
+    };
   }
 
-  async function prepareDependencyPlan(
+  function createEverestExecutableItem(release: EverestRelease): ExecutableDownloadTaskItem {
+    const descriptor = createEverestInstallTaskDescriptor(release);
+    return {
+      ...descriptor,
+      download: (operationId) => downloadEverestToStaging(celestePath, release, operationId),
+      install: async (staged) => {
+        const result = await installStagedEverest(celestePath, staged.stagedId, release);
+        setScan(result.scan);
+      }
+    };
+  }
+
+  async function prepareDependencyItems(entry: ModCatalogEntry, targetName: string, actionLabel: DependencyActionLabel) {
+    const actions = await prepareDependencyActions(entry, targetName, actionLabel);
+    if (!actions) throw new Error("已取消依赖检查");
+    return actions.map(dependencyActionToExecutableItem);
+  }
+
+  function dependencyActionToExecutableItem(action: DependencyUpdateAction): ExecutableDownloadTaskItem {
+    if (action.kind === "everest") return createEverestExecutableItem(action.release);
+    if (action.kind === "update") return createModUpdateExecutableItem(action.candidate);
+    return createCatalogInstallExecutableItem(action.entry);
+  }
+
+  async function prepareDependencyActions(
     entry: ModCatalogEntry,
     targetName: string,
     actionLabel: DependencyActionLabel
-  ): Promise<DependencyUpdatePlan | null> {
+  ): Promise<DependencyUpdateAction[] | null> {
     let metadata;
     try {
       setLoading(true, `正在检查 ${targetName} 的依赖...`);
@@ -366,23 +390,72 @@ export function App() {
       const message = readError(error);
       notifier.showWarning(message);
       if (!window.confirm(`无法预览 ${targetName} ${actionLabel}后的依赖。仍然继续${actionLabel}？`)) return null;
-      return { actionLabel, choice: "none", issues: [], targetName };
+      return [];
     } finally {
       setLoading(false);
     }
 
-    const issues = dependencyIssuesForMetadata(metadata.dependencies, false).concat(
-      dependencyIssuesForMetadata(metadata.optionalDependencies, true)
+    const everestAction = await resolveEverestDependencyAction(
+      metadata.dependencies.concat(metadata.optionalDependencies),
+      targetName,
+      actionLabel
     );
-    if (!issues.length) return { actionLabel, choice: "none", issues: [], targetName };
+    if (everestAction === false) return null;
+
+    const issues = dependencyIssuesForMetadata(metadata.dependencies, false)
+      .concat(dependencyIssuesForMetadata(metadata.optionalDependencies, true))
+      .filter((issue) => !isEverestDependencyName(issue.dependency.name));
+    if (!issues.length) return everestAction ? [everestAction] : [];
 
     const choice = await requestDependencyChoice(targetName, actionLabel, issues);
     if (!choice) return null;
-    return { actionLabel, choice, issues, targetName };
+    const actions = await resolveDependencyActions({ actionLabel, choice, issues, targetName });
+    if (!actions) return null;
+    return everestAction ? [everestAction, ...actions] : actions;
   }
 
-  async function applyDependencyPlan(plan: DependencyUpdatePlan) {
-    if (plan.choice === "none") return true;
+  async function resolveEverestDependencyAction(
+    dependencies: Dependency[],
+    targetName: string,
+    actionLabel: DependencyActionLabel
+  ): Promise<Extract<DependencyUpdateAction, { kind: "everest" }> | null | false> {
+    const requiredBuild = requiredEverestBuild(dependencies);
+    if (requiredBuild === null) return null;
+    const installedBuild = installedEverestBuild(scan.otherMods);
+    if (installedBuild !== null && installedBuild >= requiredBuild) return null;
+    let release: EverestRelease | null = null;
+    try {
+      setLoading(true, "正在检查 Everest 版本...");
+      const result = await listEverestReleases();
+      release = selectEverestReleaseForBuild(result.releases, requiredBuild);
+      if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+    } catch (error) {
+      notifier.showWarning(readError(error));
+    } finally {
+      setLoading(false);
+    }
+    if (!release) {
+      const requiredVersion = formatEverestBuildVersion(requiredBuild);
+      const installedVersion = installedBuild === null ? "未识别" : formatEverestBuildVersion(installedBuild);
+      return window.confirm(
+        `${targetName} ${actionLabel}需要 Everest ${requiredVersion} 或更高版本，当前版本 ${installedVersion}。\n\n未找到可自动更新的 Everest 版本，仍然继续${actionLabel}？`
+      )
+        ? null
+        : false;
+    }
+    const choice = await requestEverestDependencyChoice({
+      installedBuild,
+      release,
+      requiredBuild,
+      targetName
+    });
+    if (!choice) return false;
+    if (choice === "ignore") return null;
+    return { kind: "everest", name: "Everest", release };
+  }
+
+  async function resolveDependencyActions(plan: DependencyUpdatePlan): Promise<DependencyUpdateAction[] | null> {
+    if (plan.choice === "none") return [];
     const selectedIssues = dedupeDependencyIssues(plan.issues.filter((issue) => !issue.optional || plan.choice === "all"));
     const actions: DependencyUpdateAction[] = [];
     const unavailable: DependencyIssue[] = [];
@@ -394,31 +467,9 @@ export function App() {
     if (unavailable.length) {
       const text = unavailable.map(formatDependencyIssue).join("\n");
       const actionText = plan.actionLabel === "安装" ? "安装" : "覆盖";
-      if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续${actionText}目标 Mod？`)) return false;
+      if (!window.confirm(`以下依赖无法自动更新或安装：\n${text}\n\n仍然继续${actionText}目标 Mod？`)) return null;
     }
-    for (const action of dedupeDependencyActions(actions)) {
-      const result = await runDependencyAction(action);
-      if (!result) return false;
-    }
-    return true;
-  }
-
-  async function runDependencyAction(action: DependencyUpdateAction) {
-    const key = dependencyActionKey(action);
-    const existing = dependencyActionPromises.current.get(key);
-    if (existing) return await existing;
-    const promise =
-      action.kind === "update"
-        ? performModUpdate(action.candidate, "", `正在更新依赖 ${action.name}...`)
-        : performDependencyInstall(action.entry);
-    dependencyActionPromises.current.set(key, promise);
-    try {
-      return await promise;
-    } finally {
-      if (dependencyActionPromises.current.get(key) === promise) {
-        dependencyActionPromises.current.delete(key);
-      }
-    }
+    return dedupeDependencyActions(actions);
   }
 
   function dependencyIssuesForMetadata(dependencies: Dependency[], optional: boolean): DependencyIssue[] {
@@ -471,24 +522,10 @@ export function App() {
     }
   }
 
-  async function performDependencyInstall(entry: ModCatalogEntry) {
-    return await performCatalogInstall(entry, `正在安装依赖 ${entry.name}...`, `已安装依赖 ${entry.name}`);
-  }
-
   async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {
-    const descriptor = createCatalogInstallTaskDescriptor(entry);
     return await runExecutableDownloadTask(
       createOperationId("mod-install-task"),
-      [
-        {
-          ...descriptor,
-          download: (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
-          install: async (staged) => {
-            const result = await installStagedMod(celestePath, staged.stagedId, entry);
-            setScan(result.scan);
-          }
-        }
-      ],
+      [createCatalogInstallExecutableItem(entry)],
       message,
       successMessage
     );
@@ -502,7 +539,6 @@ export function App() {
       onChange: setDownloadTask
     });
     downloadTaskRunner.current = runner;
-    workspaceView.changeActiveView("downloads");
     try {
       setLoading(true, message);
       const result = await runner.start();
@@ -529,6 +565,12 @@ export function App() {
   function requestDependencyChoice(targetName: string, actionLabel: DependencyActionLabel, issues: DependencyIssue[]) {
     return new Promise<DependencyUpdateChoice | null>((resolve) => {
       setDependencyPrompt({ actionLabel, issues, resolve, targetName });
+    });
+  }
+
+  function requestEverestDependencyChoice(prompt: Omit<EverestDependencyPromptState, "resolve">) {
+    return new Promise<EverestDependencyChoice | null>((resolve) => {
+      setEverestDependencyPrompt({ ...prompt, resolve });
     });
   }
 
@@ -783,6 +825,15 @@ export function App() {
           }}
         />
       )}
+      {everestDependencyPrompt && (
+        <EverestDependencyDialog
+          prompt={everestDependencyPrompt}
+          onClose={(choice) => {
+            everestDependencyPrompt.resolve(choice);
+            setEverestDependencyPrompt(null);
+          }}
+        />
+      )}
       <ToastHost notice={notice} onClose={clearNotice} />
     </main>
   );
@@ -794,6 +845,7 @@ function isWorkspaceLoadingMessage(message: string) {
 
 type DependencyUpdateChoice = "none" | "required" | "all";
 type DependencyActionLabel = "安装" | "更新";
+type EverestDependencyChoice = "update" | "ignore";
 
 type DependencyIssue = {
   dependency: Dependency;
@@ -803,6 +855,7 @@ type DependencyIssue = {
 };
 
 type DependencyUpdateAction =
+  | { kind: "everest"; name: string; release: EverestRelease }
   | { kind: "update"; name: string; candidate: ModUpdateCandidate }
   | { kind: "install"; name: string; entry: ModCatalogEntry };
 
@@ -820,6 +873,45 @@ type DependencyPromptState = {
   targetName: string;
 };
 
+type EverestDependencyPromptState = {
+  installedBuild: number | null;
+  release: EverestRelease;
+  requiredBuild: number;
+  resolve: (choice: EverestDependencyChoice | null) => void;
+  targetName: string;
+};
+
+function EverestDependencyDialog({
+  prompt,
+  onClose
+}: {
+  prompt: EverestDependencyPromptState;
+  onClose: (choice: EverestDependencyChoice | null) => void;
+}) {
+  const requiredVersion = formatEverestBuildVersion(prompt.requiredBuild);
+  const installedVersion = prompt.installedBuild === null ? "未识别" : formatEverestBuildVersion(prompt.installedBuild);
+  const updateVersion = formatEverestBuildVersion(prompt.release.version);
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation">
+      <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="everest-dependency-title">
+        <div className="confirm-dialog-heading">
+          <LoaderCircle size={18} />
+          <h3 id="everest-dependency-title">需要更新 Everest</h3>
+        </div>
+        <p>{`${prompt.targetName} 需要 Everest ${requiredVersion} 或更高版本，当前版本 ${installedVersion}。`}</p>
+        <p>{`可以先更新到 Everest ${updateVersion} 后继续，也可以忽略此检查继续。`}</p>
+        <div className="confirm-dialog-actions">
+          <button onClick={() => onClose(null)}>取消</button>
+          <button onClick={() => onClose("ignore")}>忽略继续</button>
+          <button className="confirm-primary-button" onClick={() => onClose("update")}>
+            更新 Everest 后继续
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DependencyUpdateDialog({
   prompt,
   onClose
@@ -829,7 +921,6 @@ function DependencyUpdateDialog({
 }) {
   const requiredCount = prompt.issues.filter((issue) => !issue.optional).length;
   const optionalCount = prompt.issues.length - requiredCount;
-  const includesEverest = dependenciesIncludeEverest(prompt.issues.map((issue) => issue.dependency));
   return (
     <div className="confirm-dialog-backdrop" role="presentation">
       <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dependency-update-title">
@@ -838,7 +929,6 @@ function DependencyUpdateDialog({
           <h3 id="dependency-update-title">{prompt.actionLabel}前依赖检查</h3>
         </div>
         <p>{`${prompt.targetName} ${prompt.actionLabel}后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
-        {includesEverest && <p>其中包含 Everest，选择安装依赖时会一并更新 Everest。</p>}
         <div className="dependency-preview-list">
           {prompt.issues.map((issue) => (
             <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>

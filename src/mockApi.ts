@@ -678,6 +678,7 @@ function createMockCatalog(): ModCatalogEntry[] {
     catalogEntry("wegfan", "Strawberry Jam Collab", "1.2.9", "Map", "https://celeste.weg.fan/api/v2/download/files/sj", [
       "current-sj-hash"
     ]),
+    catalogEntry("everestMirror", "Everest Gate", "1.0.0", "Map", "https://gamebanana.com/mmdl/4444", ["everest-gate-hash"]),
     catalogEntry("wegfan", "Aqua Shrine", "1.0.0", "Map", "https://celeste.weg.fan/api/v2/download/files/aqua", ["aqua-hash"]),
     catalogEntry("everestMirror", "SpeedrunTool", "3.18.2", "Mod", "https://gamebanana.com/mmdl/3333", ["speedrun-hash"])
   ];
@@ -740,6 +741,19 @@ function mockUpdateMetadata(entry: ModCatalogEntry): ModMetadata {
       description: "",
       dependencies: [{ name: "CommunalHelper", version: "1.24.0" }],
       optionalDependencies: [{ name: "SpeedrunTool", version: "3.19.0" }]
+    };
+  }
+  if (entry.name === "Everest Gate") {
+    return {
+      name: entry.name,
+      version: entry.version,
+      author: "Mock Author",
+      description: "",
+      dependencies: [
+        { name: "EverestCore", version: "1.5033.0" },
+        { name: "CommunalHelper", version: "1.24.0" }
+      ],
+      optionalDependencies: []
     };
   }
   return {
@@ -921,7 +935,13 @@ function updateRecord(currentScan: ScanResult, recordId: string, update: (record
   };
 }
 
-function stagedDownload(stagedId: string, name: string, kind: StagedDownload["kind"], size: number | null, hash: string | null): StagedDownload {
+function stagedDownload(
+  stagedId: string,
+  name: string,
+  kind: StagedDownload["kind"],
+  size: number | null,
+  hash: string | null
+): StagedDownload {
   return {
     stagedId: stagedId.replace(/[^a-z0-9_.-]/gi, "_"),
     name,

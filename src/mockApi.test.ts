@@ -30,4 +30,14 @@ describe("mock staged downloads", () => {
     );
     await expect(mockApi.installStagedEverest("D:\\Games\\Celeste", staged.stagedId, release)).rejects.toThrow("staged");
   });
+
+  it("includes a catalog entry that requires a newer Everest build", async () => {
+    const result = await mockApi.searchModCatalog("Everest Gate", ["everestMirror"]);
+    const entry = result.entries.find((item) => item.name === "Everest Gate");
+    expect(entry).toBeTruthy();
+
+    const metadata = await mockApi.previewModUpdateMetadata("D:\\Games\\Celeste", entry!);
+    expect(metadata.dependencies).toContainEqual({ name: "EverestCore", version: "1.5033.0" });
+    expect(metadata.dependencies).toContainEqual({ name: "CommunalHelper", version: "1.24.0" });
+  });
 });

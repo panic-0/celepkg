@@ -12,6 +12,7 @@ import {
 
 export type ExecutableDownloadTaskItem = DownloadTaskItem & {
   download: (operationId: string, taskIndex: number, taskTotal: number) => Promise<StagedDownload>;
+  prepareInstall?: (staged: StagedDownload) => Promise<ExecutableDownloadTaskItem[]>;
   install: (staged: StagedDownload) => Promise<void>;
 };
 
@@ -23,8 +24,9 @@ export type DownloadTaskRunnerOptions = {
 };
 
 export class DownloadTaskRunner {
-  private readonly executableItems: ExecutableDownloadTaskItem[];
+  private executableItems: ExecutableDownloadTaskItem[];
   private readonly stagedByItemId = new Map<string, StagedDownload>();
+  private readonly installPreparedItemIds = new Set<string>();
   private readonly options: DownloadTaskRunnerOptions;
   private activeDownloads = 0;
   private installing = false;
@@ -36,7 +38,12 @@ export class DownloadTaskRunner {
     this.options = options;
     this.task = createDownloadTask(
       id,
-      items.map(({ download, install, ...item }) => item),
+      items.map(({ download, prepareInstall, install, ...item }) => {
+        void download;
+        void prepareInstall;
+        void install;
+        return item;
+      }),
       options.concurrencyLimit
     );
   }
@@ -90,7 +97,11 @@ export class DownloadTaskRunner {
         this.updateItem(itemId, (item) => ({ ...item, status: "downloaded" }));
       }
     } catch (error) {
-      this.updateItem(itemId, (item) => ({ ...item, status: this.task.cancelRequested ? "cancelled" : "downloadFailed", error: readError(error) }));
+      this.updateItem(itemId, (item) => ({
+        ...item,
+        status: this.task.cancelRequested ? "cancelled" : "downloadFailed",
+        error: readError(error)
+      }));
     } finally {
       this.activeDownloads -= 1;
       this.setTask(skipItemsWithFailedDependencies(this.task));
@@ -105,6 +116,30 @@ export class DownloadTaskRunner {
     const executable = this.executableItems.find((candidate) => candidate.id === item.id);
     const staged = this.stagedByItemId.get(item.id);
     if (!executable || !staged) return;
+    if (!this.installPreparedItemIds.has(item.id) && executable.prepareInstall) {
+      this.installing = true;
+      this.updateItem(item.id, (current) => ({ ...current, status: "waitingInstall" }));
+      try {
+        const dependencies = await executable.prepareInstall(staged);
+        this.installPreparedItemIds.add(item.id);
+        const dependencyIds = this.addExecutableItems(dependencies);
+        if (dependencyIds.length) {
+          this.updateItem(item.id, (current) => ({
+            ...current,
+            dependsOn: [...new Set([...(current.dependsOn ?? []), ...dependencyIds])]
+          }));
+        }
+      } catch (error) {
+        this.installPreparedItemIds.add(item.id);
+        this.updateItem(item.id, (current) => ({ ...current, status: "installFailed", error: readError(error) }));
+      } finally {
+        this.installing = false;
+        this.setTask(skipItemsWithFailedDependencies(this.task));
+        this.pump();
+      }
+      return;
+    }
+    this.installPreparedItemIds.add(item.id);
     this.installing = true;
     this.updateItem(item.id, (current) => ({ ...current, status: "installing" }));
     try {
@@ -125,7 +160,9 @@ export class DownloadTaskRunner {
       ["queued", "downloading", "downloaded", "waitingInstall", "installing"].includes(item.status)
     );
     if (incomplete) return;
-    const failed = this.task.items.some((item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped");
+    const failed = this.task.items.some(
+      (item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped"
+    );
     const cancelled = this.task.items.some((item) => item.status === "cancelled");
     const status = cancelled ? "cancelled" : failed ? "failed" : "done";
     if (this.task.status !== status) this.setTask({ ...this.task, status });
@@ -137,6 +174,26 @@ export class DownloadTaskRunner {
       ...this.task,
       items: this.task.items.map((item) => (item.id === id ? update(item) : item))
     });
+  }
+
+  private addExecutableItems(items: ExecutableDownloadTaskItem[]) {
+    const existingIds = new Set(this.executableItems.map((item) => item.id));
+    const newItems = items.filter((item) => !existingIds.has(item.id));
+    if (!newItems.length) return items.map((item) => item.id);
+    this.executableItems = [...this.executableItems, ...newItems];
+    this.setTask({
+      ...this.task,
+      items: [
+        ...this.task.items,
+        ...newItems.map(({ download, prepareInstall, install, ...item }) => {
+          void download;
+          void prepareInstall;
+          void install;
+          return item;
+        })
+      ]
+    });
+    return items.map((item) => item.id);
   }
 
   private updateItemByOperation(operationId: string, update: (item: DownloadTaskItem) => DownloadTaskItem) {
