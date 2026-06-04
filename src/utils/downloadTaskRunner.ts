@@ -280,7 +280,11 @@ export class DownloadTaskRunner {
   private addExecutableItems(items: ExecutableDownloadTaskItem[]) {
     const existingIds = new Set(this.executableItems.map((item) => item.id));
     const newItems = items.filter((item) => !existingIds.has(item.id));
-    if (!newItems.length) return items.map((item) => item.id);
+    const existingItemsWithNewDependencies = items.filter((item) => existingIds.has(item.id) && item.dependsOn?.length);
+    if (!newItems.length) {
+      this.mergeExistingItemDependencies(existingItemsWithNewDependencies);
+      return items.map((item) => item.id);
+    }
     this.executableItems = [...this.executableItems, ...newItems];
     this.setTask({
       ...this.task,
@@ -294,7 +298,24 @@ export class DownloadTaskRunner {
         })
       ]
     });
+    this.mergeExistingItemDependencies(existingItemsWithNewDependencies);
     return items.map((item) => item.id);
+  }
+
+  private mergeExistingItemDependencies(items: ExecutableDownloadTaskItem[]) {
+    if (!items.length) return;
+    const dependenciesById = new Map(items.map((item) => [item.id, item.dependsOn ?? []]));
+    this.setTask({
+      ...this.task,
+      items: this.task.items.map((item) => {
+        const dependencies = dependenciesById.get(item.id);
+        if (!dependencies?.length || item.status === "installed") return item;
+        return {
+          ...item,
+          dependsOn: [...new Set([...(item.dependsOn ?? []), ...dependencies].filter((id) => id !== item.id))]
+        };
+      })
+    });
   }
 
   private updateItemByOperation(operationId: string, update: (item: DownloadTaskItem) => DownloadTaskItem) {

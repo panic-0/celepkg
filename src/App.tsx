@@ -267,13 +267,11 @@ export function App() {
 
   async function updateAllMods() {
     const recordsBeforeUpdate = [...scan.maps, ...scan.otherMods];
-    const candidates = orderUpdatesByDependencyChain([...downloadableModUpdates], recordsBeforeUpdate);
-    if (!candidates.length) return;
-    if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
+    const descriptors = createModUpdateTaskDescriptors(downloadableModUpdates, recordsBeforeUpdate);
+    if (!descriptors.length) return;
+    if (!window.confirm(`更新全部 ${descriptors.length} 个 Mod？`)) return;
     completedModUpdatePaths.current.clear();
-    const items = createModUpdateTaskDescriptors(candidates, recordsBeforeUpdate).map((descriptor) =>
-      createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn)
-    );
+    const items = descriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
     const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
       concurrencyLimit: 3,
       createOperationId: () => createOperationId("mod-update"),
@@ -367,12 +365,25 @@ export function App() {
   async function prepareDependencyItems(entry: ModCatalogEntry, targetName: string, actionLabel: DependencyActionLabel) {
     const actions = await prepareDependencyActions(entry, targetName, actionLabel);
     if (!actions) throw new Error("已取消依赖检查");
-    return actions.map(dependencyActionToExecutableItem);
+    return createDependencyExecutableItems(actions);
   }
 
-  function dependencyActionToExecutableItem(action: DependencyUpdateAction): ExecutableDownloadTaskItem {
+  function createDependencyExecutableItems(actions: DependencyUpdateAction[]): ExecutableDownloadTaskItem[] {
+    const dedupedActions = dedupeDependencyActions(actions);
+    const updateActions = dedupedActions.filter((action): action is Extract<DependencyUpdateAction, { kind: "update" }> => action.kind === "update");
+    const updateDescriptors = createModUpdateTaskDescriptors(
+      updateActions.map((action) => action.candidate),
+      [...scan.maps, ...scan.otherMods]
+    );
+    const updateItems = updateDescriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
+    const nonUpdateItems = dedupedActions
+      .filter((action): action is Exclude<DependencyUpdateAction, { kind: "update" }> => action.kind !== "update")
+      .map(dependencyActionToExecutableItem);
+    return [...nonUpdateItems, ...updateItems];
+  }
+
+  function dependencyActionToExecutableItem(action: Exclude<DependencyUpdateAction, { kind: "update" }>): ExecutableDownloadTaskItem {
     if (action.kind === "everest") return createEverestExecutableItem(action.release);
-    if (action.kind === "update") return createModUpdateExecutableItem(action.candidate);
     return createCatalogInstallExecutableItem(action.entry);
   }
 
@@ -1035,50 +1046,6 @@ function buildInstalledDependencyIndex(records: ModRecord[]) {
     }
   }
   return index;
-}
-
-function orderUpdatesByDependencyChain(candidates: ModUpdateCandidate[], recordsBeforeUpdate: ModRecord[]) {
-  const installedIndex = buildInstalledDependencyIndex(recordsBeforeUpdate);
-  const candidateByRecordId = new Map(candidates.map((candidate) => [candidate.installed.recordId, candidate]));
-  const originalIndex = new Map(candidates.map((candidate, index) => [candidate.installed.recordId, index]));
-  const ordered: ModUpdateCandidate[] = [];
-  const state = new Map<string, "visiting" | "visited">();
-
-  function visit(candidate: ModUpdateCandidate) {
-    const recordId = candidate.installed.recordId;
-    const currentState = state.get(recordId);
-    if (currentState === "visited") return;
-    if (currentState === "visiting") {
-      ordered.push(candidate);
-      state.set(recordId, "visited");
-      return;
-    }
-
-    state.set(recordId, "visiting");
-    const record = recordsBeforeUpdate.find((item) => item.id === recordId);
-    if (record) {
-      const dependencies = record.dependencies
-        .map((dependency) => installedIndex.get(normalizeDependencyName(dependency.name)))
-        .filter((dependencyRecord): dependencyRecord is ModRecord => Boolean(dependencyRecord))
-        .map((dependencyRecord) => candidateByRecordId.get(dependencyRecord.id))
-        .filter((dependencyCandidate): dependencyCandidate is ModUpdateCandidate => Boolean(dependencyCandidate))
-        .sort((left, right) => (originalIndex.get(left.installed.recordId) ?? 0) - (originalIndex.get(right.installed.recordId) ?? 0));
-
-      for (const dependencyCandidate of dependencies) {
-        visit(dependencyCandidate);
-      }
-    }
-    if (state.get(recordId) !== "visited") {
-      state.set(recordId, "visited");
-      ordered.push(candidate);
-    }
-  }
-
-  for (const candidate of candidates) {
-    visit(candidate);
-  }
-
-  return ordered;
 }
 
 function updateCandidateFromRecord(entry: ModCatalogEntry, record: ModRecord): ModUpdateCandidate {

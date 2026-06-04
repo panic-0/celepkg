@@ -113,6 +113,50 @@ describe("download task runner", () => {
     ]);
   });
 
+  it("reuses existing dependency items and merges their dependency edges", async () => {
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("target", {
+          prepareInstall: async () => [
+            baseItem("helper", {
+              dependsOn: ["core"],
+              install: async () => {
+                installed.push("helper");
+              }
+            }),
+            baseItem("core", {
+              install: async () => {
+                installed.push("core");
+              }
+            })
+          ],
+          install: async () => {
+            installed.push("target");
+          }
+        }),
+        baseItem("helper", {
+          install: async () => {
+            installed.push("helper");
+          }
+        })
+      ],
+      { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const result = await runner.start();
+
+    expect(installed).toEqual(["core", "helper", "target"]);
+    expect(result.items.map((item) => item.id)).toEqual(["target", "helper", "core"]);
+    expect(result.items.find((item) => item.id === "helper")?.dependsOn).toEqual(["core"]);
+    expect(result.items.map((item) => [item.id, item.status])).toEqual([
+      ["target", "installed"],
+      ["helper", "installed"],
+      ["core", "installed"]
+    ]);
+  });
+
   it("skips targets when a dependency install fails", async () => {
     const runner = new DownloadTaskRunner(
       "task",
@@ -131,6 +175,32 @@ describe("download task runner", () => {
 
     expect(result.items.find((item) => item.id === "helper")?.status).toBe("installFailed");
     expect(result.items.find((item) => item.id === "map")?.status).toBe("skipped");
+    expect(result.status).toBe("failed");
+  });
+
+  it("skips targets when a dynamically reused dependency fails", async () => {
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("target", {
+          prepareInstall: async () => [baseItem("helper")],
+          install: async () => {
+            throw new Error("target should wait for helper");
+          }
+        }),
+        baseItem("helper", {
+          install: async () => {
+            throw new Error("helper failed");
+          }
+        })
+      ],
+      { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const result = await runner.start();
+
+    expect(result.items.find((item) => item.id === "helper")?.status).toBe("installFailed");
+    expect(result.items.find((item) => item.id === "target")?.status).toBe("skipped");
     expect(result.status).toBe("failed");
   });
 

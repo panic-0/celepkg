@@ -76,6 +76,61 @@ describe("mod update task descriptors", () => {
     ]);
   });
 
+  it("orders chained update candidates before their dependents", () => {
+    const library = record("library", "Library");
+    const helper = record("helper", "Helper", [{ name: "Library", version: "1.0.0" }]);
+    const map = record("map", "Map", [{ name: "Helper", version: "1.0.0" }]);
+
+    const descriptors = createModUpdateTaskDescriptors([candidate(map), candidate(helper), candidate(library)], [library, helper, map]);
+
+    expect(descriptors.map((item) => item.name)).toEqual(["Library", "Helper", "Map"]);
+    expect(descriptors.map((item) => [item.name, item.dependsOn])).toEqual([
+      ["Library", []],
+      ["Helper", [descriptors[0].id]],
+      ["Map", [descriptors[1].id]]
+    ]);
+  });
+
+  it("keeps diamond dependencies before the shared dependent", () => {
+    const core = record("core", "Core");
+    const left = record("left", "Left", [{ name: "Core", version: "1.0.0" }]);
+    const right = record("right", "Right", [{ name: "Core", version: "1.0.0" }]);
+    const map = record("map", "Map", [
+      { name: "Left", version: "1.0.0" },
+      { name: "Right", version: "1.0.0" }
+    ]);
+
+    const descriptors = createModUpdateTaskDescriptors([candidate(map), candidate(right), candidate(left), candidate(core)], [core, left, right, map]);
+
+    expect(descriptors.map((item) => item.name)).toEqual(["Core", "Right", "Left", "Map"]);
+    expect(descriptors[1].dependsOn).toEqual([descriptors[0].id]);
+    expect(descriptors[2].dependsOn).toEqual([descriptors[0].id]);
+    expect(descriptors[3].dependsOn).toEqual([descriptors[2].id, descriptors[1].id]);
+  });
+
+  it("ignores dependencies that are not part of the update batch", () => {
+    const helper = record("helper", "Helper");
+    const map = record("map", "Map", [
+      { name: "Helper", version: "1.0.0" },
+      { name: "Missing", version: "1.0.0" }
+    ]);
+
+    const descriptors = createModUpdateTaskDescriptors([candidate(map)], [helper, map]);
+
+    expect(descriptors).toHaveLength(1);
+    expect(descriptors[0].dependsOn).toEqual([]);
+  });
+
+  it("breaks cyclic update dependencies so the install queue can progress", () => {
+    const left = record("left", "Left", [{ name: "Right", version: "1.0.0" }]);
+    const right = record("right", "Right", [{ name: "Left", version: "1.0.0" }]);
+
+    const descriptors = createModUpdateTaskDescriptors([candidate(left), candidate(right)], [left, right]);
+
+    expect(descriptors.map((item) => item.name)).toEqual(["Right", "Left"]);
+    expect(descriptors.map((item) => item.dependsOn)).toEqual([[], [descriptors[0].id]]);
+  });
+
   it("dedupes candidates that target the same installed file", () => {
     const helper = record("helper", "Helper");
     const duplicate = candidate(helper, "HelperMirror");
