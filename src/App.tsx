@@ -87,6 +87,7 @@ export function App() {
     setLoading,
     setPathInput,
     setScan,
+    startupAutoCheckModUpdatesOnStartup,
     updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
@@ -233,10 +234,19 @@ export function App() {
   );
 
   useEffect(() => {
-    if (startupModUpdateCheckDone.current || !autoCheckModUpdatesOnStartup || loading || !celestePath.trim() || !scan.modsPath) return;
+    if (
+      startupModUpdateCheckDone.current ||
+      !startupAutoCheckModUpdatesOnStartup ||
+      !autoCheckModUpdatesOnStartup ||
+      loading ||
+      !celestePath.trim() ||
+      !scan.modsPath
+    ) {
+      return;
+    }
     startupModUpdateCheckDone.current = true;
     void checkUpdatesForMods("startup");
-  }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, loading, scan.modsPath]);
+  }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, loading, scan.modsPath, startupAutoCheckModUpdatesOnStartup]);
 
   async function updateSingleMod(candidate: ModUpdateCandidate) {
     if (!window.confirm(`更新 ${candidate.installed.name} 到 ${candidate.entry.version || "目录最新版本"}？`)) return;

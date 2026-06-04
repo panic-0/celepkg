@@ -43,6 +43,7 @@ export function useCelePkgData() {
     [modCatalogSourceEnabledCount, modCatalogSourceOrder]
   );
   const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(false);
+  const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(false);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loading, setLoadingState] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -127,6 +128,7 @@ export function useCelePkgData() {
     setModCatalogSourceOrderState(config.modCatalogSourceOrder);
     setModCatalogSourceEnabledCountState(config.modCatalogSourceEnabledCount);
     setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
+    setStartupAutoCheckModUpdatesOnStartup(config.autoCheckModUpdatesOnStartup);
     setScan((current) => ({
       ...(config.celestePath.trim() && !config.warnings.length ? current : emptyScan),
       profiles: config.profiles,
@@ -351,6 +353,7 @@ export function useCelePkgData() {
     setLoading,
     setPathInput,
     setScan,
+    startupAutoCheckModUpdatesOnStartup,
     updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
