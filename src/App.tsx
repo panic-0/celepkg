@@ -42,6 +42,7 @@ import type {
 } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
 import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "./utils/dependencyUpdateDedupe";
+import { dependenciesIncludeEverest, isEverestDependencyName } from "./utils/everestDependency";
 import { isDraftEnabled, readError } from "./utils/format";
 import { isMockMode } from "./mockApi";
 
@@ -917,6 +918,7 @@ function DependencyUpdateDialog({
 }) {
   const requiredCount = prompt.issues.filter((issue) => !issue.optional).length;
   const optionalCount = prompt.issues.length - requiredCount;
+  const includesEverest = dependenciesIncludeEverest(prompt.issues.map((issue) => issue.dependency));
   return (
     <div className="confirm-dialog-backdrop" role="presentation">
       <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dependency-update-title">
@@ -925,6 +927,7 @@ function DependencyUpdateDialog({
           <h3 id="dependency-update-title">{prompt.actionLabel}前依赖检查</h3>
         </div>
         <p>{`${prompt.targetName} ${prompt.actionLabel}后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
+        {includesEverest && <p>其中包含 Everest，选择安装依赖时会一并更新 Everest。</p>}
         <div className="dependency-preview-list">
           {prompt.issues.map((issue) => (
             <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>
@@ -1060,15 +1063,7 @@ function compareNumericVersions(left: number[], right: number[]) {
 
 function isBuiltinDependencyName(name: string) {
   const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return (
-    normalized.startsWith("everest") ||
-    normalized === "celeste" ||
-    normalized === "monocle" ||
-    normalized === "fna" ||
-    normalized === "dotnet" ||
-    normalized === "netframework" ||
-    normalized === "microsoftnetframework"
-  );
+  return isEverestDependencyName(name) || normalized === "celeste" || normalized === "monocle" || normalized === "fna" || normalized === "dotnet" || normalized === "netframework" || normalized === "microsoftnetframework";
 }
 
 const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);
