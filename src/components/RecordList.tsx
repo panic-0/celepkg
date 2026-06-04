@@ -12,9 +12,11 @@ import {
   ToggleLeft,
   ToggleRight
 } from "lucide-react";
+import { DownloadTaskPanel } from "./DownloadTaskPanel";
 import { DownloadProgressStrip } from "./DownloadProgressStrip";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModDownloadProgress, ModRecord, ModUpdateCandidate } from "../types";
+import type { DownloadTask } from "../utils/downloadTask";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
 
@@ -31,6 +33,7 @@ type RecordListProps = {
   scrollMemory: ScrollMemory;
   loading: boolean;
   loadingMessage: string;
+  downloadTask: DownloadTask | null;
   modDownloadBatchLabel: string;
   modDownloadProgress: ModDownloadProgress | null;
   modUpdateCount: number;
@@ -40,6 +43,7 @@ type RecordListProps = {
   onDisableAll: () => void;
   onEnableAll: () => void;
   onCheckModUpdates: () => void;
+  onCancelDownloadTask: () => void;
   onCancelModDownload: () => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
@@ -65,6 +69,7 @@ export function RecordList({
   scrollMemory,
   loading,
   loadingMessage,
+  downloadTask,
   modDownloadBatchLabel,
   modDownloadProgress,
   modUpdateCount,
@@ -74,6 +79,7 @@ export function RecordList({
   onDisableAll,
   onEnableAll,
   onCheckModUpdates,
+  onCancelDownloadTask,
   onCancelModDownload,
   onMapSelect,
   onMapToggle,
@@ -128,7 +134,11 @@ export function RecordList({
           <span>{formatUpdateAllLabel(modUpdateCount)}</span>
         </button>
       </div>
-      <DownloadProgressStrip batchLabel={modDownloadBatchLabel} progress={modDownloadProgress} onCancel={onCancelModDownload} />
+      {downloadTask ? (
+        <DownloadTaskPanel task={downloadTask} onCancel={onCancelDownloadTask} />
+      ) : (
+        <DownloadProgressStrip batchLabel={modDownloadBatchLabel} progress={modDownloadProgress} onCancel={onCancelModDownload} />
+      )}
 
       <div className="record-table-scroll" ref={tableScrollRef}>
         {activeView === "maps" ? (

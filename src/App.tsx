@@ -4,8 +4,10 @@ import {
   cancelModDownload,
   checkModUpdates,
   createOperationId,
+  downloadModToStaging,
   installEverest,
   installMod,
+  installStagedMod,
   previewModUpdateMetadata,
   searchModCatalog,
   updateMod
@@ -42,8 +44,11 @@ import type {
 } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
 import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "./utils/dependencyUpdateDedupe";
+import type { DownloadTask } from "./utils/downloadTask";
+import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
 import { dependenciesIncludeEverest, isEverestDependencyName } from "./utils/everestDependency";
 import { isDraftEnabled, readError } from "./utils/format";
+import { createModUpdateTaskDescriptors } from "./utils/modUpdateTask";
 import { isMockMode } from "./mockApi";
 
 export function App() {
@@ -79,10 +84,12 @@ export function App() {
   } = useCelePkgData();
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
+  const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
   const [modDownloadProgress, setModDownloadProgress] = useState<ModDownloadProgress | null>(null);
   const [modDownloadBatchLabel, setModDownloadBatchLabel] = useState("");
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
   const activeDownloadOperationId = useRef<string | null>(null);
+  const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
   const dependencyActionPromises = useRef<Map<string, Promise<boolean>>>(new Map());
   const startupModUpdateCheckDone = useRef(false);
@@ -120,7 +127,9 @@ export function App() {
       .then(({ listen }) =>
         listen<unknown>("mod-download-progress", (event) => {
           const progress = toModDownloadProgress(event.payload);
-          if (!progress || activeDownloadOperationId.current !== progress.operationId) return;
+          if (!progress) return;
+          downloadTaskRunner.current?.applyProgress(progress.operationId, progress);
+          if (activeDownloadOperationId.current !== progress.operationId) return;
           setModDownloadProgress((current) => ({
             ...progress,
             modName: progress.modName || current?.modName || ""
@@ -262,26 +271,49 @@ export function App() {
     const candidates = orderUpdatesByDependencyChain([...downloadableModUpdates], recordsBeforeUpdate);
     if (!candidates.length) return;
     if (!window.confirm(`更新全部 ${candidates.length} 个 Mod？`)) return;
-    let updatedCount = 0;
     completedModUpdatePaths.current.clear();
-    try {
-      for (const [index, candidate] of candidates.entries()) {
-        if (completedModUpdatePaths.current.has(candidate.installed.absolutePath)) continue;
-        const updated = await performModUpdate(
-          candidate,
-          `${index + 1}/${candidates.length}`,
-          `正在更新 Mod (${index + 1}/${candidates.length})...`,
-          index + 1,
-          candidates.length
+    const items = createModUpdateTaskDescriptors(candidates, recordsBeforeUpdate).map<ExecutableDownloadTaskItem>((descriptor) => ({
+      ...descriptor,
+      download: (operationId, taskIndex, taskTotal) =>
+        downloadModToStaging(celestePath, descriptor.candidate.entry, operationId, taskIndex, taskTotal),
+      install: async (staged) => {
+        const result = await installStagedMod(
+          celestePath,
+          staged.stagedId,
+          descriptor.candidate.entry,
+          descriptor.candidate.installed.absolutePath
         );
-        if (updated) updatedCount += 1;
+        setScan(result.scan);
+        removeUpdatedCandidate(descriptor.candidate);
       }
-      notifier.showSuccess(`已更新 ${updatedCount} 个 Mod`);
+    }));
+    clearMockDownloadTimer();
+    clearProgressClearTimer();
+    activeDownloadOperationId.current = null;
+    setModDownloadBatchLabel("");
+    setModDownloadProgress(null);
+    const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
+      concurrencyLimit: 3,
+      createOperationId: () => createOperationId("mod-update"),
+      cancelOperation: cancelModDownload,
+      onChange: setDownloadTask
+    });
+    downloadTaskRunner.current = runner;
+    try {
+      setLoading(true, `正在更新 ${items.length} 个 Mod...`);
+      const result = await runner.start();
+      const installedCount = result.items.filter((item) => item.status === "installed").length;
+      const failedCount = result.items.filter(
+        (item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped"
+      ).length;
+      if (result.status === "cancelled") notifier.showInfo("已取消更新任务");
+      else if (failedCount) notifier.showWarning(`更新完成，成功 ${installedCount} 个，失败 ${failedCount} 个`);
+      else notifier.showSuccess(`已更新 ${installedCount} 个 Mod`);
     } catch (error) {
       const message = readError(error);
-      markDownloadProgressError();
       notifier.showError(message);
     } finally {
+      if (downloadTaskRunner.current === runner) downloadTaskRunner.current = null;
       setLoading(false);
     }
   }
@@ -608,6 +640,16 @@ export function App() {
   }
 
   async function cancelActiveModDownload() {
+    const runner = downloadTaskRunner.current;
+    if (runner) {
+      try {
+        await runner.cancel();
+        notifier.showInfo("已请求取消当前下载任务");
+      } catch (error) {
+        notifier.showError(readError(error));
+      }
+      return;
+    }
     const operationId = activeDownloadOperationId.current;
     if (!operationId) return;
     try {
@@ -826,6 +868,7 @@ export function App() {
             scrollMemory={scrollMemory}
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
+            downloadTask={downloadTask}
             modDownloadBatchLabel={modDownloadBatchLabel}
             modDownloadProgress={modDownloadProgress}
             modUpdateCount={downloadableModUpdates.length}
@@ -833,6 +876,7 @@ export function App() {
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}
+            onCancelDownloadTask={cancelActiveModDownload}
             onCancelModDownload={cancelActiveModDownload}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
@@ -1063,7 +1107,15 @@ function compareNumericVersions(left: number[], right: number[]) {
 
 function isBuiltinDependencyName(name: string) {
   const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return isEverestDependencyName(name) || normalized === "celeste" || normalized === "monocle" || normalized === "fna" || normalized === "dotnet" || normalized === "netframework" || normalized === "microsoftnetframework";
+  return (
+    isEverestDependencyName(name) ||
+    normalized === "celeste" ||
+    normalized === "monocle" ||
+    normalized === "fna" ||
+    normalized === "dotnet" ||
+    normalized === "netframework" ||
+    normalized === "microsoftnetframework"
+  );
 }
 
 const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);
