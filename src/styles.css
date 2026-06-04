@@ -1529,7 +1529,7 @@ button.profile {
 
 .everest-channel-panel {
   display: grid;
-  grid-template-rows: auto 30px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1594,6 +1594,7 @@ button.profile {
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: 10px;
   align-items: center;
+  min-height: 62px;
   padding: 9px;
   border: 1px solid #dce4ec;
   border-radius: 7px;
