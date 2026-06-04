@@ -203,6 +203,7 @@ export function App() {
     toggleMod: profileDraft.toggleMod
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
+  const showingModRecords = workspaceView.activeView === "mods";
 
   const checkUpdatesForMods = useCallback(
     async (mode: "manual" | "startup" = "manual") => {
@@ -712,29 +713,29 @@ export function App() {
         <WorkspaceNav
           activeView={workspaceView.activeView}
           dependencyModCount={profileDraft.dependencyModDraft.size}
-          enabledFilter={filters.enabledFilter}
+          enabledFilter={showingModRecords ? filters.modEnabledFilter : filters.mapEnabledFilter}
           enabledMapCount={workspaceView.enabledMapCount}
           enabledModCount={workspaceView.enabledModCount}
           helperMapCount={filters.helperMapMods.length}
           mapProfileName={workspaceView.mapProfileName}
           modProfileName={workspaceView.modProfileName}
-          progressFilter={filters.progressFilter}
-          query={filters.query}
-          referenceFilter={filters.referenceFilter}
+          progressFilter={showingModRecords ? filters.modProgressFilter : filters.mapProgressFilter}
+          query={showingModRecords ? filters.modQuery : filters.mapQuery}
+          referenceFilter={filters.modReferenceFilter}
           showHelperMaps={filters.showHelperMaps}
-          sortKey={filters.sortKey}
+          sortKey={filters.mapSortKey}
           mainMode={workspaceView.mainMode}
           mapDetailTab={uiLayout.mapDetailTab}
           mapDetailControls={mapDetailControls}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
           onActiveViewChange={workspaceView.changeActiveView}
-          onEnabledFilterChange={filters.setEnabledFilter}
-          onProgressFilterChange={filters.setProgressFilter}
-          onQueryChange={filters.setQuery}
-          onReferenceFilterChange={filters.setReferenceFilter}
+          onEnabledFilterChange={showingModRecords ? filters.setModEnabledFilter : filters.setMapEnabledFilter}
+          onProgressFilterChange={showingModRecords ? filters.setModProgressFilter : filters.setMapProgressFilter}
+          onQueryChange={showingModRecords ? filters.setModQuery : filters.setMapQuery}
+          onReferenceFilterChange={filters.setModReferenceFilter}
           onShowHelperMapsChange={filters.setShowHelperMaps}
-          onSortKeyChange={filters.setSortKey}
+          onSortKeyChange={filters.setMapSortKey}
         />
 
         {workspaceView.activeView === "profiles" ? (

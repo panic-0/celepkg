@@ -11,12 +11,15 @@ type ModFiltersOptions = {
 };
 
 export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFiltersOptions) {
-  const [query, setQuery] = useState("");
-  const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>("all");
-  const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
-  const [referenceFilter, setReferenceFilter] = useState<ReferenceFilter>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [mapQuery, setMapQuery] = useState("");
+  const [mapEnabledFilter, setMapEnabledFilter] = useState<EnabledFilter>("all");
+  const [mapProgressFilter, setMapProgressFilter] = useState<ProgressFilter>("all");
+  const [mapSortKey, setMapSortKey] = useState<SortKey>("name");
   const [showHelperMaps, setShowHelperMaps] = useState(false);
+  const [modQuery, setModQuery] = useState("");
+  const [modEnabledFilter, setModEnabledFilter] = useState<EnabledFilter>("all");
+  const [modProgressFilter, setModProgressFilter] = useState<ProgressFilter>("all");
+  const [modReferenceFilter, setModReferenceFilter] = useState<ReferenceFilter>("all");
 
   const helperMapMods = useMemo(() => scan.otherMods.filter((modItem) => modItem.subMaps.length > 0), [scan.otherMods]);
   const visibleMapRecords = useMemo(
@@ -26,37 +29,37 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
   const { optionalReferencedModIds, referencedModIds } = useMemo(() => findReferencedModIds(scan), [scan]);
 
   const filteredMaps = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = mapQuery.trim().toLowerCase();
     const maps = visibleMapRecords.filter((map) => {
       const draftEnabled = isDraftEnabled(map, enabledMapDraft, enabledModDraft);
-      if (enabledFilter === "enabled" && !draftEnabled) return false;
-      if (enabledFilter === "disabled" && draftEnabled) return false;
-      if (progressFilter === "completed" && map.completionStatus !== "completed") return false;
-      if (progressFilter === "unfinished" && map.completionStatus !== "unfinished") return false;
-      if (progressFilter === "withStats" && !map.stats) return false;
-      if (progressFilter === "warnings" && !map.warnings.length) return false;
+      if (mapEnabledFilter === "enabled" && !draftEnabled) return false;
+      if (mapEnabledFilter === "disabled" && draftEnabled) return false;
+      if (mapProgressFilter === "completed" && map.completionStatus !== "completed") return false;
+      if (mapProgressFilter === "unfinished" && map.completionStatus !== "unfinished") return false;
+      if (mapProgressFilter === "withStats" && !map.stats) return false;
+      if (mapProgressFilter === "warnings" && !map.warnings.length) return false;
       if (!normalizedQuery) return true;
       return mapSearchText(map).includes(normalizedQuery);
     });
     return [...maps].sort((a, b) => {
-      if (sortKey === "deaths") return (b.stats?.deaths ?? -1) - (a.stats?.deaths ?? -1);
-      if (sortKey === "time") return (b.stats?.timePlayed ?? -1) - (a.stats?.timePlayed ?? -1);
-      if (sortKey === "strawberries") return strawberrySortValue(b) - strawberrySortValue(a);
+      if (mapSortKey === "deaths") return (b.stats?.deaths ?? -1) - (a.stats?.deaths ?? -1);
+      if (mapSortKey === "time") return (b.stats?.timePlayed ?? -1) - (a.stats?.timePlayed ?? -1);
+      if (mapSortKey === "strawberries") return strawberrySortValue(b) - strawberrySortValue(a);
       return a.name.localeCompare(b.name, "zh-Hans-CN");
     });
-  }, [enabledMapDraft, enabledFilter, enabledModDraft, progressFilter, query, sortKey, visibleMapRecords]);
+  }, [enabledMapDraft, enabledModDraft, mapEnabledFilter, mapProgressFilter, mapQuery, mapSortKey, visibleMapRecords]);
 
   const filteredMods = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = modQuery.trim().toLowerCase();
     const mods = scan.otherMods.filter((modItem) => {
       const draftEnabled = modItem.readOnly || enabledModDraft.has(modItem.id);
-      if (enabledFilter === "enabled" && !draftEnabled) return false;
-      if (enabledFilter === "disabled" && draftEnabled) return false;
-      if (progressFilter === "warnings" && !modItem.warnings.length) return false;
+      if (modEnabledFilter === "enabled" && !draftEnabled) return false;
+      if (modEnabledFilter === "disabled" && draftEnabled) return false;
+      if (modProgressFilter === "warnings" && !modItem.warnings.length) return false;
       const isReferenced = referencedModIds.has(modItem.id);
       const isOptionalReferenced = optionalReferencedModIds.has(modItem.id);
-      if (referenceFilter === "unreferenced" && isReferenced && !modItem.favorite) return false;
-      if (referenceFilter === "unreferencedAndOptional" && (isReferenced || isOptionalReferenced) && !modItem.favorite) return false;
+      if (modReferenceFilter === "unreferenced" && isReferenced && !modItem.favorite) return false;
+      if (modReferenceFilter === "unreferencedAndOptional" && (isReferenced || isOptionalReferenced) && !modItem.favorite) return false;
       if (!normalizedQuery) return true;
       return [
         modItem.name,
@@ -70,25 +73,31 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
         .includes(normalizedQuery);
     });
     return [...mods].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-  }, [enabledFilter, enabledModDraft, optionalReferencedModIds, progressFilter, query, referenceFilter, referencedModIds, scan.otherMods]);
+  }, [enabledModDraft, modEnabledFilter, modProgressFilter, modQuery, modReferenceFilter, optionalReferencedModIds, referencedModIds, scan.otherMods]);
 
   return {
-    enabledFilter,
     filteredMaps,
     filteredMods,
     helperMapMods,
-    progressFilter,
-    query,
-    referenceFilter,
+    mapEnabledFilter,
+    mapProgressFilter,
+    mapQuery,
+    mapSortKey,
+    modEnabledFilter,
+    modProgressFilter,
+    modQuery,
+    modReferenceFilter,
     referencedModIds,
-    setEnabledFilter,
-    setProgressFilter,
-    setQuery,
-    setReferenceFilter,
+    setMapEnabledFilter,
+    setMapProgressFilter,
+    setMapQuery,
+    setMapSortKey,
+    setModEnabledFilter,
+    setModProgressFilter,
+    setModQuery,
+    setModReferenceFilter,
     setShowHelperMaps,
-    setSortKey,
     showHelperMaps,
-    sortKey,
     visibleMapRecords
   };
 }
