@@ -295,7 +295,6 @@ export function App() {
       const message = readError(error);
       notifier.showError(message);
     } finally {
-      if (downloadTaskRunner.current === runner) downloadTaskRunner.current = null;
       setLoading(false);
     }
   }
@@ -557,7 +556,6 @@ export function App() {
       notifier.showError(readError(error));
       return false;
     } finally {
-      if (downloadTaskRunner.current === runner) downloadTaskRunner.current = null;
       setLoading(false);
     }
   }
@@ -574,16 +572,75 @@ export function App() {
     });
   }
 
-  async function cancelActiveModDownload() {
+  async function pauseTaskDownloads() {
     const runner = downloadTaskRunner.current;
     if (runner) {
       try {
-        await runner.cancel();
-        notifier.showInfo("已请求取消当前下载任务");
+        await runner.pauseDownloads();
+        notifier.showInfo("已停止下载，新项目会停在待下载列表");
       } catch (error) {
         notifier.showError(readError(error));
       }
-      return;
+    }
+  }
+
+  function resumeTaskDownloads() {
+    const runner = downloadTaskRunner.current;
+    if (!runner) return;
+    runner.resumeDownloads();
+    notifier.showInfo("已恢复下载");
+  }
+
+  function pauseTaskInstalls() {
+    const runner = downloadTaskRunner.current;
+    if (!runner) return;
+    runner.pauseInstalls();
+    notifier.showInfo("已停止安装，新下载完成的项目会停在等待安装列表");
+  }
+
+  function resumeTaskInstalls() {
+    const runner = downloadTaskRunner.current;
+    if (!runner) return;
+    runner.resumeInstalls();
+    notifier.showInfo("已恢复安装");
+  }
+
+  async function cancelTaskDownloads() {
+    const runner = downloadTaskRunner.current;
+    if (!runner) return;
+    try {
+      await runner.cancelPendingDownloads();
+      notifier.showInfo("已取消当前待下载项目");
+    } catch (error) {
+      notifier.showError(readError(error));
+    }
+  }
+
+  function cancelTaskInstalls() {
+    const runner = downloadTaskRunner.current;
+    if (!runner) return;
+    runner.cancelPendingInstalls();
+    notifier.showInfo("已取消当前待安装项目");
+  }
+
+  async function retryFailedDownloadTask() {
+    const runner = downloadTaskRunner.current;
+    if (!runner) return;
+    try {
+      setLoading(true, "正在重试失败任务...");
+      const result = await runner.retryFailed();
+      const installedCount = result.items.filter((item) => item.status === "installed").length;
+      const failedCount = result.items.filter(
+        (item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped"
+      ).length;
+      if (result.status === "running") notifier.showInfo("已将失败项目重新加入重试队列");
+      else if (result.status === "cancelled") notifier.showInfo("已取消重试任务");
+      else if (failedCount) notifier.showWarning(`重试完成，成功 ${installedCount} 个，失败 ${failedCount} 个`);
+      else notifier.showSuccess(`重试完成，成功 ${installedCount} 个`);
+    } catch (error) {
+      notifier.showError(readError(error));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -728,7 +785,16 @@ export function App() {
             onBackupsRefresh={backups.refreshBackups}
           />
         ) : workspaceView.activeView === "downloads" ? (
-          <DownloadManager task={downloadTask} onCancelTask={cancelActiveModDownload} />
+          <DownloadManager
+            task={downloadTask}
+            onPauseDownloads={pauseTaskDownloads}
+            onResumeDownloads={resumeTaskDownloads}
+            onPauseInstalls={pauseTaskInstalls}
+            onResumeInstalls={resumeTaskInstalls}
+            onCancelDownloads={cancelTaskDownloads}
+            onCancelInstalls={cancelTaskInstalls}
+            onRetryFailed={retryFailedDownloadTask}
+          />
         ) : workspaceView.activeView === "catalog" ? (
           <ModCatalogManager
             loading={loading}

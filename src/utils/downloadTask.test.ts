@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   activeDownloadOperationIds,
+  canRetryFailedTask,
   createDownloadTask,
   groupDownloadTaskItems,
+  markPendingDownloadsCancelled,
+  markPendingInstallsCancelled,
   markTaskCancelling,
   selectNextInstallItem,
   selectQueuedItemsForDownload,
@@ -49,6 +52,7 @@ describe("download task model", () => {
 
     expect(selectQueuedItemsForDownload(task).map((entry) => entry.id)).toEqual(["next-1", "next-2"]);
     expect(activeDownloadOperationIds(task)).toEqual(["op-active"]);
+    expect(selectQueuedItemsForDownload({ ...task, downloadPaused: true })).toEqual([]);
   });
 
   it("installs one downloaded item at a time after dependencies are installed", () => {
@@ -59,6 +63,7 @@ describe("download task model", () => {
       "map"
     );
     expect(selectNextInstallItem({ ...task, items: [item("everest", "installing"), item("map", "downloaded", ["everest"])] })).toBeNull();
+    expect(selectNextInstallItem({ ...task, installPaused: true })).toBeNull();
   });
 
   it("cancels queued and waiting items without changing active downloads or installs", () => {
@@ -83,6 +88,44 @@ describe("download task model", () => {
     ]);
     expect(selectQueuedItemsForDownload(cancelling)).toEqual([]);
     expect(selectNextInstallItem(cancelling)).toBeNull();
+  });
+
+  it("cancels current download or install queues without pausing future work", () => {
+    const task = createDownloadTask("task", [
+      { ...item("downloading", "downloading"), operationId: "op-1" },
+      item("queued", "queued"),
+      item("downloaded", "downloaded"),
+      item("waitingInstall", "waitingInstall"),
+      item("installing", "installing")
+    ]);
+
+    const downloadsCancelled = markPendingDownloadsCancelled(task);
+    expect(downloadsCancelled.downloadPaused).toBe(false);
+    expect(downloadsCancelled.items.map((entry) => [entry.id, entry.status])).toEqual([
+      ["downloading", "cancelled"],
+      ["queued", "cancelled"],
+      ["downloaded", "downloaded"],
+      ["waitingInstall", "waitingInstall"],
+      ["installing", "installing"]
+    ]);
+
+    const installsCancelled = markPendingInstallsCancelled(task);
+    expect(installsCancelled.installPaused).toBe(false);
+    expect(installsCancelled.items.map((entry) => [entry.id, entry.status])).toEqual([
+      ["downloading", "downloading"],
+      ["queued", "queued"],
+      ["downloaded", "installFailed"],
+      ["waitingInstall", "installFailed"],
+      ["installing", "installing"]
+    ]);
+  });
+
+  it("allows retrying failed items while a paused task is still running", () => {
+    const task = createDownloadTask("task", [item("failed", "installFailed"), item("waiting", "downloaded")]);
+
+    expect(canRetryFailedTask(task)).toBe(true);
+    expect(canRetryFailedTask({ ...task, items: [item("failed", "installFailed"), item("active", "installing")] })).toBe(false);
+    expect(canRetryFailedTask({ ...task, status: "cancelling" })).toBe(false);
   });
 
   it("skips targets whose dependencies failed", () => {

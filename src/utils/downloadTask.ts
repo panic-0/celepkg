@@ -32,6 +32,8 @@ export type DownloadTask = {
   status: DownloadTaskStatus;
   concurrencyLimit: number;
   cancelRequested: boolean;
+  downloadPaused: boolean;
+  installPaused: boolean;
   items: DownloadTaskItem[];
 };
 
@@ -49,6 +51,8 @@ export function createDownloadTask(id: string, items: DownloadTaskItem[], concur
     status: "running",
     concurrencyLimit: Math.max(1, concurrencyLimit),
     cancelRequested: false,
+    downloadPaused: false,
+    installPaused: false,
     items
   };
 }
@@ -70,7 +74,7 @@ export function activeDownloadOperationIds(task: DownloadTask): string[] {
 }
 
 export function selectQueuedItemsForDownload(task: DownloadTask): DownloadTaskItem[] {
-  if (task.cancelRequested || task.status === "cancelling") return [];
+  if (task.cancelRequested || task.status === "cancelling" || task.downloadPaused) return [];
   const activeCount = task.items.filter((item) => item.status === "downloading").length;
   const availableSlots = Math.max(0, task.concurrencyLimit - activeCount);
   if (availableSlots === 0) return [];
@@ -78,7 +82,7 @@ export function selectQueuedItemsForDownload(task: DownloadTask): DownloadTaskIt
 }
 
 export function selectNextInstallItem(task: DownloadTask): DownloadTaskItem | null {
-  if (task.cancelRequested || task.status === "cancelling") return null;
+  if (task.cancelRequested || task.status === "cancelling" || task.installPaused) return null;
   if (task.items.some((item) => item.status === "installing")) return null;
   const installedIds = new Set(task.items.filter((item) => item.status === "installed").map((item) => item.id));
   return (
@@ -97,6 +101,30 @@ export function markTaskCancelling(task: DownloadTask): DownloadTask {
     items: task.items.map((item) => {
       if (item.status === "queued" || item.status === "downloaded" || item.status === "waitingInstall") {
         return { ...item, status: "cancelled", error: "已取消" };
+      }
+      return item;
+    })
+  };
+}
+
+export function markPendingDownloadsCancelled(task: DownloadTask): DownloadTask {
+  return {
+    ...task,
+    items: task.items.map((item) => {
+      if (item.status === "queued" || item.status === "downloading") {
+        return { ...item, status: "cancelled", operationId: undefined, progress: undefined, error: "已取消下载" };
+      }
+      return item;
+    })
+  };
+}
+
+export function markPendingInstallsCancelled(task: DownloadTask): DownloadTask {
+  return {
+    ...task,
+    items: task.items.map((item) => {
+      if (item.status === "downloaded" || item.status === "waitingInstall") {
+        return { ...item, status: "installFailed", error: "已取消安装" };
       }
       return item;
     })
@@ -130,4 +158,14 @@ export function summarizeDownloadTask(task: DownloadTask) {
     installed: groups.installed.length,
     installFailed: groups.installFailed.length
   };
+}
+
+export function isRetriableTaskItem(item: DownloadTaskItem) {
+  return item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped" || item.status === "cancelled";
+}
+
+export function canRetryFailedTask(task: DownloadTask) {
+  if (task.status === "cancelling") return false;
+  if (!task.items.some(isRetriableTaskItem)) return false;
+  return !task.items.some((item) => item.status === "downloading" || item.status === "installing");
 }

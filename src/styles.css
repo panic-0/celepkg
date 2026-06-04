@@ -1255,6 +1255,14 @@ button.profile {
   color: #203040;
 }
 
+.download-task-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
 .download-task-lists {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
@@ -3386,6 +3394,10 @@ button.profile {
   }
 
   .download-task-header button {
+    width: 100%;
+  }
+
+  .download-task-actions {
     width: 100%;
   }
 

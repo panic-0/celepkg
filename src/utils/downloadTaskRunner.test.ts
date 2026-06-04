@@ -177,4 +177,288 @@ describe("download task runner", () => {
     ]);
     expect(result.status).toBe("cancelled");
   });
+
+  it("pauses downloads without failing queued or active items and resumes later", async () => {
+    const first = deferred<ReturnType<typeof staged>>();
+    const cancelledOperations: string[] = [];
+    const started: string[] = [];
+    let modOneAttempts = 0;
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          download: async () => {
+            modOneAttempts += 1;
+            started.push("mod-1");
+            if (modOneAttempts > 1) return staged("mod-1");
+            return await first.promise;
+          }
+        }),
+        baseItem("mod-2", {
+          download: async () => {
+            started.push("mod-2");
+            return staged("mod-2");
+          }
+        })
+      ],
+      {
+        concurrencyLimit: 1,
+        createOperationId: (item) => `op-${item.id}`,
+        cancelOperation: async (operationId) => {
+          cancelledOperations.push(operationId);
+        }
+      }
+    );
+
+    const done = runner.start();
+    await Promise.resolve();
+    await runner.pauseDownloads();
+    first.reject(new Error("cancelled"));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+
+    expect(cancelledOperations).toEqual(["op-mod-1"]);
+    expect(runner.snapshot().downloadPaused).toBe(true);
+    expect(runner.snapshot().items.map((item) => [item.id, item.status])).toEqual([
+      ["mod-1", "queued"],
+      ["mod-2", "queued"]
+    ]);
+
+    runner.resumeDownloads();
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(started).toEqual(["mod-1", "mod-1", "mod-2"]);
+  });
+
+  it("resumes downloads cleanly when the cancelled operation settles after resume", async () => {
+    const first = deferred<ReturnType<typeof staged>>();
+    const started: string[] = [];
+    let modOneAttempts = 0;
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          download: async () => {
+            modOneAttempts += 1;
+            started.push(`mod-1:${modOneAttempts}`);
+            if (modOneAttempts > 1) return staged("mod-1");
+            return await first.promise;
+          }
+        })
+      ],
+      { concurrencyLimit: 1, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const done = runner.start();
+    await Promise.resolve();
+    await runner.pauseDownloads();
+    runner.resumeDownloads();
+    first.reject(new Error("cancelled"));
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(started).toEqual(["mod-1:1", "mod-1:2"]);
+  });
+
+  it("pauses installs while allowing downloaded items to wait for install", async () => {
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          install: async () => {
+            installed.push("mod-1");
+          }
+        })
+      ],
+      { concurrencyLimit: 1, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const done = runner.start();
+    runner.pauseInstalls();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(runner.snapshot().installPaused).toBe(true);
+    expect(runner.snapshot().items[0].status).toBe("downloaded");
+    expect(installed).toEqual([]);
+
+    runner.resumeInstalls();
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(installed).toEqual(["mod-1"]);
+  });
+
+  it("cancels current downloads into the failure list without pausing future downloads", async () => {
+    const first = deferred<ReturnType<typeof staged>>();
+    const cancelledOperations: string[] = [];
+    const started: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          download: async () => {
+            started.push("mod-1");
+            return await first.promise;
+          }
+        }),
+        baseItem("mod-2", {
+          download: async () => {
+            started.push("mod-2");
+            return staged("mod-2");
+          }
+        })
+      ],
+      {
+        concurrencyLimit: 1,
+        createOperationId: (item) => `op-${item.id}`,
+        cancelOperation: async (operationId) => {
+          cancelledOperations.push(operationId);
+        }
+      }
+    );
+
+    const done = runner.start();
+    await Promise.resolve();
+    await runner.cancelPendingDownloads();
+    first.reject(new Error("cancelled"));
+    const result = await done;
+
+    expect(cancelledOperations).toEqual(["op-mod-1"]);
+    expect(runner.snapshot().downloadPaused).toBe(false);
+    expect(started).toEqual(["mod-1"]);
+    expect(result.status).toBe("cancelled");
+    expect(result.items.map((item) => [item.id, item.status, item.error])).toEqual([
+      ["mod-1", "cancelled", "已取消下载"],
+      ["mod-2", "cancelled", "已取消下载"]
+    ]);
+  });
+
+  it("cancels current install queue without pausing future installs", async () => {
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("target", {
+          prepareInstall: async () => [
+            baseItem("helper", {
+              install: async () => {
+                installed.push("helper");
+              }
+            })
+          ],
+          install: async () => {
+            installed.push("target");
+          }
+        })
+      ],
+      { concurrencyLimit: 1, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const done = runner.start();
+    runner.pauseInstalls();
+    await Promise.resolve();
+    await Promise.resolve();
+    runner.cancelPendingInstalls();
+    runner.resumeInstalls();
+    const result = await done;
+
+    expect(runner.snapshot().installPaused).toBe(false);
+    expect(installed).toEqual([]);
+    expect(result.status).toBe("failed");
+    expect(result.items.map((item) => [item.id, item.status, item.error])).toEqual([["target", "installFailed", "已取消安装"]]);
+  });
+
+  it("retries failed installs while the task is still running but paused", async () => {
+    const installed: string[] = [];
+    let installAttempts = 0;
+    const runnerRef: { current?: DownloadTaskRunner } = {};
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("flaky", {
+          install: async () => {
+            installAttempts += 1;
+            if (installAttempts === 1) {
+              runnerRef.current?.pauseInstalls();
+              throw new Error("install failed");
+            }
+            installed.push("flaky");
+          }
+        }),
+        baseItem("later", {
+          install: async () => {
+            installed.push("later");
+          }
+        })
+      ],
+      { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+    runnerRef.current = runner;
+
+    const done = runner.start();
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+
+    expect(runner.snapshot().status).toBe("running");
+    expect(runner.snapshot().installPaused).toBe(true);
+    expect(runner.snapshot().items.map((item) => [item.id, item.status])).toEqual([
+      ["flaky", "installFailed"],
+      ["later", "downloaded"]
+    ]);
+
+    const retried = await runner.retryFailed();
+    expect(retried.status).toBe("running");
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+    expect(runner.snapshot().items.find((item) => item.id === "flaky")?.status).toBe("downloaded");
+
+    runner.resumeInstalls();
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(installed).toEqual(["flaky", "later"]);
+  });
+
+  it("retries failed items without reinstalling successful items", async () => {
+    let failingDownloadAttempts = 0;
+    let installedSuccessCount = 0;
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("success", {
+          install: async () => {
+            installedSuccessCount += 1;
+            installed.push("success");
+          }
+        }),
+        baseItem("flaky", {
+          download: async () => {
+            failingDownloadAttempts += 1;
+            if (failingDownloadAttempts === 1) throw new Error("network failed");
+            return staged("flaky");
+          },
+          install: async () => {
+            installed.push("flaky");
+          }
+        })
+      ],
+      { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const failed = await runner.start();
+    expect(failed.status).toBe("failed");
+    expect(failed.items.find((item) => item.id === "flaky")?.status).toBe("downloadFailed");
+
+    const retried = await runner.retryFailed();
+
+    expect(retried.status).toBe("done");
+    expect(installedSuccessCount).toBe(1);
+    expect(installed).toEqual(["success", "flaky"]);
+    expect(retried.items.map((item) => [item.id, item.status])).toEqual([
+      ["success", "installed"],
+      ["flaky", "installed"]
+    ]);
+  });
 });

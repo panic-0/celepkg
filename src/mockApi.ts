@@ -271,6 +271,8 @@ export const mockApi = {
     _taskIndex = 1,
     _taskTotal = 1
   ): Promise<StagedDownload> {
+    void _taskIndex;
+    void _taskTotal;
     await delay(300);
     const staged = stagedDownload(`mod-${entry.id || entry.name}-${operationId}`, entry.name, "mod", entry.size, entry.xxHash[0] ?? null);
     stagedDownloads.set(staged.stagedId, staged);
