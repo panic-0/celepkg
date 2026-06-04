@@ -5,7 +5,8 @@ import {
   validateModCatalogSearchResult,
   validateModInstallResult,
   validateModUpdateCheckResult,
-  validateScanResult
+  validateScanResult,
+  validateStagedDownload
 } from "./apiValidation";
 
 const profiles = {
@@ -91,6 +92,34 @@ describe("api validation", () => {
       profiles,
       warnings: ["配置提示"]
     });
+  });
+
+  it("accepts staged download responses", () => {
+    expect(
+      validateStagedDownload({
+        stagedId: "Helper.zip.download",
+        name: "Helper",
+        kind: "mod",
+        size: 1024,
+        hash: "abc"
+      })
+    ).toEqual({
+      stagedId: "Helper.zip.download",
+      name: "Helper",
+      kind: "mod",
+      size: 1024,
+      hash: "abc"
+    });
+
+    expect(() =>
+      validateStagedDownload({
+        stagedId: "Everest.zip.download",
+        name: "Everest",
+        kind: "core",
+        size: null,
+        hash: null
+      })
+    ).toThrow("staged download.kind");
   });
 
   it("rejects config responses with changed field types", () => {

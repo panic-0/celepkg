@@ -22,6 +22,7 @@ import type {
   SaveFileInfo,
   ScanResult,
   ScanTiming,
+  StagedDownload,
   SubMapInfo
 } from "./types";
 
@@ -148,6 +149,17 @@ export function validateModInstallResult(value: unknown): ModInstallResult {
     replacedPath: object.replacedPath === null ? null : stringAt(object.replacedPath, "mod install result.replacedPath"),
     hash: stringAt(object.hash, "mod install result.hash"),
     scan: validateScanResult(object.scan)
+  };
+}
+
+export function validateStagedDownload(value: unknown): StagedDownload {
+  const object = objectAt(value, "staged download");
+  return {
+    stagedId: stringAt(object.stagedId, "staged download.stagedId"),
+    name: stringAt(object.name, "staged download.name"),
+    kind: oneOfAt(object.kind, ["mod", "everest"], "staged download.kind"),
+    size: nullableNumberAt(object.size, "staged download.size"),
+    hash: object.hash === null ? null : stringAt(object.hash, "staged download.hash")
   };
 }
 

@@ -14,7 +14,8 @@ import {
   validateNullableString,
   validateProfilesState,
   validateVoid,
-  validateScanResult
+  validateScanResult,
+  validateStagedDownload
 } from "./apiValidation";
 import { isMockMode, mockApi } from "./mockApi";
 import type {
@@ -32,7 +33,8 @@ import type {
   Profile,
   ProfilesState,
   RestoreScope,
-  ScanResult
+  ScanResult,
+  StagedDownload
 } from "./types";
 
 async function invokeChecked<T>(command: string, validator: (value: unknown) => T, args?: Record<string, unknown>): Promise<T> {
@@ -126,6 +128,20 @@ export async function installEverest(
   return invokeChecked("install_everest", validateEverestInstallResult, { celestePath, release, operationId });
 }
 
+export async function downloadEverestToStaging(
+  celestePath: string,
+  release: EverestRelease,
+  operationId = createOperationId("everest")
+): Promise<StagedDownload> {
+  if (isMockMode()) return mockApi.downloadEverestToStaging(celestePath, release, operationId);
+  return invokeChecked("download_everest_to_staging", validateStagedDownload, { celestePath, release, operationId });
+}
+
+export async function installStagedEverest(celestePath: string, stagedId: string, release: EverestRelease): Promise<EverestInstallResult> {
+  if (isMockMode()) return mockApi.installStagedEverest(celestePath, stagedId, release);
+  return invokeChecked("install_staged_everest", validateEverestInstallResult, { celestePath, stagedId, release });
+}
+
 export async function installMod(
   celestePath: string,
   entry: ModCatalogEntry,
@@ -135,6 +151,27 @@ export async function installMod(
 ): Promise<ModInstallResult> {
   if (isMockMode()) return mockApi.installMod(celestePath, entry);
   return invokeChecked("install_mod", validateModInstallResult, { celestePath, entry, operationId, taskIndex, taskTotal });
+}
+
+export async function downloadModToStaging(
+  celestePath: string,
+  entry: ModCatalogEntry,
+  operationId = createOperationId("install"),
+  taskIndex = 1,
+  taskTotal = 1
+): Promise<StagedDownload> {
+  if (isMockMode()) return mockApi.downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal);
+  return invokeChecked("download_mod_to_staging", validateStagedDownload, { celestePath, entry, operationId, taskIndex, taskTotal });
+}
+
+export async function installStagedMod(
+  celestePath: string,
+  stagedId: string,
+  entry: ModCatalogEntry,
+  installedPath?: string
+): Promise<ModInstallResult> {
+  if (isMockMode()) return mockApi.installStagedMod(celestePath, stagedId, entry, installedPath);
+  return invokeChecked("install_staged_mod", validateModInstallResult, { celestePath, stagedId, entry, installedPath: installedPath ?? null });
 }
 
 export async function updateMod(

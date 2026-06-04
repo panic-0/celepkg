@@ -203,6 +203,14 @@ export type ModInstallResult = {
   scan: ScanResult;
 };
 
+export type StagedDownload = {
+  stagedId: string;
+  name: string;
+  kind: "mod" | "everest";
+  size: number | null;
+  hash: string | null;
+};
+
 export type ModDownloadProgress = {
   operationId: string;
   modName: string;

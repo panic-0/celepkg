@@ -17,6 +17,7 @@ import type {
   ProfilesState,
   RestoreScope,
   ScanResult,
+  StagedDownload,
   SubMapInfo
 } from "./types";
 
@@ -58,6 +59,7 @@ let profiles: ProfilesState = {
 
 let scan = createMockScan();
 const catalogEntries = createMockCatalog();
+const stagedDownloads = new Map<string, StagedDownload>();
 let backups: BackupInfo[] = [
   backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\.celepkg\\backups\\1770048600000000000-auto", true, true),
   backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\.celepkg\\backups\\1770045000000000000-auto", true, false),
@@ -223,6 +225,19 @@ export const mockApi = {
     return clone({ release, scan });
   },
 
+  async downloadEverestToStaging(_celestePath: string, release: EverestRelease, operationId: string): Promise<StagedDownload> {
+    await delay(300);
+    const staged = stagedDownload(`everest-${release.version}-${operationId}`, "Everest", "everest", release.mainFileSize, null);
+    stagedDownloads.set(staged.stagedId, staged);
+    return clone(staged);
+  },
+
+  async installStagedEverest(celestePath: string, stagedId: string, release: EverestRelease): Promise<EverestInstallResult> {
+    requireStagedDownload(stagedId, "everest");
+    stagedDownloads.delete(stagedId);
+    return await this.installEverest(celestePath, release);
+  },
+
   async installMod(celestePath: string, entry: ModCatalogEntry): Promise<ModInstallResult> {
     await delay(900);
     const installed = record({
@@ -247,6 +262,26 @@ export const mockApi = {
       hash: entry.xxHash[0] ?? "mock-hash",
       scan
     });
+  },
+
+  async downloadModToStaging(
+    _celestePath: string,
+    entry: ModCatalogEntry,
+    operationId: string,
+    _taskIndex = 1,
+    _taskTotal = 1
+  ): Promise<StagedDownload> {
+    await delay(300);
+    const staged = stagedDownload(`mod-${entry.id || entry.name}-${operationId}`, entry.name, "mod", entry.size, entry.xxHash[0] ?? null);
+    stagedDownloads.set(staged.stagedId, staged);
+    return clone(staged);
+  },
+
+  async installStagedMod(celestePath: string, stagedId: string, entry: ModCatalogEntry, installedPath?: string): Promise<ModInstallResult> {
+    requireStagedDownload(stagedId, "mod");
+    stagedDownloads.delete(stagedId);
+    if (installedPath) return await this.updateMod(celestePath, entry, installedPath);
+    return await this.installMod(celestePath, entry);
   },
 
   async updateMod(celestePath: string, entry: ModCatalogEntry, installedPath: string): Promise<ModInstallResult> {
@@ -886,10 +921,27 @@ function updateRecord(currentScan: ScanResult, recordId: string, update: (record
   };
 }
 
+function stagedDownload(stagedId: string, name: string, kind: StagedDownload["kind"], size: number | null, hash: string | null): StagedDownload {
+  return {
+    stagedId: stagedId.replace(/[^a-z0-9_.-]/gi, "_"),
+    name,
+    kind,
+    size,
+    hash
+  };
+}
+
+function requireStagedDownload(stagedId: string, kind: StagedDownload["kind"]) {
+  const staged = stagedDownloads.get(stagedId);
+  if (!staged) throw new Error("Mock staged 下载不存在。");
+  if (staged.kind !== kind) throw new Error("Mock staged 下载类型不匹配。");
+  return staged;
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
