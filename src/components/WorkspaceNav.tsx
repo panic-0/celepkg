@@ -2,6 +2,7 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   Archive,
+  Download,
   Gamepad2,
   Mountain,
   PackageSearch,
@@ -110,6 +111,10 @@ export function WorkspaceNav({
         <button className={activeView === "catalog" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("catalog")}>
           <PackageSearch size={18} />
           <span>下载 Mod</span>
+        </button>
+        <button className={activeView === "downloads" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("downloads")}>
+          <Download size={18} />
+          <span>下载管理</span>
         </button>
         <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
           <UserRound size={18} />

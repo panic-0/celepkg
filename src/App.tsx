@@ -12,6 +12,7 @@ import {
   searchModCatalog
 } from "./api";
 import { BackupManager } from "./components/BackupManager";
+import { DownloadManager } from "./components/DownloadManager";
 import { EverestManager } from "./components/EverestManager";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
@@ -89,17 +90,12 @@ export function App() {
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
-  const [modDownloadProgress, setModDownloadProgress] = useState<ModDownloadProgress | null>(null);
-  const [modDownloadBatchLabel, setModDownloadBatchLabel] = useState("");
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
-  const activeDownloadOperationId = useRef<string | null>(null);
   const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
   const dependencyActionPromises = useRef<Map<string, Promise<boolean>>>(new Map());
   const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
-  const mockDownloadTimer = useRef<number | null>(null);
-  const progressClearTimer = useRef<number | null>(null);
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
   const itemWarnings = useMemo(
@@ -133,11 +129,6 @@ export function App() {
           const progress = toModDownloadProgress(event.payload);
           if (!progress) return;
           downloadTaskRunner.current?.applyProgress(progress.operationId, progress);
-          if (activeDownloadOperationId.current !== progress.operationId) return;
-          setModDownloadProgress((current) => ({
-            ...progress,
-            modName: progress.modName || current?.modName || ""
-          }));
         })
       )
       .then((listener) => {
@@ -148,13 +139,6 @@ export function App() {
     return () => {
       disposed = true;
       if (unlisten) unlisten();
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (mockDownloadTimer.current !== null) window.clearInterval(mockDownloadTimer.current);
-      if (progressClearTimer.current !== null) window.clearTimeout(progressClearTimer.current);
     };
   }, []);
 
@@ -291,11 +275,6 @@ export function App() {
         removeUpdatedCandidate(descriptor.candidate);
       }
     }));
-    clearMockDownloadTimer();
-    clearProgressClearTimer();
-    activeDownloadOperationId.current = null;
-    setModDownloadBatchLabel("");
-    setModDownloadProgress(null);
     const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
       concurrencyLimit: 3,
       createOperationId: () => createOperationId("mod-update"),
@@ -303,6 +282,7 @@ export function App() {
       onChange: setDownloadTask
     });
     downloadTaskRunner.current = runner;
+    workspaceView.changeActiveView("downloads");
     try {
       setLoading(true, `正在更新 ${items.length} 个 Mod...`);
       const result = await runner.start();
@@ -515,11 +495,6 @@ export function App() {
   }
 
   async function runExecutableDownloadTask(taskId: string, items: ExecutableDownloadTaskItem[], message: string, successMessage: string) {
-    clearMockDownloadTimer();
-    clearProgressClearTimer();
-    activeDownloadOperationId.current = null;
-    setModDownloadBatchLabel("");
-    setModDownloadProgress(null);
     const runner = new DownloadTaskRunner(taskId, items, {
       concurrencyLimit: 3,
       createOperationId: () => createOperationId("mod-task"),
@@ -527,6 +502,7 @@ export function App() {
       onChange: setDownloadTask
     });
     downloadTaskRunner.current = runner;
+    workspaceView.changeActiveView("downloads");
     try {
       setLoading(true, message);
       const result = await runner.start();
@@ -556,28 +532,6 @@ export function App() {
     });
   }
 
-  function scheduleProgressClear(operationId: string, delay: number) {
-    clearProgressClearTimer();
-    progressClearTimer.current = window.setTimeout(() => {
-      if (activeDownloadOperationId.current !== operationId) return;
-      activeDownloadOperationId.current = null;
-      setModDownloadBatchLabel("");
-      setModDownloadProgress(null);
-    }, delay);
-  }
-
-  function clearMockDownloadTimer() {
-    if (mockDownloadTimer.current === null) return;
-    window.clearInterval(mockDownloadTimer.current);
-    mockDownloadTimer.current = null;
-  }
-
-  function clearProgressClearTimer() {
-    if (progressClearTimer.current === null) return;
-    window.clearTimeout(progressClearTimer.current);
-    progressClearTimer.current = null;
-  }
-
   async function cancelActiveModDownload() {
     const runner = downloadTaskRunner.current;
     if (runner) {
@@ -588,21 +542,6 @@ export function App() {
         notifier.showError(readError(error));
       }
       return;
-    }
-    const operationId = activeDownloadOperationId.current;
-    if (!operationId) return;
-    try {
-      const cancelled = await cancelModDownload(operationId);
-      if (!cancelled) {
-        notifier.showInfo("下载任务已结束或不存在");
-        scheduleProgressClear(operationId, 800);
-        return;
-      }
-      clearMockDownloadTimer();
-      setModDownloadProgress((current) => (current && current.operationId === operationId ? { ...current, phase: "error" } : current));
-      notifier.showInfo("已请求取消当前下载");
-    } catch (error) {
-      notifier.showError(readError(error));
     }
   }
 
@@ -640,6 +579,7 @@ export function App() {
           workspaceView.activeView === "profiles" ||
           workspaceView.activeView === "settings" ||
           workspaceView.activeView === "backups" ||
+          workspaceView.activeView === "downloads" ||
           workspaceView.activeView === "everest" ||
           workspaceView.activeView === "catalog"
             ? "management-view"
@@ -745,30 +685,19 @@ export function App() {
             onBackupsCleanup={backups.cleanupOldAutoBackups}
             onBackupsRefresh={backups.refreshBackups}
           />
+        ) : workspaceView.activeView === "downloads" ? (
+          <DownloadManager task={downloadTask} onCancelTask={cancelActiveModDownload} />
         ) : workspaceView.activeView === "catalog" ? (
           <ModCatalogManager
-            downloadTask={downloadTask}
             loading={loading}
             notifier={notifier}
-            progress={modDownloadProgress}
             scan={scan}
             sources={modCatalogSources}
             setLoading={setLoading}
-            onCancelDownloadTask={cancelActiveModDownload}
-            onCancelDownload={cancelActiveModDownload}
             onInstall={installCatalogEntry}
           />
         ) : workspaceView.activeView === "everest" ? (
-          <EverestManager
-            downloadTask={downloadTask}
-            loading={loading}
-            mods={scan.otherMods}
-            notifier={notifier}
-            progress={modDownloadProgress}
-            onCancelDownloadTask={cancelActiveModDownload}
-            onCancelDownload={cancelActiveModDownload}
-            onInstall={installEverestRelease}
-          />
+          <EverestManager loading={loading} mods={scan.otherMods} notifier={notifier} onInstall={installEverestRelease} />
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
@@ -811,16 +740,11 @@ export function App() {
             scrollMemory={scrollMemory}
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
-            downloadTask={downloadTask}
-            modDownloadBatchLabel={modDownloadBatchLabel}
-            modDownloadProgress={modDownloadProgress}
             modUpdateCount={downloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}
-            onCancelDownloadTask={cancelActiveModDownload}
-            onCancelModDownload={cancelActiveModDownload}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={workspaceView.selectMod}

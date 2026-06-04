@@ -12,11 +12,8 @@ import {
   ToggleLeft,
   ToggleRight
 } from "lucide-react";
-import { DownloadTaskPanel } from "./DownloadTaskPanel";
-import { DownloadProgressStrip } from "./DownloadProgressStrip";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
-import type { ModDownloadProgress, ModRecord, ModUpdateCandidate } from "../types";
-import type { DownloadTask } from "../utils/downloadTask";
+import type { ModRecord, ModUpdateCandidate } from "../types";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
 
@@ -33,9 +30,6 @@ type RecordListProps = {
   scrollMemory: ScrollMemory;
   loading: boolean;
   loadingMessage: string;
-  downloadTask: DownloadTask | null;
-  modDownloadBatchLabel: string;
-  modDownloadProgress: ModDownloadProgress | null;
   modUpdateCount: number;
   modUpdatesByRecordId: Map<string, ModUpdateCandidate>;
   visibleMapCount: number;
@@ -43,8 +37,6 @@ type RecordListProps = {
   onDisableAll: () => void;
   onEnableAll: () => void;
   onCheckModUpdates: () => void;
-  onCancelDownloadTask: () => void;
-  onCancelModDownload: () => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
@@ -69,9 +61,6 @@ export function RecordList({
   scrollMemory,
   loading,
   loadingMessage,
-  downloadTask,
-  modDownloadBatchLabel,
-  modDownloadProgress,
   modUpdateCount,
   modUpdatesByRecordId,
   visibleMapCount,
@@ -79,8 +68,6 @@ export function RecordList({
   onDisableAll,
   onEnableAll,
   onCheckModUpdates,
-  onCancelDownloadTask,
-  onCancelModDownload,
   onMapSelect,
   onMapToggle,
   onModSelect,
@@ -134,12 +121,6 @@ export function RecordList({
           <span>{formatUpdateAllLabel(modUpdateCount)}</span>
         </button>
       </div>
-      {downloadTask ? (
-        <DownloadTaskPanel task={downloadTask} onCancel={onCancelDownloadTask} />
-      ) : (
-        <DownloadProgressStrip batchLabel={modDownloadBatchLabel} progress={modDownloadProgress} onCancel={onCancelModDownload} />
-      )}
-
       <div className="record-table-scroll" ref={tableScrollRef}>
         {activeView === "maps" ? (
           <MapTable

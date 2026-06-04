@@ -318,7 +318,8 @@ h1 {
 .detail-pane,
 .profile-manager,
 .settings-manager,
-.backup-manager {
+.backup-manager,
+.download-manager {
   border: 1px solid #cfd8e2;
   background: #ffffff;
   border-radius: 7px;
@@ -980,7 +981,7 @@ button.profile {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .profile-manager {
@@ -1005,6 +1006,28 @@ button.profile {
   min-width: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.download-manager {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  grid-template-rows: auto auto;
+  overflow: auto;
+  border: 1px solid #cfd8e2;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.download-manager > .download-task-panel {
+  align-self: start;
+  align-content: start;
+  border-bottom: 0;
+}
+
+.download-manager-empty {
+  min-height: 260px;
 }
 
 .mod-catalog-manager {
@@ -3314,6 +3337,7 @@ button.profile {
   .profile-manager,
   .settings-manager,
   .backup-manager,
+  .download-manager,
   .everest-manager {
     min-height: 520px;
   }

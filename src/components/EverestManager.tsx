@@ -1,19 +1,13 @@
-import { Download, LoaderCircle, RefreshCw, X } from "lucide-react";
+import { Download, LoaderCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listEverestReleases } from "../api";
-import { DownloadTaskPanel } from "./DownloadTaskPanel";
-import type { AppNotifier, EverestRelease, EverestReleaseList, ModDownloadProgress, ModRecord } from "../types";
-import type { DownloadTask } from "../utils/downloadTask";
+import type { AppNotifier, EverestRelease, EverestReleaseList, ModRecord } from "../types";
 import { readError } from "../utils/format";
 
 type EverestManagerProps = {
-  downloadTask: DownloadTask | null;
   loading: boolean;
   mods: ModRecord[];
   notifier: AppNotifier;
-  progress: ModDownloadProgress | null;
-  onCancelDownloadTask: () => void;
-  onCancelDownload: () => void;
   onInstall: (release: EverestRelease) => void;
 };
 
@@ -23,16 +17,7 @@ const channels = [
   { key: "dev", label: "Dev" }
 ];
 
-export function EverestManager({
-  downloadTask,
-  loading,
-  mods,
-  notifier,
-  progress,
-  onCancelDownloadTask,
-  onCancelDownload,
-  onInstall
-}: EverestManagerProps) {
+export function EverestManager({ loading, mods, notifier, onInstall }: EverestManagerProps) {
   const [releaseList, setReleaseList] = useState<EverestReleaseList>({ releases: [], warnings: [] });
   const [activeChannel, setActiveChannel] = useState("stable");
   const [loadingReleases, setLoadingReleases] = useState(false);
@@ -102,12 +87,6 @@ export function EverestManager({
             </div>
           </div>
 
-          {downloadTask ? (
-            <DownloadTaskPanel task={downloadTask} onCancel={onCancelDownloadTask} />
-          ) : (
-            <EverestProgress progress={progress} onCancel={onCancelDownload} />
-          )}
-
           <div className="everest-release-list">
             {loadingReleases ? (
               <div className="empty-state compact">
@@ -150,28 +129,6 @@ export function EverestManager({
   );
 }
 
-function EverestProgress({ progress, onCancel }: { progress: ModDownloadProgress | null; onCancel: () => void }) {
-  if (!progress || progress.modName !== "Everest") return <div className="everest-progress-slot" />;
-  const percent =
-    progress.total && progress.total > 0 ? Math.max(0, Math.min(100, Math.round((progress.downloaded / progress.total) * 100))) : null;
-  return (
-    <div className="everest-progress-slot active" aria-live="polite">
-      <div className="everest-progress-copy">
-        <span>{formatProgressText(progress, percent)}</span>
-        {progress.phase === "downloading" && <small>{formatProgressMeta(progress, percent)}</small>}
-        {progress.phase === "downloading" && (
-          <button className="record-download-cancel-button" onClick={onCancel} title="取消下载" type="button">
-            <X size={13} />
-          </button>
-        )}
-      </div>
-      <div className={percent === null && progress.phase === "downloading" ? "record-download-bar indeterminate" : "record-download-bar"}>
-        <span style={{ width: `${progress.phase === "done" ? 100 : (percent ?? 35)}%` }} />
-      </div>
-    </div>
-  );
-}
-
 function formatEverestVersion(version: number) {
   return `1.${version}.0`;
 }
@@ -191,26 +148,4 @@ function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value || "-";
   return date.toLocaleDateString();
-}
-
-function formatProgressText(progress: ModDownloadProgress, percent: number | null) {
-  if (progress.phase === "verifying") return "正在校验 Everest";
-  if (progress.phase === "installing") return "正在安装 Everest";
-  if (progress.phase === "done") return "Everest 安装完成";
-  if (progress.phase === "error") return "Everest 安装失败";
-  return `正在下载 Everest${percent === null ? "" : ` ${percent}%`}`;
-}
-
-function formatProgressMeta(progress: ModDownloadProgress, percent: number | null) {
-  const bytes =
-    percent === null ? formatBytes(progress.downloaded) : `${formatBytes(progress.downloaded)} / ${formatBytes(progress.total ?? 0)}`;
-  const speed = progress.speedBytesPerSec > 0 ? ` · ${formatBytes(progress.speedBytesPerSec)}/s` : "";
-  return `${bytes}${speed}`;
-}
-
-function formatBytes(value: number) {
-  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
-  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${value} B`;
 }

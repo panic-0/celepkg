@@ -1,38 +1,20 @@
 import { Download, ExternalLink, Info, PackageCheck, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { searchModCatalog } from "../api";
-import { DownloadTaskPanel } from "./DownloadTaskPanel";
-import { DownloadProgressStrip } from "./DownloadProgressStrip";
-import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModDownloadProgress, ScanResult } from "../types";
-import type { DownloadTask } from "../utils/downloadTask";
+import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
 
 type ModCatalogManagerProps = {
-  downloadTask: DownloadTask | null;
   loading: boolean;
   notifier: AppNotifier;
   scan: ScanResult;
   sources: ModCatalogSourceKind[];
   setLoading: (loading: boolean, message?: string) => void;
-  progress: ModDownloadProgress | null;
-  onCancelDownloadTask: () => void;
-  onCancelDownload: () => void;
   onInstall: (entry: ModCatalogEntry) => void;
 };
 
 const defaultSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror"];
 
-export function ModCatalogManager({
-  downloadTask,
-  loading,
-  notifier,
-  scan,
-  sources,
-  setLoading,
-  progress,
-  onCancelDownloadTask,
-  onCancelDownload,
-  onInstall
-}: ModCatalogManagerProps) {
+export function ModCatalogManager({ loading, notifier, scan, sources, setLoading, onInstall }: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
@@ -88,17 +70,6 @@ export function ModCatalogManager({
             <PackageCheck size={17} />
             <h3>目录结果</h3>
           </div>
-          {downloadTask ? (
-            <DownloadTaskPanel task={downloadTask} onCancel={onCancelDownloadTask} />
-          ) : (
-            <DownloadProgressStrip
-              className="catalog-download-progress"
-              doneLabel="已安装"
-              errorLabel="安装失败"
-              progress={progress}
-              onCancel={onCancelDownload}
-            />
-          )}
           <WarningStrip warnings={searchResult.warnings} />
           <div className="catalog-list">
             {searchResult.entries.map((entry) => (
@@ -119,9 +90,7 @@ export function ModCatalogManager({
           entry={detailEntry}
           installed={installedNames.has(detailEntry.name.toLowerCase())}
           loading={loading}
-          progress={progress}
           onClose={() => setDetailEntry(null)}
-          onCancelDownload={onCancelDownload}
           onInstall={() => onInstall(detailEntry)}
         />
       )}
@@ -173,17 +142,13 @@ function CatalogEntryDetailDialog({
   entry,
   installed,
   loading,
-  progress,
   onClose,
-  onCancelDownload,
   onInstall
 }: {
   entry: ModCatalogEntry;
   installed: boolean;
   loading: boolean;
-  progress: ModDownloadProgress | null;
   onClose: () => void;
-  onCancelDownload: () => void;
   onInstall: () => void;
 }) {
   return (
@@ -212,13 +177,6 @@ function CatalogEntryDetailDialog({
           <FactRow label="下载地址" value={entry.downloadUrl || "无下载地址"} />
           <FactRow label="来源页面" value={entry.pageUrl || "无来源页面"} />
         </dl>
-        <DownloadProgressStrip
-          className="catalog-detail-progress"
-          doneLabel="已安装"
-          errorLabel="安装失败"
-          progress={progress}
-          onCancel={onCancelDownload}
-        />
         <div className="confirm-dialog-actions">
           {entry.pageUrl && (
             <a className="button-like" href={entry.pageUrl} target="_blank" rel="noreferrer">
