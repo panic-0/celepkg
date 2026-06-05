@@ -4,6 +4,7 @@ import type { ModRecord } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
 import type { ModDetailTab } from "../hooks/useUiLayout";
 import { Info } from "./common";
+import { DependencyReferenceList, LongValue, TabButton } from "./detailCommon";
 
 type ModDetailProps = {
   activeTab: ModDetailTab;
@@ -174,42 +175,11 @@ export function ModDetail({
   );
 }
 
-function DependencyReferenceList({ emptyText, references }: { emptyText: string; references: DependencyReference[] }) {
-  if (!references.length) return <p className="muted">{emptyText}</p>;
-  return (
-    <div className="dependency-list">
-      {references.map((reference) => (
-        <span className="ui-chip" key={reference.id} title={`${reference.name} (${reference.fileName})`}>
-          <strong>{reference.name}</strong>
-          <small>{reference.kind === "map" ? "地图" : "Mod"}</small>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function Metric({ label, tone, value }: { label: string; tone?: "warn"; value: React.ReactNode }) {
   return (
     <span className={tone ? `overview-metric ${tone}` : "overview-metric"}>
       <small>{label}</small>
       <strong>{value}</strong>
     </span>
-  );
-}
-
-function LongValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="ui-long-value long-field">
-      <span>{label}</span>
-      <code title={value}>{value || "-"}</code>
-    </div>
-  );
-}
-
-function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button className={active ? "tab-button active" : "tab-button"} onClick={onClick} role="tab" aria-selected={active}>
-      {children}
-    </button>
   );
 }

@@ -3,7 +3,6 @@ import { Fragment, useMemo } from "react";
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
-import type { DependencyReference } from "../utils/dependencies";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
 import { sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
@@ -16,6 +15,8 @@ import {
 } from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
+import { DependencyReferenceList, LongValue, TabButton } from "./detailCommon";
+import type { DependencyReference } from "../utils/dependencies";
 
 type MapDetailProps = {
   activeTab: MapDetailTab;
@@ -342,20 +343,6 @@ export function MapDetail({
   );
 }
 
-function DependencyReferenceList({ emptyText, references }: { emptyText: string; references: DependencyReference[] }) {
-  if (!references.length) return <p className="muted">{emptyText}</p>;
-  return (
-    <div className="dependency-list">
-      {references.map((reference) => (
-        <span className="ui-chip" key={reference.id} title={`${reference.name} (${reference.fileName})`}>
-          <strong>{reference.name}</strong>
-          <small>{reference.kind === "map" ? "地图" : "Mod"}</small>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDenominator: StrawberryDenominator) {
   const members = subMaps.filter((subMap) => subMapMatchesFolder(subMap, path));
   const statsMembers = members.filter((subMap) => subMap.stats);
@@ -413,15 +400,6 @@ function subMapSidName(sid: string) {
   return sid.split("/").filter(Boolean).at(-1) ?? sid;
 }
 
-function LongValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="ui-long-value long-field">
-      <span>{label}</span>
-      <code title={value}>{value || "-"}</code>
-    </div>
-  );
-}
-
 function LongList({ label, values, emptyText }: { label?: string; values: string[]; emptyText: string }) {
   return (
     <div className="ui-long-value long-list-field">
@@ -438,13 +416,5 @@ function LongList({ label, values, emptyText }: { label?: string; values: string
         <p className="muted">{emptyText}</p>
       )}
     </div>
-  );
-}
-
-function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button className={active ? "tab-button active" : "tab-button"} onClick={onClick} role="tab" aria-selected={active}>
-      {children}
-    </button>
   );
 }
