@@ -5,7 +5,7 @@ use crate::utils::normalize_slash;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zip::ZipArchive;
 
@@ -66,7 +66,7 @@ pub fn restore_backup(
         .iter()
         .filter(|file| should_restore_file(file, normalized_scope))
     {
-        restore_file(&backup_path, file)?;
+        restore_file(&backup_path, celeste_path, file)?;
     }
     Ok(info)
 }
@@ -150,10 +150,14 @@ fn copy_backup_source(backup_path: &Path, source: BackupSource) -> Result<Backup
     })
 }
 
-fn restore_file(backup_path: &Path, file: &BackupFileEntry) -> Result<(), String> {
-    let target = PathBuf::from(&file.target_path);
+fn restore_file(
+    backup_path: &Path,
+    celeste_path: &Path,
+    file: &BackupFileEntry,
+) -> Result<(), String> {
+    let target = restore_target_path(celeste_path, file)?;
     if file.existed {
-        let source = backup_path.join(&file.backup_path);
+        let source = restore_source_path(backup_path, file)?;
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(|error| format!("创建还原目录失败：{error}"))?;
         }
@@ -162,6 +166,62 @@ fn restore_file(backup_path: &Path, file: &BackupFileEntry) -> Result<(), String
         fs::remove_file(target).map_err(|error| format!("移除还原目标失败：{error}"))?;
     }
     Ok(())
+}
+
+fn restore_target_path(celeste_path: &Path, file: &BackupFileEntry) -> Result<PathBuf, String> {
+    let target = PathBuf::from(&file.target_path);
+    if !target.is_absolute() || path_contains_parent_dir(&target) {
+        return Err("备份清单中的还原目标路径无效".to_string());
+    }
+    let allowed_targets = backup_sources(celeste_path)
+        .into_iter()
+        .filter(|source| source.category == file.category && source.label == file.label)
+        .map(|source| source.target)
+        .collect::<Vec<_>>();
+    if allowed_targets
+        .iter()
+        .any(|allowed| paths_match_for_restore(&target, allowed))
+    {
+        Ok(target)
+    } else {
+        Err("备份清单中的还原目标不属于受管文件".to_string())
+    }
+}
+
+fn restore_source_path(backup_path: &Path, file: &BackupFileEntry) -> Result<PathBuf, String> {
+    let relative = PathBuf::from(&file.backup_path);
+    if relative.is_absolute()
+        || path_contains_parent_dir(&relative)
+        || path_has_root_or_prefix(&relative)
+    {
+        return Err("备份清单中的备份文件路径无效".to_string());
+    }
+    let source = backup_path.join(relative);
+    let canonical_backup = backup_path
+        .canonicalize()
+        .map_err(|error| format!("读取备份目录失败：{error}"))?;
+    let canonical_source = source
+        .canonicalize()
+        .map_err(|error| format!("读取备份文件失败：{error}"))?;
+    if !canonical_source.starts_with(&canonical_backup) {
+        return Err("备份文件不在备份快照目录中".to_string());
+    }
+    Ok(canonical_source)
+}
+
+fn path_contains_parent_dir(path: &Path) -> bool {
+    path.components()
+        .any(|component| matches!(component, Component::ParentDir))
+}
+
+fn path_has_root_or_prefix(path: &Path) -> bool {
+    path.components()
+        .any(|component| matches!(component, Component::RootDir | Component::Prefix(_)))
+}
+
+fn paths_match_for_restore(left: &Path, right: &Path) -> bool {
+    normalize_slash(&left.to_string_lossy())
+        .eq_ignore_ascii_case(&normalize_slash(&right.to_string_lossy()))
 }
 
 fn read_backup_info(backup_path: &Path) -> Option<BackupInfo> {
@@ -521,6 +581,66 @@ mod tests {
     }
 
     #[test]
+    fn restore_rejects_manifest_target_outside_managed_files() {
+        let root = temp_root("restore-target");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        let mods = celeste.join("Mods");
+        let outside = root.join("outside.txt");
+        fs::create_dir_all(&mods).expect("mods");
+        write_file(&mods.join("blacklist.txt"), "blacklist-original");
+        write_file(&outside, "outside-original");
+        let backup = create_backup_in(&backups, &celeste, BACKUP_KIND_MANUAL).expect("backup");
+        let mut files = backup.files.clone();
+        files[0].target_path = outside.to_string_lossy().to_string();
+        write_backup_manifest(
+            Path::new(&backup.backup_path),
+            &backup.id,
+            &backup.created_at,
+            &backup.kind,
+            &celeste,
+            files,
+        );
+
+        let error = restore_backup_in(&backups, &backup.id, RESTORE_SCOPE_GAME)
+            .expect_err("tampered target");
+
+        assert!(error.contains("还原目标不属于受管文件"));
+        assert_eq!(
+            fs::read_to_string(&outside).expect("outside"),
+            "outside-original"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn restore_rejects_manifest_backup_path_escape() {
+        let root = temp_root("restore-source");
+        let backups = root.join("backups");
+        let celeste = root.join("Celeste");
+        let mods = celeste.join("Mods");
+        fs::create_dir_all(&mods).expect("mods");
+        write_file(&mods.join("blacklist.txt"), "blacklist-original");
+        let backup = create_backup_in(&backups, &celeste, BACKUP_KIND_MANUAL).expect("backup");
+        let mut files = backup.files.clone();
+        files[0].backup_path = "../outside.txt".to_string();
+        write_backup_manifest(
+            Path::new(&backup.backup_path),
+            &backup.id,
+            &backup.created_at,
+            &backup.kind,
+            &celeste,
+            files,
+        );
+
+        let error = restore_backup_in(&backups, &backup.id, RESTORE_SCOPE_GAME)
+            .expect_err("tampered source");
+
+        assert!(error.contains("备份文件路径无效"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn restore_all_ignores_state_entries_from_old_backups() {
         let entry = BackupFileEntry {
             category: "state".to_string(),
@@ -737,7 +857,7 @@ mod tests {
             .iter()
             .filter(|file| should_restore_file(file, normalized_scope))
         {
-            restore_file(&backup_path, file)?;
+            restore_file(&backup_path, Path::new(&info.celeste_path), file)?;
         }
         Ok(info)
     }
@@ -772,6 +892,28 @@ mod tests {
                 kind: kind.to_string(),
                 celeste_path: celeste_path.to_string_lossy().to_string(),
                 files: vec![],
+                mods: vec![],
+            },
+        )
+        .expect("manifest");
+    }
+
+    fn write_backup_manifest(
+        backup_path: &Path,
+        id: &str,
+        created_at: &str,
+        kind: &str,
+        celeste_path: &Path,
+        files: Vec<BackupFileEntry>,
+    ) {
+        write_json(
+            &backup_path.join("manifest.json"),
+            &BackupManifest {
+                id: id.to_string(),
+                created_at: created_at.to_string(),
+                kind: kind.to_string(),
+                celeste_path: celeste_path.to_string_lossy().to_string(),
+                files,
                 mods: vec![],
             },
         )
