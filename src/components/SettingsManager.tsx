@@ -216,7 +216,12 @@ export function SettingsManager({
                 <PackageSearch size={16} />
                 启动时拉取列表
               </button>
-              <button className="inline-toggle" disabled={catalogCacheRefreshing} onClick={onModCatalogCacheRefresh} title="立即重新拉取并覆盖本地 Mod 列表缓存">
+              <button
+                className="inline-toggle"
+                disabled={catalogCacheRefreshing}
+                onClick={onModCatalogCacheRefresh}
+                title="立即重新拉取并覆盖本地 Mod 列表缓存"
+              >
                 <RefreshCw size={16} className={catalogCacheRefreshing ? "spin-icon" : ""} />
                 刷新列表缓存
               </button>

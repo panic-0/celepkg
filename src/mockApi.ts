@@ -140,7 +140,10 @@ export const mockApi = {
       .filter((entry) => selectedSources.includes(entry.source))
       .filter(
         (entry) =>
-          !needle || `${entry.name} ${entry.version} ${entry.gameBananaType} ${entry.categoryName} ${entry.subCategoryName}`.toLowerCase().includes(needle)
+          !needle ||
+          `${entry.name} ${entry.version} ${entry.gameBananaType} ${entry.categoryName} ${entry.subCategoryName}`
+            .toLowerCase()
+            .includes(needle)
       );
     return clone({
       sources: selectedSources,
@@ -676,14 +679,56 @@ function createMockScan(): ScanResult {
 function createMockCatalog(): ModCatalogEntry[] {
   return [
     catalogEntry("everestMirror", "CommunalHelper", "1.24.3", "Mod", "https://gamebanana.com/mmdl/1111", ["new-communal-hash"], "Helpers"),
-    catalogEntry("everestMirror", "Galactica", "2.1.0", "Mod", "https://gamebanana.com/mmdl/2222", ["new-galactica-hash"], "Maps", "Campaign"),
-    catalogEntry("wegfan", "Strawberry Jam Collab", "1.2.9", "Mod", "https://celeste.weg.fan/api/v2/download/files/sj", [
-      "current-sj-hash"
-    ], "Maps", "Campaign"),
-    catalogEntry("everestMirror", "Everest Gate", "1.0.0", "Mod", "https://gamebanana.com/mmdl/4444", ["everest-gate-hash"], "Maps", "Standalone"),
-    catalogEntry("wegfan", "Aqua Shrine", "1.0.0", "Mod", "https://celeste.weg.fan/api/v2/download/files/aqua", ["aqua-hash"], "Maps", "Standalone"),
+    catalogEntry(
+      "everestMirror",
+      "Galactica",
+      "2.1.0",
+      "Mod",
+      "https://gamebanana.com/mmdl/2222",
+      ["new-galactica-hash"],
+      "Maps",
+      "Campaign"
+    ),
+    catalogEntry(
+      "wegfan",
+      "Strawberry Jam Collab",
+      "1.2.9",
+      "Mod",
+      "https://celeste.weg.fan/api/v2/download/files/sj",
+      ["current-sj-hash"],
+      "Maps",
+      "Campaign"
+    ),
+    catalogEntry(
+      "everestMirror",
+      "Everest Gate",
+      "1.0.0",
+      "Mod",
+      "https://gamebanana.com/mmdl/4444",
+      ["everest-gate-hash"],
+      "Maps",
+      "Standalone"
+    ),
+    catalogEntry(
+      "wegfan",
+      "Aqua Shrine",
+      "1.0.0",
+      "Mod",
+      "https://celeste.weg.fan/api/v2/download/files/aqua",
+      ["aqua-hash"],
+      "Maps",
+      "Standalone"
+    ),
     catalogEntry("everestMirror", "SpeedrunTool", "3.18.2", "Mod", "https://gamebanana.com/mmdl/3333", ["speedrun-hash"], "Tools"),
-    catalogEntry("wegfan", "Loading time optimizer", "0.1.0", "Mod", "https://celeste.weg.fan/api/v2/download/files/loading", ["loading-hash"], "Other/Misc")
+    catalogEntry(
+      "wegfan",
+      "Loading time optimizer",
+      "0.1.0",
+      "Mod",
+      "https://celeste.weg.fan/api/v2/download/files/loading",
+      ["loading-hash"],
+      "Other/Misc"
+    )
   ];
 }
 

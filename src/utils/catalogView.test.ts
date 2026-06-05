@@ -92,7 +92,9 @@ describe("catalog view model", () => {
 
     expect(filterCatalogEntryViews(views, { ...allFilters, type: "maps" }).map((view) => view.entry.name)).toEqual(["Map Entry"]);
     expect(filterCatalogEntryViews(views, { ...allFilters, type: "tools" }).map((view) => view.entry.name)).toEqual(["Tool Entry"]);
-    expect(filterCatalogEntryViews(views, { ...allFilters, source: "everestMirror" }).map((view) => view.entry.name)).toEqual(["Map Entry"]);
+    expect(filterCatalogEntryViews(views, { ...allFilters, source: "everestMirror" }).map((view) => view.entry.name)).toEqual([
+      "Map Entry"
+    ]);
     expect(filterCatalogEntryViews(views, { ...allFilters, install: "installed" }).map((view) => view.entry.name)).toEqual([
       "Installed Helper"
     ]);
@@ -120,11 +122,7 @@ describe("catalog view model", () => {
 
   it("sorts by update time, name, and size", () => {
     const views = buildCatalogEntryViews(
-      [
-        entry("B", { lastUpdate: 1, size: 10 }),
-        entry("A", { lastUpdate: 3, size: 30 }),
-        entry("C", { lastUpdate: 2, size: 20 })
-      ],
+      [entry("B", { lastUpdate: 1, size: 10 }), entry("A", { lastUpdate: 3, size: 30 }), entry("C", { lastUpdate: 2, size: 20 })],
       [],
       null,
       ""

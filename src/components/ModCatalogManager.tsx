@@ -33,15 +33,7 @@ const defaultFilters: CatalogFilters = {
   downloadableOnly: false
 };
 
-export function ModCatalogManager({
-  downloadTask,
-  loading,
-  notifier,
-  scan,
-  sources,
-  onInstall,
-  onRetryFailed
-}: ModCatalogManagerProps) {
+export function ModCatalogManager({ downloadTask, loading, notifier, scan, sources, onInstall, onRetryFailed }: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
@@ -56,8 +48,13 @@ export function ModCatalogManager({
     [downloadTask, query, scan.maps, scan.otherMods, searchResult.entries]
   );
   const typeOptions = useMemo(() => catalogTypeOptions(allViews), [allViews]);
-  const visibleViews = useMemo(() => sortCatalogEntryViews(filterCatalogEntryViews(allViews, filters), sortKey), [allViews, filters, sortKey]);
-  const detailView = detailEntry ? allViews.find((view) => view.entry.source === detailEntry.source && view.entry.id === detailEntry.id) ?? null : null;
+  const visibleViews = useMemo(
+    () => sortCatalogEntryViews(filterCatalogEntryViews(allViews, filters), sortKey),
+    [allViews, filters, sortKey]
+  );
+  const detailView = detailEntry
+    ? (allViews.find((view) => view.entry.source === detailEntry.source && view.entry.id === detailEntry.id) ?? null)
+    : null;
   const activeSourceLabels = sourceList.map(sourceLabel).join("、");
 
   useEffect(() => {
@@ -217,7 +214,10 @@ function CatalogEntryRow({
   const entry = view.entry;
   const installDisabled = loading || view.installed || view.queued || !view.downloadable;
   return (
-    <article className={`catalog-row catalog-row-clickable ${view.queued ? "queued-row" : ""} ${view.failed ? "failed-row" : ""}`} onClick={onOpenDetail}>
+    <article
+      className={`catalog-row catalog-row-clickable ${view.queued ? "queued-row" : ""} ${view.failed ? "failed-row" : ""}`}
+      onClick={onOpenDetail}
+    >
       <div className="catalog-row-main">
         <strong title={entry.name}>{entry.name}</strong>
         <span>{sourceLabel(entry.source)}</span>
@@ -322,7 +322,9 @@ function CatalogDownloadSummary({ task }: { task: DownloadTask | null }) {
   if (!task?.items.length) return null;
   const modItems = task.items.filter((item) => item.kind === "mod");
   if (!modItems.length) return null;
-  const active = modItems.filter((item) => ["queued", "downloading", "downloaded", "waitingInstall", "installing"].includes(item.status)).length;
+  const active = modItems.filter((item) =>
+    ["queued", "downloading", "downloaded", "waitingInstall", "installing"].includes(item.status)
+  ).length;
   const failed = modItems.filter((item) => ["downloadFailed", "installFailed", "cancelled", "skipped"].includes(item.status)).length;
   const done = modItems.filter((item) => item.status === "installed").length;
   return (

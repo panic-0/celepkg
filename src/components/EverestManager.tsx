@@ -33,22 +33,25 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
     [activeChannel, releaseList.releases]
   );
 
-  const refreshReleases = useCallback(async (forceRefresh = true) => {
-    if (!forceRefresh && everestReleaseCache) {
-      setReleaseList(everestReleaseCache);
-      return;
-    }
-    setLoadingReleases(!everestReleaseCache || forceRefresh);
-    try {
-      const result = await loadEverestReleaseList(forceRefresh);
-      setReleaseList(result);
-      if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
-    } catch (error) {
-      notifier.showError(readError(error));
-    } finally {
-      setLoadingReleases(false);
-    }
-  }, [notifier]);
+  const refreshReleases = useCallback(
+    async (forceRefresh = true) => {
+      if (!forceRefresh && everestReleaseCache) {
+        setReleaseList(everestReleaseCache);
+        return;
+      }
+      setLoadingReleases(!everestReleaseCache || forceRefresh);
+      try {
+        const result = await loadEverestReleaseList(forceRefresh);
+        setReleaseList(result);
+        if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+      } catch (error) {
+        notifier.showError(readError(error));
+      } finally {
+        setLoadingReleases(false);
+      }
+    },
+    [notifier]
+  );
 
   useEffect(() => {
     void refreshReleases(false);

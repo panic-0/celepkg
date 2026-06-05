@@ -14,14 +14,7 @@ export type CatalogFilters = {
   downloadableOnly: boolean;
 };
 
-export type CatalogEntryState =
-  | "notInstalled"
-  | "installed"
-  | "queued"
-  | "downloading"
-  | "waitingInstall"
-  | "installing"
-  | "failed";
+export type CatalogEntryState = "notInstalled" | "installed" | "queued" | "downloading" | "waitingInstall" | "installing" | "failed";
 
 export type CatalogEntryView = {
   entry: ModCatalogEntry;
@@ -129,7 +122,12 @@ function catalogEntryState(entry: ModCatalogEntry, installedAliases: Set<string>
     if (taskItem.status === "downloading") return "downloading";
     if (taskItem.status === "downloaded" || taskItem.status === "waitingInstall") return "waitingInstall";
     if (taskItem.status === "installing") return "installing";
-    if (taskItem.status === "downloadFailed" || taskItem.status === "installFailed" || taskItem.status === "cancelled" || taskItem.status === "skipped") {
+    if (
+      taskItem.status === "downloadFailed" ||
+      taskItem.status === "installFailed" ||
+      taskItem.status === "cancelled" ||
+      taskItem.status === "skipped"
+    ) {
       return "failed";
     }
   }
