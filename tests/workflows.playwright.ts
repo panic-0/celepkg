@@ -80,3 +80,59 @@ test("settings save-file and catalog-cache actions show persistent feedback", as
   await page.getByRole("button", { name: "刷新列表缓存" }).click();
   await expect(page.getByText(/已刷新 \d+ 个 Mod 数据源缓存。|Mock：官方指针源暂时较慢/)).toBeVisible();
 });
+
+test("backup manager creates, restores, and deletes mock backups", async ({ page }) => {
+  await openMock(page);
+  await openNav(page, "备份还原");
+
+  await expect(page.getByRole("heading", { name: "备份还原" })).toBeVisible();
+  const initialBackupCount = await page.locator(".backup-item").count();
+  const backupManager = page.locator(".backup-manager");
+
+  await backupManager.getByRole("button", { name: "备份", exact: true }).click();
+  await expect(page.getByText(/已创建备份：/)).toBeVisible();
+  await expect(page.locator(".backup-item")).toHaveCount(initialBackupCount + 1);
+
+  const newestBackup = page.locator(".backup-item").first();
+  await newestBackup.getByRole("button", { name: "还原启用状态" }).click();
+  const restoreDialog = page.getByRole("dialog", { name: "还原启用状态" });
+  await expect(restoreDialog).toBeVisible();
+  await restoreDialog.getByRole("button", { name: "确认还原启用状态" }).click();
+  await expect(page.getByText("已还原游戏文件。")).toBeVisible();
+
+  await newestBackup.getByRole("button", { name: "删除" }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "删除备份" });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "删除" }).click();
+  await expect(page.getByText("已删除备份。")).toBeVisible();
+  await expect(page.locator(".backup-item")).toHaveCount(initialBackupCount);
+});
+
+test("download manager pauses, cancels, and retries failed mock update tasks", async ({ page }) => {
+  await openMock(page);
+
+  await page.getByRole("button", { name: "其他 Mod" }).click();
+  await page.getByRole("button", { name: "检查更新" }).click();
+  await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
+
+  await page.getByRole("button", { name: /更新全部/ }).click();
+  const updateDialog = page.getByRole("dialog", { name: "批量更新 Mod" });
+  await expect(updateDialog).toBeVisible();
+  await updateDialog.getByRole("button", { name: "更新全部" }).click();
+
+  await openNav(page, "下载管理");
+  await expect(page.getByRole("heading", { name: "下载管理" })).toBeVisible();
+  await expect(page.locator(".download-task-panel")).toContainText(/下载中 [1-9]/);
+
+  await page.getByRole("button", { name: "停止下载" }).click();
+  await expect(page.getByRole("button", { name: "恢复下载" })).toBeVisible();
+  await page.getByRole("button", { name: "恢复下载" }).click();
+  await expect(page.getByRole("button", { name: "停止下载" })).toBeVisible();
+
+  await page.getByRole("button", { name: "取消下载" }).click();
+  await expect(page.locator(".download-task-panel")).toContainText(/下载失败 [1-9]/);
+  await page.waitForTimeout(500);
+
+  await page.getByRole("button", { name: "重试失败" }).click();
+  await expect(page.locator(".download-task-panel")).toContainText(/下载中 [1-9]|成功 [1-9]/, { timeout: 5000 });
+});
