@@ -113,6 +113,7 @@ export type ConfigResponse = {
   modCatalogSourceOrder: ModCatalogSourceKind[];
   modCatalogSourceEnabledCount: number;
   autoCheckModUpdatesOnStartup: boolean;
+  autoRefreshModCatalogCacheOnStartup: boolean;
   selectedSaveFiles: string[];
   profiles: ProfilesState;
   warnings: string[];

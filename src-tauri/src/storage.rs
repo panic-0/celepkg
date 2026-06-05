@@ -26,6 +26,8 @@ pub struct AppState {
     pub mod_catalog_source_enabled_count: usize,
     #[serde(default = "default_auto_check_mod_updates_on_startup")]
     pub auto_check_mod_updates_on_startup: bool,
+    #[serde(default = "default_auto_refresh_mod_catalog_cache_on_startup")]
+    pub auto_refresh_mod_catalog_cache_on_startup: bool,
     #[serde(default = "default_selected_save_files")]
     pub selected_save_files: Vec<String>,
     #[serde(default)]
@@ -164,6 +166,8 @@ fn default_state() -> AppState {
         mod_catalog_source_order: default_mod_catalog_source_order(),
         mod_catalog_source_enabled_count: default_mod_catalog_source_enabled_count(),
         auto_check_mod_updates_on_startup: default_auto_check_mod_updates_on_startup(),
+        auto_refresh_mod_catalog_cache_on_startup:
+            default_auto_refresh_mod_catalog_cache_on_startup(),
         selected_save_files: default_selected_save_files(),
         protected_record_ids: vec![],
         profiles: vec![
@@ -345,6 +349,10 @@ fn default_auto_check_mod_updates_on_startup() -> bool {
     false
 }
 
+fn default_auto_refresh_mod_catalog_cache_on_startup() -> bool {
+    true
+}
+
 fn default_selected_save_files() -> Vec<String> {
     vec!["0.celeste".to_string()]
 }
@@ -364,6 +372,12 @@ pub fn scan_cache_path(celeste_path: &Path) -> PathBuf {
         "{}.json",
         stable_id(&celeste_path.to_string_lossy().to_lowercase())
     ))
+}
+
+pub fn mod_catalog_cache_path(source: ModCatalogSourceKind) -> PathBuf {
+    app_dir()
+        .join("mod-catalog-cache")
+        .join(format!("{source:?}.json").to_ascii_lowercase())
 }
 
 pub fn read_json<T: for<'de> Deserialize<'de>>(file: &Path) -> Option<T> {
@@ -448,6 +462,7 @@ mod tests {
         );
         assert_eq!(state.mod_catalog_source_enabled_count, 2);
         assert!(!state.auto_check_mod_updates_on_startup);
+        assert!(state.auto_refresh_mod_catalog_cache_on_startup);
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
         assert_eq!(state.profiles.len(), 2);

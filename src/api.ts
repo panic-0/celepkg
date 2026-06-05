@@ -84,6 +84,11 @@ export async function setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStart
   return invokeChecked("set_auto_check_mod_updates_on_startup", validateConfigResponse, { autoCheckModUpdatesOnStartup });
 }
 
+export async function setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup: boolean): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup);
+  return invokeChecked("set_auto_refresh_mod_catalog_cache_on_startup", validateConfigResponse, { autoRefreshModCatalogCacheOnStartup });
+}
+
 export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
   if (isMockMode()) return mockApi.setSelectedSaveFiles(saveFiles);
   return invokeChecked("set_selected_save_files", validateConfigResponse, { saveFiles });
@@ -102,6 +107,11 @@ export async function rescanCeleste(celestePath: string): Promise<ScanResult> {
 export async function searchModCatalog(query: string, sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
   if (isMockMode()) return mockApi.searchModCatalog(query, sources);
   return invokeChecked("search_mod_catalog", validateModCatalogSearchResult, { query, sources });
+}
+
+export async function refreshModCatalogCache(sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
+  if (isMockMode()) return mockApi.refreshModCatalogCache(sources);
+  return invokeChecked("refresh_mod_catalog_cache", validateModCatalogSearchResult, { sources });
 }
 
 export async function checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {

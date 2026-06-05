@@ -40,6 +40,10 @@ export function validateConfigResponse(value: unknown): ConfigResponse {
     ),
     modCatalogSourceEnabledCount: numberAt(object.modCatalogSourceEnabledCount, "config.modCatalogSourceEnabledCount"),
     autoCheckModUpdatesOnStartup: booleanAt(object.autoCheckModUpdatesOnStartup, "config.autoCheckModUpdatesOnStartup"),
+    autoRefreshModCatalogCacheOnStartup: booleanAt(
+      object.autoRefreshModCatalogCacheOnStartup,
+      "config.autoRefreshModCatalogCacheOnStartup"
+    ),
     selectedSaveFiles: stringArrayAt(object.selectedSaveFiles, "config.selectedSaveFiles"),
     profiles: validateProfilesState(object.profiles, "config.profiles"),
     warnings: stringArrayAt(object.warnings, "config.warnings")

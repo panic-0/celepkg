@@ -78,6 +78,7 @@ describe("api validation", () => {
         modCatalogSourceOrder: ["wegfan", "everestMirror", "everest"],
         modCatalogSourceEnabledCount: 2,
         autoCheckModUpdatesOnStartup: true,
+        autoRefreshModCatalogCacheOnStartup: true,
         selectedSaveFiles: ["0.celeste"],
         profiles,
         warnings: ["配置提示"]
@@ -90,6 +91,7 @@ describe("api validation", () => {
       modCatalogSourceOrder: ["wegfan", "everestMirror", "everest"],
       modCatalogSourceEnabledCount: 2,
       autoCheckModUpdatesOnStartup: true,
+      autoRefreshModCatalogCacheOnStartup: true,
       selectedSaveFiles: ["0.celeste"],
       profiles,
       warnings: ["配置提示"]
@@ -134,6 +136,7 @@ describe("api validation", () => {
         modCatalogSourceOrder: ["wegfan", "everestMirror", "everest"],
         modCatalogSourceEnabledCount: 2,
         autoCheckModUpdatesOnStartup: true,
+        autoRefreshModCatalogCacheOnStartup: true,
         selectedSaveFiles: ["0.celeste"],
         profiles,
         warnings: []

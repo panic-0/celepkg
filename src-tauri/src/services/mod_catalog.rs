@@ -4,8 +4,9 @@ use crate::domain::{
     ModDownloadProgress, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
     ModUpdateCheckResult, ProfilesState,
 };
+use crate::storage::{mod_catalog_cache_path, read_json, write_json};
 use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -22,6 +23,7 @@ const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(120);
+const MOD_CATALOG_CACHE_TTL: Duration = Duration::from_secs(30 * 60);
 
 #[derive(Clone, Copy)]
 pub struct ModDownloadReporter<'a> {
@@ -118,6 +120,18 @@ pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatal
     if !normalized_query.is_empty() {
         entries.retain(|entry| entry_matches_query(entry, &normalized_query));
     }
+    entries.sort_by_key(|entry| entry.name.to_lowercase());
+    entries.truncate(200);
+    ModCatalogSearchResult {
+        sources: load.sources,
+        entries,
+        warnings: load.warnings,
+    }
+}
+
+pub fn refresh_catalog_cache(sources: &[ModCatalogSourceKind]) -> ModCatalogSearchResult {
+    let load = load_catalogs_fresh(sources);
+    let mut entries = load.entries;
     entries.sort_by_key(|entry| entry.name.to_lowercase());
     entries.truncate(200);
     ModCatalogSearchResult {
@@ -710,7 +724,25 @@ struct CatalogLoad {
     warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CachedCatalog {
+    cached_at: u64,
+    entries: Vec<ModCatalogEntry>,
+}
+
 fn load_catalogs(sources: &[ModCatalogSourceKind]) -> CatalogLoad {
+    load_catalogs_with_cache_mode(sources, true)
+}
+
+fn load_catalogs_fresh(sources: &[ModCatalogSourceKind]) -> CatalogLoad {
+    load_catalogs_with_cache_mode(sources, false)
+}
+
+fn load_catalogs_with_cache_mode(
+    sources: &[ModCatalogSourceKind],
+    allow_valid_cache: bool,
+) -> CatalogLoad {
     let client = reqwest::blocking::Client::builder()
         .user_agent("celepkg/0.2")
         .build();
@@ -727,10 +759,13 @@ fn load_catalogs(sources: &[ModCatalogSourceKind]) -> CatalogLoad {
     };
 
     for source in sources {
-        match load_catalog(&client, *source) {
-            Ok(mut source_entries) => {
+        match load_catalog_cached(&client, *source, allow_valid_cache) {
+            Ok((mut source_entries, warning)) => {
                 loaded_sources.push(*source);
                 entries.append(&mut source_entries);
+                if let Some(warning) = warning {
+                    warnings.push(warning);
+                }
             }
             Err(error) => warnings.push(error),
         }
@@ -741,6 +776,73 @@ fn load_catalogs(sources: &[ModCatalogSourceKind]) -> CatalogLoad {
         entries,
         warnings,
     }
+}
+
+fn load_catalog_cached(
+    client: &reqwest::blocking::Client,
+    source: ModCatalogSourceKind,
+    allow_valid_cache: bool,
+) -> Result<(Vec<ModCatalogEntry>, Option<String>), String> {
+    if allow_valid_cache {
+        if let Some(cache) = read_valid_catalog_cache(source) {
+            return Ok((cache.entries, None));
+        }
+    }
+
+    match load_catalog(client, source) {
+        Ok(entries) => {
+            write_catalog_cache(source, &entries);
+            Ok((entries, None))
+        }
+        Err(error) => {
+            if let Some(cache) = read_catalog_cache(source) {
+                return Ok((
+                    cache.entries,
+                    Some(format!(
+                        "{}，已使用本地缓存目录",
+                        error.trim_end_matches('。')
+                    )),
+                ));
+            }
+            Err(error)
+        }
+    }
+}
+
+fn read_valid_catalog_cache(source: ModCatalogSourceKind) -> Option<CachedCatalog> {
+    let cache = read_catalog_cache(source)?;
+    let age = now_secs().saturating_sub(cache.cached_at);
+    if age <= MOD_CATALOG_CACHE_TTL.as_secs() {
+        Some(cache)
+    } else {
+        None
+    }
+}
+
+fn read_catalog_cache(source: ModCatalogSourceKind) -> Option<CachedCatalog> {
+    let cache: CachedCatalog = read_json(&mod_catalog_cache_path(source))?;
+    if cache.entries.is_empty() {
+        return None;
+    }
+    Some(cache)
+}
+
+fn write_catalog_cache(source: ModCatalogSourceKind, entries: &[ModCatalogEntry]) {
+    if entries.is_empty() {
+        return;
+    }
+    let cache = CachedCatalog {
+        cached_at: now_secs(),
+        entries: entries.to_vec(),
+    };
+    let _ = write_json(&mod_catalog_cache_path(source), &cache);
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn load_catalog(
@@ -1085,6 +1187,25 @@ Helper:
         assert_eq!(entries[0].category_name, "Maps");
         assert_eq!(entries[0].sub_category_name, "Standalone");
         assert_eq!(entries[0].last_update, Some(1712873770));
+    }
+
+    #[test]
+    fn valid_catalog_cache_round_trips_entries() {
+        let entry = test_catalog_entry("helper", "Helper");
+        let cache_path = mod_catalog_cache_path(ModCatalogSourceKind::Wegfan);
+        let previous = fs::read(&cache_path).ok();
+
+        write_catalog_cache(ModCatalogSourceKind::Wegfan, std::slice::from_ref(&entry));
+        let cached = read_valid_catalog_cache(ModCatalogSourceKind::Wegfan).expect("valid cache");
+
+        assert_eq!(cached.entries.len(), 1);
+        assert_eq!(cached.entries[0].name, "Helper");
+
+        if let Some(previous) = previous {
+            fs::write(cache_path, previous).expect("restore previous catalog cache");
+        } else {
+            let _ = fs::remove_file(cache_path);
+        }
     }
 
     #[test]

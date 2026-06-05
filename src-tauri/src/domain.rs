@@ -146,6 +146,7 @@ pub struct ConfigResponse {
     pub mod_catalog_source_order: Vec<ModCatalogSourceKind>,
     pub mod_catalog_source_enabled_count: usize,
     pub auto_check_mod_updates_on_startup: bool,
+    pub auto_refresh_mod_catalog_cache_on_startup: bool,
     pub selected_save_files: Vec<String>,
     pub profiles: ProfilesState,
     pub warnings: Vec<String>,

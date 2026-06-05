@@ -34,6 +34,7 @@ let autoBackupRetentionCount = 20;
 let modCatalogSourceOrder: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
 let modCatalogSourceEnabledCount = 2;
 let autoCheckModUpdatesOnStartup = false;
+let autoRefreshModCatalogCacheOnStartup = true;
 let selectedSaveFiles = ["0.celeste", "1.celeste"];
 let backupSequence = 4;
 
@@ -111,6 +112,11 @@ export const mockApi = {
     return clone(config());
   },
 
+  async setAutoRefreshModCatalogCacheOnStartup(enabled: boolean): Promise<ConfigResponse> {
+    autoRefreshModCatalogCacheOnStartup = enabled;
+    return clone(config());
+  },
+
   async setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
     selectedSaveFiles = [...saveFiles];
     scan = { ...scan, selectedSaveFiles };
@@ -141,6 +147,11 @@ export const mockApi = {
       entries,
       warnings: selectedSources.includes("everest") ? ["Mock：官方指针源暂时较慢，已继续显示其他结果。"] : []
     });
+  },
+
+  async refreshModCatalogCache(sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
+    await delay(250);
+    return mockApi.searchModCatalog("", sources);
   },
 
   async checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
@@ -424,6 +435,7 @@ function config(): ConfigResponse {
     modCatalogSourceOrder,
     modCatalogSourceEnabledCount,
     autoCheckModUpdatesOnStartup,
+    autoRefreshModCatalogCacheOnStartup,
     selectedSaveFiles,
     profiles,
     warnings: []

@@ -70,6 +70,7 @@ export function App() {
     autoBackupEnabled,
     autoBackupRetentionCount,
     autoCheckModUpdatesOnStartup,
+    autoRefreshModCatalogCacheOnStartup,
     celestePath,
     clearNotice,
     configWarnings,
@@ -81,6 +82,7 @@ export function App() {
     notice,
     notifier,
     refresh,
+    refreshModCatalogCacheNow,
     savePathAndRefresh,
     savePathAndRescan,
     scan,
@@ -93,6 +95,7 @@ export function App() {
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
     updateAutoCheckModUpdatesOnStartup,
+    updateAutoRefreshModCatalogCacheOnStartup,
     updateModCatalogSources,
     updateSelectedSaveFiles
   } = useCelePkgData();
@@ -875,6 +878,7 @@ export function App() {
             autoBackupEnabled={autoBackupEnabled}
             autoBackupRetentionCount={autoBackupRetentionCount}
             autoCheckModUpdatesOnStartup={autoCheckModUpdatesOnStartup}
+            autoRefreshModCatalogCacheOnStartup={autoRefreshModCatalogCacheOnStartup}
             loading={loading}
             modCatalogSourceEnabledCount={modCatalogSourceEnabledCount}
             modCatalogSourceOrder={modCatalogSourceOrder}
@@ -886,7 +890,9 @@ export function App() {
             onAutoBackupEnabledChange={updateAutoBackupEnabled}
             onAutoBackupRetentionCountChange={updateAutoBackupRetentionCount}
             onAutoCheckModUpdatesOnStartupChange={updateAutoCheckModUpdatesOnStartup}
+            onAutoRefreshModCatalogCacheOnStartupChange={updateAutoRefreshModCatalogCacheOnStartup}
             onModCatalogSourcesChange={updateModCatalogSources}
+            onModCatalogCacheRefresh={refreshModCatalogCacheNow}
             onSelectedSaveFilesChange={updateSelectedSaveFiles}
             onShowWarningColumnChange={uiLayout.setShowWarningColumn}
             onStrawberryDenominatorChange={uiLayout.setStrawberryDenominator}

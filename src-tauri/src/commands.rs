@@ -101,6 +101,16 @@ pub fn set_auto_check_mod_updates_on_startup(
 }
 
 #[tauri::command]
+pub fn set_auto_refresh_mod_catalog_cache_on_startup(
+    auto_refresh_mod_catalog_cache_on_startup: bool,
+) -> Result<ConfigResponse, String> {
+    let mut state = load_state()?;
+    state.auto_refresh_mod_catalog_cache_on_startup = auto_refresh_mod_catalog_cache_on_startup;
+    write_state(&state)?;
+    Ok(config_response(&state, vec![]))
+}
+
+#[tauri::command]
 pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
     let mut state = load_state()?;
     let path = resolve_input_path_from_state("", &state);
@@ -166,6 +176,18 @@ pub async fn search_mod_catalog(
     })
     .await
     .map_err(|error| format!("搜索 Mod 目录任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn refresh_mod_catalog_cache(
+    sources: Vec<String>,
+) -> Result<ModCatalogSearchResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sources = services::mod_catalog::parse_sources(&sources);
+        Ok(services::mod_catalog::refresh_catalog_cache(&sources))
+    })
+    .await
+    .map_err(|error| format!("刷新 Mod 目录缓存任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -622,6 +644,7 @@ fn config_response(state: &crate::storage::AppState, warnings: Vec<String>) -> C
         mod_catalog_source_order: state.mod_catalog_source_order.clone(),
         mod_catalog_source_enabled_count: state.mod_catalog_source_enabled_count,
         auto_check_mod_updates_on_startup: state.auto_check_mod_updates_on_startup,
+        auto_refresh_mod_catalog_cache_on_startup: state.auto_refresh_mod_catalog_cache_on_startup,
         selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),
         warnings,

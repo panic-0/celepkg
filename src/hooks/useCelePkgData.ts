@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getConfig,
+  refreshModCatalogCache,
   rescanCeleste,
   scanCeleste,
   setAutoBackupCleanupEnabled,
   setAutoCheckModUpdatesOnStartup,
+  setAutoRefreshModCatalogCacheOnStartup,
   selectCelesteDirectory,
   setAutoBackupEnabled,
   setAutoBackupRetentionCount,
@@ -45,11 +47,13 @@ export function useCelePkgData() {
   );
   const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(false);
   const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(false);
+  const [autoRefreshModCatalogCacheOnStartup, setAutoRefreshModCatalogCacheOnStartupState] = useState(true);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loadingState, setLoadingState] = useState(emptyLoadingState);
   const [notice, setNotice] = useState<AppNotice | null>(null);
   const noticeIdRef = useRef(0);
   const selectedSaveRequestRef = useRef(0);
+  const startupCatalogCacheRefreshRef = useRef(false);
 
   const showNotice = useCallback((tone: AppNoticeTone, text: string) => {
     noticeIdRef.current += 1;
@@ -129,6 +133,12 @@ export function useCelePkgData() {
     setModCatalogSourceEnabledCountState(config.modCatalogSourceEnabledCount);
     setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
     setStartupAutoCheckModUpdatesOnStartup(config.autoCheckModUpdatesOnStartup);
+    setAutoRefreshModCatalogCacheOnStartupState(config.autoRefreshModCatalogCacheOnStartup);
+    if (config.autoRefreshModCatalogCacheOnStartup && !startupCatalogCacheRefreshRef.current) {
+      startupCatalogCacheRefreshRef.current = true;
+      const sources = activeModCatalogSources(config.modCatalogSourceOrder, config.modCatalogSourceEnabledCount);
+      void refreshModCatalogCache(sources).catch(() => undefined);
+    }
     setScan((current) => ({
       ...(config.celestePath.trim() && !config.warnings.length ? current : emptyScan),
       profiles: config.profiles,
@@ -233,6 +243,46 @@ export function useCelePkgData() {
     [clearNotice, setLoading, showNotice]
   );
 
+  const updateAutoRefreshModCatalogCacheOnStartup = useCallback(
+    async (enabled: boolean) => {
+      setLoading(true, "正在更新 Mod 设置...");
+      clearNotice();
+      try {
+        const config = await setAutoRefreshModCatalogCacheOnStartup(enabled);
+        setAutoRefreshModCatalogCacheOnStartupState(config.autoRefreshModCatalogCacheOnStartup);
+        setScan((current) => ({ ...current, profiles: config.profiles }));
+        showNotice(
+          "success",
+          config.autoRefreshModCatalogCacheOnStartup ? "已开启启动时静默拉取 Mod 列表缓存。" : "已关闭启动时静默拉取 Mod 列表缓存。"
+        );
+      } catch (error) {
+        showNotice("error", readError(error));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearNotice, setLoading, showNotice]
+  );
+
+  const refreshModCatalogCacheNow = useCallback(async () => {
+    setLoading(true, "正在刷新 Mod 列表缓存...");
+    clearNotice();
+    try {
+      const result = await refreshModCatalogCache(modCatalogSources);
+      if (result.warnings.length) {
+        showNotice("warning", result.warnings.join("；"));
+      } else {
+        showNotice("success", `已刷新 ${result.sources.length} 个 Mod 数据源缓存。`);
+      }
+      return result;
+    } catch (error) {
+      showNotice("error", readError(error));
+      return undefined;
+    } finally {
+      setLoading(false);
+    }
+  }, [clearNotice, modCatalogSources, setLoading, showNotice]);
+
   const updateSelectedSaveFiles = useCallback(
     async (saveFiles: string[]) => {
       const requestId = selectedSaveRequestRef.current + 1;
@@ -327,6 +377,7 @@ export function useCelePkgData() {
     autoBackupEnabled,
     autoBackupRetentionCount,
     autoCheckModUpdatesOnStartup,
+    autoRefreshModCatalogCacheOnStartup,
     celestePath,
     clearNotice,
     configWarnings,
@@ -339,6 +390,7 @@ export function useCelePkgData() {
     notice,
     notifier,
     refresh,
+    refreshModCatalogCacheNow,
     savePathAndRefresh,
     savePathAndRescan,
     scan,
@@ -351,6 +403,7 @@ export function useCelePkgData() {
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
     updateAutoCheckModUpdatesOnStartup,
+    updateAutoRefreshModCatalogCacheOnStartup,
     updateModCatalogSources,
     updateSelectedSaveFiles
   };

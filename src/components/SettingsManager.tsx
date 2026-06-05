@@ -1,4 +1,4 @@
-import { Archive, CircleDot, Columns3, PackageSearch, Save, SearchCheck, ToggleLeft, ToggleRight } from "lucide-react";
+import { Archive, CircleDot, Columns3, PackageSearch, RefreshCw, Save, SearchCheck, ToggleLeft, ToggleRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ModCatalogSourceKind, SaveFileInfo } from "../types";
 import { formatUnixNanoseconds } from "../utils/time";
@@ -10,6 +10,7 @@ type SettingsManagerProps = {
   autoBackupEnabled: boolean;
   autoBackupRetentionCount: number;
   autoCheckModUpdatesOnStartup: boolean;
+  autoRefreshModCatalogCacheOnStartup: boolean;
   loading: boolean;
   modCatalogSourceEnabledCount: number;
   modCatalogSourceOrder: ModCatalogSourceKind[];
@@ -21,6 +22,8 @@ type SettingsManagerProps = {
   onAutoBackupEnabledChange: (value: boolean) => void;
   onAutoBackupRetentionCountChange: (value: number) => void;
   onAutoCheckModUpdatesOnStartupChange: (value: boolean) => void;
+  onAutoRefreshModCatalogCacheOnStartupChange: (value: boolean) => void;
+  onModCatalogCacheRefresh: () => void;
   onModCatalogSourcesChange: (order: ModCatalogSourceKind[], enabledCount: number) => void;
   onSelectedSaveFilesChange: (value: string[]) => void;
   onShowWarningColumnChange: (value: boolean) => void;
@@ -32,6 +35,7 @@ export function SettingsManager({
   autoBackupEnabled,
   autoBackupRetentionCount,
   autoCheckModUpdatesOnStartup,
+  autoRefreshModCatalogCacheOnStartup,
   loading,
   modCatalogSourceEnabledCount,
   modCatalogSourceOrder,
@@ -43,6 +47,8 @@ export function SettingsManager({
   onAutoBackupEnabledChange,
   onAutoBackupRetentionCountChange,
   onAutoCheckModUpdatesOnStartupChange,
+  onAutoRefreshModCatalogCacheOnStartupChange,
+  onModCatalogCacheRefresh,
   onModCatalogSourcesChange,
   onSelectedSaveFilesChange,
   onShowWarningColumnChange,
@@ -197,6 +203,20 @@ export function SettingsManager({
                 {autoCheckModUpdatesOnStartup ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
                 <SearchCheck size={16} />
                 启动时检查更新
+              </button>
+              <button
+                className={autoRefreshModCatalogCacheOnStartup ? "inline-toggle active" : "inline-toggle"}
+                disabled={loading}
+                onClick={() => onAutoRefreshModCatalogCacheOnStartupChange(!autoRefreshModCatalogCacheOnStartup)}
+                title="应用启动后在后台刷新 Mod 获取中心的列表缓存"
+              >
+                {autoRefreshModCatalogCacheOnStartup ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                <PackageSearch size={16} />
+                启动时拉取列表
+              </button>
+              <button className="inline-toggle" disabled={loading} onClick={onModCatalogCacheRefresh} title="立即重新拉取并覆盖本地 Mod 列表缓存">
+                <RefreshCw size={16} />
+                刷新列表缓存
               </button>
             </section>
           </div>
