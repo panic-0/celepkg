@@ -152,17 +152,34 @@
   background: var(--color-panel);
 }
 
-.nav-summary div {
+.nav-summary-item {
   display: grid;
   gap: 3px;
   min-width: 0;
-  padding-bottom: 6px;
+  min-height: 0;
+  padding: 4px 5px 6px;
   border-bottom: 1px solid #edf1f4;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
-.nav-summary div:last-child {
+.nav-summary-item:last-child {
   padding-bottom: 0;
   border-bottom: 0;
+}
+
+.nav-summary-item:hover,
+.nav-summary-item:focus-visible {
+  background: var(--color-panel-subtle);
+}
+
+.nav-summary-item.active {
+  background: var(--color-primary-surface);
 }
 
 .nav-summary span,

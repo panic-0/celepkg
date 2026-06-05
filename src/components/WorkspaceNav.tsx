@@ -131,16 +131,26 @@ export function WorkspaceNav({
       </section>
 
       <section className="nav-summary">
-        <div>
+        <button
+          className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
+          onClick={() => onActiveViewChange("profiles")}
+          title="打开 Profile 管理"
+          type="button"
+        >
           <span>地图 Profile</span>
           <strong title={mapProfileName || "未选择"}>{mapProfileName || "未选择"}</strong>
           <small>{`${enabledMapCount}/${totalMapCount} 地图`}</small>
-        </div>
-        <div>
+        </button>
+        <button
+          className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
+          onClick={() => onActiveViewChange("profiles")}
+          title="打开 Profile 管理"
+          type="button"
+        >
           <span>Mod Profile</span>
           <strong title={modProfileName || "未选择"}>{modProfileName || "未选择"}</strong>
           <small>{`${enabledModCount}/${totalModCount} Mod，${dependencyModCount} 依赖`}</small>
-        </div>
+        </button>
       </section>
 
       {showsRecordFilters && (
