@@ -398,6 +398,10 @@ pub fn mod_catalog_cache_path(source: ModCatalogSourceKind) -> PathBuf {
         .join(format!("{source:?}.json").to_ascii_lowercase())
 }
 
+pub fn installed_mod_hash_cache_path() -> PathBuf {
+    app_dir().join("installed-mod-hashes.json")
+}
+
 pub fn read_json<T: for<'de> Deserialize<'de>>(file: &Path) -> Option<T> {
     let text = fs::read_to_string(file).ok()?;
     serde_json::from_str(&text).ok()

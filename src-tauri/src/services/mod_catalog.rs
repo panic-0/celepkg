@@ -4,7 +4,9 @@ use crate::domain::{
     ModDownloadProgress, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
     ModUpdateCheckResult, ProfilesState,
 };
-use crate::storage::{mod_catalog_cache_path, read_json, write_json};
+use crate::storage::{
+    installed_mod_hash_cache_path, mod_catalog_cache_path, read_json, write_json,
+};
 use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -12,7 +14,7 @@ use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use xxhash_rust::xxh64::Xxh64;
 use zip::ZipArchive;
 
@@ -27,6 +29,7 @@ const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(120);
 const MOD_CATALOG_CACHE_TTL: Duration = Duration::from_secs(30 * 60);
+const INSTALLED_MOD_HASH_CACHE_VERSION: u32 = 1;
 
 #[derive(Clone, Copy)]
 pub struct ModDownloadReporter<'a> {
@@ -1139,17 +1142,112 @@ struct InstalledModIndex {
     mods: HashMap<String, InstalledModMatch>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct InstalledModHashCache {
+    #[serde(default)]
+    version: u32,
+    #[serde(default)]
+    entries: HashMap<String, InstalledModHashCacheEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct InstalledModHashCacheEntry {
+    len: u64,
+    modified: u128,
+    hash: String,
+}
+
+impl InstalledModHashCache {
+    fn read(cache_path: &Path) -> Self {
+        let Some(cache) = read_json::<InstalledModHashCache>(cache_path) else {
+            return Self::current();
+        };
+        if cache.version == INSTALLED_MOD_HASH_CACHE_VERSION {
+            cache
+        } else {
+            Self::current()
+        }
+    }
+
+    fn current() -> Self {
+        Self {
+            version: INSTALLED_MOD_HASH_CACHE_VERSION,
+            entries: HashMap::new(),
+        }
+    }
+
+    fn hash_for_path(&mut self, cache_key: &str, path: &Path) -> Result<String, String> {
+        let stamp = file_hash_stamp(path)?;
+        if let Some(entry) = self.entries.get(cache_key) {
+            if entry.len == stamp.len && entry.modified == stamp.modified {
+                return Ok(entry.hash.clone());
+            }
+        }
+
+        let hash = xxh64_file(path)?;
+        self.entries.insert(
+            cache_key.to_string(),
+            InstalledModHashCacheEntry {
+                len: stamp.len,
+                modified: stamp.modified,
+                hash: hash.clone(),
+            },
+        );
+        Ok(hash)
+    }
+
+    fn retain_keys(&mut self, keys: &HashSet<String>) {
+        self.entries.retain(|key, _| keys.contains(key));
+    }
+
+    fn write_if_changed(&self, cache_path: &Path, previous: &Self) {
+        if self != previous {
+            let _ = write_json(cache_path, self);
+        }
+    }
+}
+
+struct FileHashStamp {
+    len: u64,
+    modified: u128,
+}
+
+fn file_hash_stamp(path: &Path) -> Result<FileHashStamp, String> {
+    let metadata = fs::metadata(path).map_err(|error| format!("读取文件信息失败：{error}"))?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    Ok(FileHashStamp {
+        len: metadata.len(),
+        modified,
+    })
+}
+
 impl InstalledModIndex {
     fn new(records: &[ModRecord]) -> Self {
+        Self::new_with_cache_path(records, &installed_mod_hash_cache_path())
+    }
+
+    fn new_with_cache_path(records: &[ModRecord], cache_path: &Path) -> Self {
+        let mut hash_cache = InstalledModHashCache::read(cache_path);
+        let previous_hash_cache = hash_cache.clone();
+        let mut seen_hash_keys = HashSet::new();
         let mut mods = HashMap::new();
         for record in records {
             if !record.is_archive || record.read_only {
                 continue;
             }
             let path = Path::new(&record.absolute_path);
-            let Ok(hash) = xxh64_file(path) else {
+            let cache_key = record.absolute_path.clone();
+            let Ok(hash) = hash_cache.hash_for_path(&cache_key, path) else {
                 continue;
             };
+            seen_hash_keys.insert(cache_key);
             let installed = InstalledModMatch {
                 record_id: record.id.clone(),
                 name: record.name.clone(),
@@ -1163,6 +1261,8 @@ impl InstalledModIndex {
                 mods.entry(key).or_insert_with(|| installed.clone());
             }
         }
+        hash_cache.retain_keys(&seen_hash_keys);
+        hash_cache.write_if_changed(cache_path, &previous_hash_cache);
         Self { mods }
     }
 
@@ -1391,6 +1491,65 @@ Helper:
         };
         let installed = InstalledModIndex::new(&[record]);
         assert!(installed.find(&entry).is_some());
+    }
+
+    #[test]
+    fn installed_mod_index_uses_cached_hash_when_file_stamp_matches() {
+        let dir = tempfile::tempdir().unwrap();
+        let mod_path = dir.path().join("CachedHelper.zip");
+        fs::write(&mod_path, b"cached zip bytes").unwrap();
+        let cache_path = dir.path().join("hash-cache.json");
+        let record = test_record(&mod_path, "CachedHelper", "1.0.0");
+        let cache_key = record.absolute_path.clone();
+        let stamp = file_hash_stamp(&mod_path).unwrap();
+        let cached_hash = "0123456789abcdef".to_string();
+        let mut cache = InstalledModHashCache::current();
+        cache.entries.insert(
+            cache_key,
+            InstalledModHashCacheEntry {
+                len: stamp.len,
+                modified: stamp.modified,
+                hash: cached_hash.clone(),
+            },
+        );
+        write_json(&cache_path, &cache).unwrap();
+
+        let entry = test_catalog_entry("cached-helper", "CachedHelper");
+        let installed = InstalledModIndex::new_with_cache_path(&[record], &cache_path);
+        let matched = installed.find(&entry).unwrap();
+
+        assert_eq!(matched.hash, cached_hash);
+    }
+
+    #[test]
+    fn installed_mod_index_rehashes_when_cached_file_stamp_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let mod_path = dir.path().join("ChangedHelper.zip");
+        fs::write(&mod_path, b"changed zip bytes").unwrap();
+        let cache_path = dir.path().join("hash-cache.json");
+        let record = test_record(&mod_path, "ChangedHelper", "1.0.0");
+        let cache_key = record.absolute_path.clone();
+        let stamp = file_hash_stamp(&mod_path).unwrap();
+        let mut cache = InstalledModHashCache::current();
+        cache.entries.insert(
+            cache_key.clone(),
+            InstalledModHashCacheEntry {
+                len: stamp.len + 1,
+                modified: stamp.modified,
+                hash: "stale".to_string(),
+            },
+        );
+        write_json(&cache_path, &cache).unwrap();
+
+        let entry = test_catalog_entry("changed-helper", "ChangedHelper");
+        let actual_hash = xxh64_file(&mod_path).unwrap();
+        let installed = InstalledModIndex::new_with_cache_path(&[record], &cache_path);
+        let matched = installed.find(&entry).unwrap();
+        let written_cache = read_json::<InstalledModHashCache>(&cache_path).unwrap();
+
+        assert_eq!(matched.hash, actual_hash);
+        assert_eq!(written_cache.entries[&cache_key].hash, actual_hash);
+        assert_eq!(written_cache.entries[&cache_key].len, stamp.len);
     }
 
     #[test]
