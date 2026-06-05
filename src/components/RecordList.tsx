@@ -265,49 +265,22 @@ function MapTable({
           const updateCandidate = updatesByRecordId.get(map.id);
           return (
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
-              <td className="action-cell">
-                <div className="record-actions">
-                  <ToggleButton
-                    blockedReason={map.readOnly ? `${map.name} 是内置项目，不能通过 Profile 启用或禁用。` : undefined}
-                    enabled={enabled}
-                    label="地图"
-                    onClick={() => onToggle(map)}
-                  />
-                  <div className="record-flag-actions" aria-label="地图标记">
-                    <FlagButton
-                      active={map.favorite}
-                      icon={<Star size={16} />}
-                      label="收藏"
-                      variant="favorite"
-                      onClick={() => onFavoriteToggle(map)}
-                    />
-                    <FlagButton
-                      active={map.protected}
-                      disabled={map.readOnly}
-                      icon={map.protected ? <Lock size={16} /> : <Shield size={16} />}
-                      label="始终启用"
-                      variant="protected"
-                      onClick={() => onProtectedToggle(map)}
-                    />
-                  </div>
-                </div>
-              </td>
-              <td className="name-cell">
-                <div className="name-title-row">
-                  <strong title={map.name}>{map.name}</strong>
-                  {map.metadata.version && (
-                    <span className="version-text" title={map.metadata.version}>
-                      {map.metadata.version}
-                    </span>
-                  )}
-                  {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
-                </div>
+              <RecordActionCell
+                enabled={enabled}
+                flagLabel="地图标记"
+                record={map}
+                toggleLabel="地图"
+                onFavoriteToggle={onFavoriteToggle}
+                onProtectedToggle={onProtectedToggle}
+                onToggle={onToggle}
+              />
+              <RecordNameCell record={map} updateCandidate={updateCandidate} onUpdate={onUpdate}>
                 <div className="inline-pills">
                   {map.readOnly && <span>官图</span>}
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
                   {map.stats && <span>有存档</span>}
                 </div>
-              </td>
+              </RecordNameCell>
               <td className="num">{map.mapCount || 1}</td>
               <td>{formatCompletionStatus(map.completionStatus)}</td>
               <td className="num">{map.stats?.deaths ?? "-"}</td>
@@ -382,44 +355,16 @@ function ModTable({
           const requiredReferences = requiredReferencesByModId.get(modItem.id) ?? [];
           return (
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
-              <td className="action-cell">
-                <div className="record-actions">
-                  <ToggleButton
-                    blockedReason={modItem.readOnly ? `${modItem.name} 是内置项目，不能通过 Profile 启用或禁用。` : undefined}
-                    enabled={enabled}
-                    label="Mod"
-                    onClick={() => onToggle(modItem)}
-                  />
-                  <div className="record-flag-actions" aria-label="Mod 标记">
-                    <FlagButton
-                      active={modItem.favorite}
-                      icon={<Star size={16} />}
-                      label="收藏"
-                      variant="favorite"
-                      onClick={() => onFavoriteToggle(modItem)}
-                    />
-                    <FlagButton
-                      active={modItem.protected}
-                      disabled={modItem.readOnly}
-                      icon={modItem.protected ? <Lock size={16} /> : <Shield size={16} />}
-                      label="始终启用"
-                      variant="protected"
-                      onClick={() => onProtectedToggle(modItem)}
-                    />
-                  </div>
-                </div>
-              </td>
-              <td className="name-cell">
-                <div className="name-title-row">
-                  <strong title={modItem.name}>{modItem.name}</strong>
-                  {modItem.metadata.version && (
-                    <span className="version-text" title={modItem.metadata.version}>
-                      {modItem.metadata.version}
-                    </span>
-                  )}
-                  {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
-                </div>
-              </td>
+              <RecordActionCell
+                enabled={enabled}
+                flagLabel="Mod 标记"
+                record={modItem}
+                toggleLabel="Mod"
+                onFavoriteToggle={onFavoriteToggle}
+                onProtectedToggle={onProtectedToggle}
+                onToggle={onToggle}
+              />
+              <RecordNameCell record={modItem} updateCandidate={updateCandidate} onUpdate={onUpdate} />
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
               <td className="num" title={formatDependencyReferenceTitle(requiredReferences)}>
@@ -440,6 +385,81 @@ function ModTable({
 function formatDependencyReferenceTitle(references: DependencyReference[]) {
   if (!references.length) return "没有被其他地图或 Mod 声明为必需依赖";
   return references.map((reference) => reference.name).join("、");
+}
+
+function RecordActionCell({
+  enabled,
+  flagLabel,
+  record,
+  toggleLabel,
+  onFavoriteToggle,
+  onProtectedToggle,
+  onToggle
+}: {
+  enabled: boolean;
+  flagLabel: string;
+  record: ModRecord;
+  toggleLabel: string;
+  onFavoriteToggle: (record: ModRecord) => void;
+  onProtectedToggle: (record: ModRecord) => void;
+  onToggle: (record: ModRecord) => void;
+}) {
+  return (
+    <td className="action-cell">
+      <div className="record-actions">
+        <ToggleButton
+          blockedReason={record.readOnly ? `${record.name} 是内置项目，不能通过 Profile 启用或禁用。` : undefined}
+          enabled={enabled}
+          label={toggleLabel}
+          onClick={() => onToggle(record)}
+        />
+        <div className="record-flag-actions" aria-label={flagLabel}>
+          <FlagButton
+            active={record.favorite}
+            icon={<Star size={16} />}
+            label="收藏"
+            variant="favorite"
+            onClick={() => onFavoriteToggle(record)}
+          />
+          <FlagButton
+            active={record.protected}
+            disabled={record.readOnly}
+            icon={record.protected ? <Lock size={16} /> : <Shield size={16} />}
+            label="始终启用"
+            variant="protected"
+            onClick={() => onProtectedToggle(record)}
+          />
+        </div>
+      </div>
+    </td>
+  );
+}
+
+function RecordNameCell({
+  children,
+  record,
+  updateCandidate,
+  onUpdate
+}: {
+  children?: React.ReactNode;
+  record: ModRecord;
+  updateCandidate?: ModUpdateCandidate;
+  onUpdate: (candidate: ModUpdateCandidate) => void;
+}) {
+  return (
+    <td className="name-cell">
+      <div className="name-title-row">
+        <strong title={record.name}>{record.name}</strong>
+        {record.metadata.version && (
+          <span className="version-text" title={record.metadata.version}>
+            {record.metadata.version}
+          </span>
+        )}
+        {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
+      </div>
+      {children}
+    </td>
+  );
 }
 
 function InlineUpdateButton({ candidate, onUpdate }: { candidate: ModUpdateCandidate; onUpdate: (candidate: ModUpdateCandidate) => void }) {
