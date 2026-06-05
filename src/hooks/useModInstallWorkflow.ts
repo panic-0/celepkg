@@ -10,7 +10,7 @@ import {
   previewModUpdateMetadata,
   searchModCatalog
 } from "../api";
-import type { AppConfirmPromptState, DependencyPromptState, EverestDependencyPromptState } from "../components/AppDialogs";
+import { useAppPrompts } from "./useAppPrompts";
 import type {
   AppNotifier,
   Dependency,
@@ -31,9 +31,7 @@ import {
   type DependencyActionLabel,
   type DependencyIssue,
   type DependencyUpdateAction,
-  type DependencyUpdateChoice,
-  type DependencyUpdatePlan,
-  type EverestDependencyChoice
+  type DependencyUpdatePlan
 } from "../utils/appDependencyResolution";
 import { dedupeDependencyActions, dedupeDependencyIssues } from "../utils/dependencyUpdateDedupe";
 import type { DownloadTask } from "../utils/downloadTask";
@@ -86,9 +84,17 @@ export function useModInstallWorkflow({
 }: ModInstallWorkflowOptions) {
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [modUpdateChecking, setModUpdateChecking] = useState(false);
-  const [confirmPrompt, setConfirmPrompt] = useState<AppConfirmPromptState | null>(null);
-  const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
-  const [everestDependencyPrompt, setEverestDependencyPrompt] = useState<EverestDependencyPromptState | null>(null);
+  const {
+    closeConfirmPrompt,
+    closeDependencyPrompt,
+    closeEverestDependencyPrompt,
+    confirmPrompt,
+    dependencyPrompt,
+    everestDependencyPrompt,
+    requestAppConfirm,
+    requestDependencyChoice,
+    requestEverestDependencyChoice
+  } = useAppPrompts();
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
   const modUpdateCheckRequest = useRef(0);
   const manualModUpdateCheckRequest = useRef(0);
@@ -526,39 +532,6 @@ export function useModInstallWorkflow({
       message,
       successMessage
     );
-  }
-
-  function requestDependencyChoice(targetName: string, actionLabel: DependencyActionLabel, issues: DependencyIssue[]) {
-    return new Promise<DependencyUpdateChoice | null>((resolve) => {
-      setDependencyPrompt({ actionLabel, issues, resolve, targetName });
-    });
-  }
-
-  function requestEverestDependencyChoice(prompt: Omit<EverestDependencyPromptState, "resolve">) {
-    return new Promise<EverestDependencyChoice | null>((resolve) => {
-      setEverestDependencyPrompt({ ...prompt, resolve });
-    });
-  }
-
-  function requestAppConfirm(prompt: Omit<AppConfirmPromptState, "resolve">) {
-    return new Promise<boolean>((resolve) => {
-      setConfirmPrompt({ ...prompt, resolve });
-    });
-  }
-
-  function closeDependencyPrompt(choice: DependencyUpdateChoice | null) {
-    dependencyPrompt?.resolve(choice);
-    setDependencyPrompt(null);
-  }
-
-  function closeEverestDependencyPrompt(choice: EverestDependencyChoice | null) {
-    everestDependencyPrompt?.resolve(choice);
-    setEverestDependencyPrompt(null);
-  }
-
-  function closeConfirmPrompt(confirmed: boolean) {
-    confirmPrompt?.resolve(confirmed);
-    setConfirmPrompt(null);
   }
 
   function removeUpdatedCandidate(candidate: ModUpdateCandidate) {
