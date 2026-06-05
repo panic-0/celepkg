@@ -4,9 +4,10 @@ use crate::domain::{
     ModDownloadProgress, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
     ModUpdateCheckResult, ProfilesState,
 };
-use crate::storage::{
-    installed_mod_hash_cache_path, mod_catalog_cache_path, read_json, write_json,
+use crate::services::mod_catalog_cache::{
+    read_catalog_cache, read_valid_catalog_cache, write_catalog_cache,
 };
+use crate::storage::{installed_mod_hash_cache_path, read_json, write_json};
 use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -28,7 +29,6 @@ const CATALOG_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(120);
-const MOD_CATALOG_CACHE_TTL: Duration = Duration::from_secs(30 * 60);
 const INSTALLED_MOD_HASH_CACHE_VERSION: u32 = 1;
 
 #[derive(Clone, Copy)]
@@ -798,13 +798,6 @@ struct CatalogLoad {
     warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CachedCatalog {
-    cached_at: u64,
-    entries: Vec<ModCatalogEntry>,
-}
-
 fn load_catalogs(sources: &[ModCatalogSourceKind]) -> CatalogLoad {
     load_catalogs_with_cache_mode(sources, true)
 }
@@ -887,42 +880,6 @@ fn load_catalog_cached(
             Err(error)
         }
     }
-}
-
-fn read_valid_catalog_cache(source: ModCatalogSourceKind) -> Option<CachedCatalog> {
-    let cache = read_catalog_cache(source)?;
-    let age = now_secs().saturating_sub(cache.cached_at);
-    if age <= MOD_CATALOG_CACHE_TTL.as_secs() {
-        Some(cache)
-    } else {
-        None
-    }
-}
-
-fn read_catalog_cache(source: ModCatalogSourceKind) -> Option<CachedCatalog> {
-    let cache: CachedCatalog = read_json(&mod_catalog_cache_path(source))?;
-    if cache.entries.is_empty() {
-        return None;
-    }
-    Some(cache)
-}
-
-fn write_catalog_cache(source: ModCatalogSourceKind, entries: &[ModCatalogEntry]) {
-    if entries.is_empty() {
-        return;
-    }
-    let cache = CachedCatalog {
-        cached_at: now_secs(),
-        entries: entries.to_vec(),
-    };
-    let _ = write_json(&mod_catalog_cache_path(source), &cache);
-}
-
-fn now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
 }
 
 fn load_catalog(
@@ -1301,6 +1258,7 @@ fn catalog_keys(entry: &ModCatalogEntry) -> impl Iterator<Item = String> + '_ {
 mod tests {
     use super::*;
     use crate::domain::{CompletionStatus, ModKind, ModMetadata};
+    use crate::storage::mod_catalog_cache_path;
     use std::fs;
     use std::io::{Cursor, Write};
     use std::net::TcpListener;
