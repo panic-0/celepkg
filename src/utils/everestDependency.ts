@@ -5,10 +5,6 @@ export function isEverestDependencyName(name: string) {
   return normalized.startsWith("everest");
 }
 
-export function dependenciesIncludeEverest(dependencies: Dependency[]) {
-  return dependencies.some((dependency) => isEverestDependencyName(dependency.name));
-}
-
 export function requiredEverestBuild(dependencies: Dependency[]) {
   const builds = dependencies
     .filter((dependency) => isEverestDependencyName(dependency.name))
