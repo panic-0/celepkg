@@ -28,6 +28,7 @@ type MapDetailProps = {
   scrollMemory: ScrollMemory;
   strawberryDenominator: StrawberryDenominator;
   onBack: () => void;
+  onLocationOpen: (map: ModRecord) => void;
   onTabChange: (tab: MapDetailTab) => void;
 };
 
@@ -41,6 +42,7 @@ export function MapDetail({
   scrollMemory,
   strawberryDenominator,
   onBack,
+  onLocationOpen,
   onTabChange
 }: MapDetailProps) {
   const mapId = map?.id ?? "empty";
@@ -292,7 +294,13 @@ export function MapDetail({
       {activeTab === "dependencies" && (
         <div className="detail-tab-panel detail-split-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
-            <h3>文件</h3>
+            <div className="detail-section-title">
+              <h3>文件</h3>
+              <button className="detail-action-button" onClick={() => onLocationOpen(map)} type="button">
+                <FolderOpen size={15} />
+                打开位置
+              </button>
+            </div>
             <LongValue label="文件" value={map.relativePath} />
             <LongList label="SID" values={map.mapIds} emptyText="无" />
           </section>

@@ -14,6 +14,7 @@ type ModDetailProps = {
   requiredReferences: DependencyReference[];
   scrollMemory: ScrollMemory;
   onBack: () => void;
+  onLocationOpen: (modItem: ModRecord) => void;
   onTabChange: (tab: ModDetailTab) => void;
 };
 
@@ -25,6 +26,7 @@ export function ModDetail({
   requiredReferences,
   scrollMemory,
   onBack,
+  onLocationOpen,
   onTabChange
 }: ModDetailProps) {
   const modId = modItem?.id ?? "empty";
@@ -153,7 +155,13 @@ export function ModDetail({
       {activeTab === "files" && (
         <div className="detail-tab-panel detail-split-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
-            <h3>文件</h3>
+            <div className="detail-section-title">
+              <h3>文件</h3>
+              <button className="detail-action-button" onClick={() => onLocationOpen(modItem)} type="button">
+                <FolderOpen size={15} />
+                打开位置
+              </button>
+            </div>
             <LongValue label="文件" value={modItem.relativePath} />
             <LongValue label="名称" value={modItem.fileName} />
           </section>

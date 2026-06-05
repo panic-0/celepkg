@@ -245,6 +245,25 @@
   font-size: 15px;
 }
 
+.detail-section-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-section-title h3 {
+  min-width: 0;
+}
+
+.detail-action-button {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .info-line {
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);

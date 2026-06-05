@@ -12,6 +12,7 @@ import { AppToolbar } from "./components/AppToolbar";
 import { WorkspaceNav } from "./components/WorkspaceNav";
 import { AppOverlays } from "./components/AppOverlays";
 import { WorkspaceLoadingOverlay } from "./components/WorkspaceLoadingOverlay";
+import { openModLocation } from "./api";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useDownloadTaskControls } from "./hooks/useDownloadTaskControls";
@@ -25,7 +26,8 @@ import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
 import { findDependencyReferencesByModId } from "./utils/dependencies";
-import { isDraftEnabled } from "./utils/format";
+import { isDraftEnabled, readError } from "./utils/format";
+import type { ModRecord } from "./types";
 import type { ActiveView } from "./viewTypes";
 
 export function App() {
@@ -180,6 +182,15 @@ export function App() {
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
   const showingModRecords = workspaceView.activeView === "mods";
+
+  async function openRecordLocation(record: ModRecord) {
+    try {
+      await openModLocation(record.absolutePath);
+      notifier.showSuccess("已打开本地内容位置。");
+    } catch (error) {
+      notifier.showError(readError(error));
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -344,6 +355,7 @@ export function App() {
             }
             scrollMemory={scrollMemory}
             onBack={workspaceView.showList}
+            onLocationOpen={openRecordLocation}
             onTabChange={uiLayout.setMapDetailTab}
           />
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "mods" ? (
@@ -359,6 +371,7 @@ export function App() {
             }
             scrollMemory={scrollMemory}
             onBack={workspaceView.showList}
+            onLocationOpen={openRecordLocation}
             onTabChange={uiLayout.setModDetailTab}
           />
         ) : (

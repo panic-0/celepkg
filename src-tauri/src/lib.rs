@@ -32,6 +32,7 @@ pub fn run() {
             commands::downloads::cancel_mod_download,
             commands::records::set_record_favorite,
             commands::records::set_record_protected,
+            commands::records::open_mod_location,
             commands::profiles::save_profile,
             commands::profiles::delete_profile,
             commands::profiles::apply_profile,

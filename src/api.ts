@@ -251,6 +251,11 @@ export async function openBackupLocation(backupPath: string): Promise<void> {
   return invokeChecked("open_backup_location", validateVoid, { backupPath });
 }
 
+export async function openModLocation(absolutePath: string): Promise<void> {
+  if (isMockMode()) return mockApi.openModLocation(absolutePath);
+  return invokeChecked("open_mod_location", validateVoid, { absolutePath });
+}
+
 export function createOperationId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

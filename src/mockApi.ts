@@ -427,6 +427,10 @@ export const mockApi = {
 
   async openBackupLocation(backupPath: string): Promise<void> {
     void backupPath;
+  },
+
+  async openModLocation(absolutePath: string): Promise<void> {
+    void absolutePath;
   }
 };
 
