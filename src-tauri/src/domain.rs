@@ -380,6 +380,9 @@ mod contract_tests {
         assert_round_trip::<StagedDownload>(&contract, "stagedDownload");
         assert_round_trip::<EverestReleaseList>(&contract, "everestReleaseList");
         assert_round_trip::<EverestInstallResult>(&contract, "everestInstallResult");
+        assert_round_trip::<BackupInfo>(&contract, "backupInfo");
+        assert_round_trip::<Vec<BackupInfo>>(&contract, "backupList");
+        assert_round_trip::<ModMetadata>(&contract, "modMetadata");
     }
 
     fn assert_round_trip<T>(contract: &Value, key: &str)

@@ -355,5 +355,58 @@
       "warnings": [],
       "timings": []
     }
+  },
+  "backupInfo": {
+    "id": "1770000400000000000-manual",
+    "createdAt": "1770000400000000000",
+    "kind": "manual",
+    "celestePath": "D:/Games/Celeste",
+    "backupPath": "D:/Games/Celeste/celepkg/backups/1770000400000000000-manual",
+    "files": [
+      {
+        "category": "game",
+        "label": "blacklist.txt",
+        "targetPath": "D:/Games/Celeste/Mods/blacklist.txt",
+        "backupPath": "D:/Games/Celeste/celepkg/backups/1770000400000000000-manual/Mods/blacklist.txt",
+        "existed": true
+      },
+      {
+        "category": "state",
+        "label": "settings.json",
+        "targetPath": "D:/Games/Celeste/celepkg/settings.json",
+        "backupPath": "D:/Games/Celeste/celepkg/backups/1770000400000000000-manual/settings.json",
+        "existed": false
+      }
+    ],
+    "mods": [
+      {
+        "name": "SampleHelper",
+        "metadataName": "SampleHelper",
+        "fileName": "SampleHelper.zip",
+        "relativePath": "Mods/SampleHelper.zip",
+        "version": "1.2.3",
+        "enabled": true,
+        "isArchive": true
+      }
+    ]
+  },
+  "backupList": [
+    {
+      "id": "1770000400000000000-manual",
+      "createdAt": "1770000400000000000",
+      "kind": "manual",
+      "celestePath": "D:/Games/Celeste",
+      "backupPath": "D:/Games/Celeste/celepkg/backups/1770000400000000000-manual",
+      "files": [],
+      "mods": []
+    }
+  ],
+  "modMetadata": {
+    "name": "Sample Map",
+    "version": "1.0.1",
+    "author": "Mapper",
+    "description": "Contract metadata sample",
+    "dependencies": [{ "name": "SampleHelper", "version": "1.2.0" }],
+    "optionalDependencies": [{ "name": "SpeedrunTool", "version": "" }]
   }
 }

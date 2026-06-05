@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   validateBackupInfo,
+  validateBackupList,
   validateConfigResponse,
   validateEverestInstallResult,
   validateEverestReleaseList,
   validateModCatalogSearchResult,
   validateModInstallResult,
+  validateModMetadata,
   validateModUpdateCheckResult,
   validateScanResult,
   validateStagedDownload
@@ -80,6 +82,9 @@ describe("api validation", () => {
     expect(validateStagedDownload(apiContract.stagedDownload)).toEqual(apiContract.stagedDownload);
     expect(validateEverestReleaseList(apiContract.everestReleaseList)).toEqual(apiContract.everestReleaseList);
     expect(validateEverestInstallResult(apiContract.everestInstallResult)).toEqual(apiContract.everestInstallResult);
+    expect(validateBackupInfo(apiContract.backupInfo)).toEqual(apiContract.backupInfo);
+    expect(validateBackupList(apiContract.backupList)).toEqual(apiContract.backupList);
+    expect(validateModMetadata(apiContract.modMetadata)).toEqual(apiContract.modMetadata);
   });
 
   it("accepts valid config responses", () => {
