@@ -26,7 +26,7 @@ Favorite 是“标记”，不是“启用”。它只方便你识别重要条�
 
 Profile 不会删除或移动 Mod 文件。应用 Profile 时，CelePkg 通过改 `blacklist.txt` 控制启用状态。
 
-地图 Profile 和 Mod Profile 分开编辑。每一类都需要选中一个当前 Profile；初始默认是 `Main Profile`。在地图 / Mod 列表中切换启用状态、批量启用 / 禁用，或在 Profile 页面修改启动参数时，都会直接保存到当前 Profile，不需要再点“保存”。
+左侧“本地内容”里包含地图和其他 Mod，列表顶部的“地图 / 其他 Mod”用于切换当前内容类型。地图 Profile 和 Mod Profile 分开编辑。每一类都需要选中一个当前 Profile；初始默认是 `Main Profile`。在地图 / Mod 列表中切换启用状态、批量启用 / 禁用，或在 Profile 页面修改启动参数时，都会直接保存到当前 Profile，不需要再点“保存”。
 
 写入位置：
 
@@ -89,6 +89,12 @@ Profile 列表每一行右侧都有复制按钮。它会完整复制对应的 Pr
 
 例子：刚更新地图包、刚安装新 Mod、CelePkg 更新了草莓识别规则时，用“刷新缓存并重新扫描地图”。
 
+## 确认弹窗
+
+删除 Profile、覆盖 Profile、删除备份、还原启用状态、安装 Mod、更新 Mod、安装 Everest，以及依赖无法自动处理时，都会使用 CelePkg 内置确认弹窗。
+
+确认弹窗会显示目标、版本、数量或风险说明。可以点取消、按 Esc 关闭，或按 Tab 在弹窗内切换焦点。
+
 ## 备份
 
 备份只保护 CelePkg 会改的文件，不是整个 Mods 目录。
@@ -102,4 +108,4 @@ Profile 列表每一行右侧都有复制按钮。它会完整复制对应的 Pr
 
 备份清单还会记录当时本地 Mod 列表、版本和启用状态，方便之后核对环境；它不会备份 Mod zip 或文件夹本体，不能恢复已经删除的 Mod 文件。
 
-例子：应用 Profile 后启用状态不对，可以还原应用前的备份，让 blacklist 和 favorites 回到当时状态。
+例子：应用 Profile 后启用状态不对，可以点“还原启用状态”还原应用前的备份，让 blacklist 和 favorites 回到当时状态。
