@@ -1,4 +1,4 @@
-import { AlertTriangle, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelModDownload,
@@ -25,7 +25,14 @@ import { SettingsManager } from "./components/SettingsManager";
 import { AppToolbar } from "./components/AppToolbar";
 import { ToastHost } from "./components/ToastHost";
 import { WorkspaceNav } from "./components/WorkspaceNav";
-import { DialogFacts, DialogShell, type DialogFact } from "./components/common";
+import {
+  AppConfirmDialog,
+  DependencyUpdateDialog,
+  EverestDependencyDialog,
+  type AppConfirmPromptState,
+  type DependencyPromptState,
+  type EverestDependencyPromptState
+} from "./components/AppDialogs";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
@@ -35,20 +42,26 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import type {
-  Dependency,
-  EverestRelease,
-  ModCatalogEntry,
-  ModDownloadProgress,
-  ModRecord,
-  ModUpdateCandidate,
-  ModUpdateCheckResult
-} from "./types";
+import type { Dependency, EverestRelease, ModCatalogEntry, ModDownloadProgress, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
 import { dedupeDependencyActions, dedupeDependencyIssues } from "./utils/dependencyUpdateDedupe";
 import type { DownloadTask } from "./utils/downloadTask";
 import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
 import { createEverestInstallTaskDescriptor } from "./utils/everestTask";
+import {
+  buildInstalledDependencyIndex,
+  dependencyEntrySatisfies,
+  formatDependencyIssue,
+  isBuiltinDependencyName,
+  updateCandidateFromRecord,
+  versionTooLow,
+  type DependencyActionLabel,
+  type DependencyIssue,
+  type DependencyUpdateAction,
+  type DependencyUpdateChoice,
+  type DependencyUpdatePlan,
+  type EverestDependencyChoice
+} from "./utils/appDependencyResolution";
 import {
   formatEverestBuildVersion,
   installedEverestBuild,
@@ -1058,225 +1071,10 @@ function isWorkspaceLoadingMessage(message: string) {
   return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
 }
 
-type DependencyUpdateChoice = "none" | "required" | "all";
-type DependencyActionLabel = "安装" | "更新";
-type EverestDependencyChoice = "update" | "ignore";
-
 type DownloadControlState = {
   downloadPaused: boolean;
   installPaused: boolean;
 };
-
-type AppConfirmPromptState = {
-  cancelLabel?: string;
-  confirmLabel: string;
-  description: string;
-  details?: string[];
-  facts?: DialogFact[];
-  resolve: (confirmed: boolean) => void;
-  title: string;
-  variant?: "primary" | "danger";
-};
-
-type DependencyIssue = {
-  dependency: Dependency;
-  installed?: ModRecord;
-  optional: boolean;
-  reason: "missing" | "tooLow";
-};
-
-type DependencyUpdateAction =
-  | { kind: "everest"; name: string; release: EverestRelease }
-  | { kind: "update"; name: string; candidate: ModUpdateCandidate }
-  | { kind: "install"; name: string; entry: ModCatalogEntry };
-
-type DependencyUpdatePlan = {
-  actionLabel: DependencyActionLabel;
-  choice: DependencyUpdateChoice;
-  issues: DependencyIssue[];
-  targetName: string;
-};
-
-type DependencyPromptState = {
-  actionLabel: DependencyActionLabel;
-  issues: DependencyIssue[];
-  resolve: (choice: DependencyUpdateChoice | null) => void;
-  targetName: string;
-};
-
-type EverestDependencyPromptState = {
-  installedBuild: number | null;
-  release: EverestRelease;
-  requiredBuild: number;
-  resolve: (choice: EverestDependencyChoice | null) => void;
-  targetName: string;
-};
-
-function AppConfirmDialog({ prompt, onClose }: { prompt: AppConfirmPromptState; onClose: (confirmed: boolean) => void }) {
-  return (
-    <DialogShell
-      actions={[
-        { label: prompt.cancelLabel ?? "取消", onClick: () => onClose(false) },
-        { label: prompt.confirmLabel, onClick: () => onClose(true), variant: prompt.variant ?? "primary" }
-      ]}
-      icon={<AlertTriangle size={18} />}
-      onClose={() => onClose(false)}
-      title={prompt.title}
-    >
-      <p>{prompt.description}</p>
-      {prompt.facts && prompt.facts.length > 0 && <DialogFacts facts={prompt.facts} />}
-      {prompt.details && prompt.details.length > 0 && (
-        <div className="dependency-preview-list">
-          {prompt.details.map((detail) => (
-            <div className="dependency-preview-row" key={detail}>
-              <span>{detail}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </DialogShell>
-  );
-}
-
-function EverestDependencyDialog({
-  prompt,
-  onClose
-}: {
-  prompt: EverestDependencyPromptState;
-  onClose: (choice: EverestDependencyChoice | null) => void;
-}) {
-  const requiredVersion = formatEverestBuildVersion(prompt.requiredBuild);
-  const installedVersion = prompt.installedBuild === null ? "未识别" : formatEverestBuildVersion(prompt.installedBuild);
-  const updateVersion = formatEverestBuildVersion(prompt.release.version);
-  return (
-    <DialogShell
-      actions={[
-        { label: "取消", onClick: () => onClose(null) },
-        { label: "忽略继续", onClick: () => onClose("ignore") },
-        { label: "更新 Everest 后继续", onClick: () => onClose("update"), variant: "primary" }
-      ]}
-      icon={<LoaderCircle size={18} />}
-      onClose={() => onClose(null)}
-      title="需要更新 Everest"
-    >
-      <p>{`${prompt.targetName} 需要 Everest ${requiredVersion} 或更高版本，当前版本 ${installedVersion}。`}</p>
-      <p>{`可以先更新到 Everest ${updateVersion} 后继续，也可以忽略此检查继续。`}</p>
-    </DialogShell>
-  );
-}
-
-function DependencyUpdateDialog({
-  prompt,
-  onClose
-}: {
-  prompt: DependencyPromptState;
-  onClose: (choice: DependencyUpdateChoice | null) => void;
-}) {
-  const requiredCount = prompt.issues.filter((issue) => !issue.optional).length;
-  const optionalCount = prompt.issues.length - requiredCount;
-  return (
-    <DialogShell
-      actions={[
-        { label: "取消", onClick: () => onClose(null) },
-        { label: "不更新依赖", onClick: () => onClose("none") },
-        { label: "更新必须", onClick: () => onClose("required"), variant: "primary" },
-        { label: "更新全部", onClick: () => onClose("all"), variant: "primary" }
-      ]}
-      icon={<LoaderCircle size={18} />}
-      onClose={() => onClose(null)}
-      title={`${prompt.actionLabel}前依赖检查`}
-    >
-      <p>{`${prompt.targetName} ${prompt.actionLabel}后有 ${requiredCount} 个必需依赖、${optionalCount} 个可选依赖可能未满足。`}</p>
-      <div className="dependency-preview-list">
-        {prompt.issues.map((issue) => (
-          <div className="dependency-preview-row" key={`${issue.optional ? "optional" : "required"}:${issue.dependency.name}`}>
-            <strong>{issue.dependency.name}</strong>
-            <span>{issue.optional ? "可选依赖" : "必需依赖"}</span>
-            <small>{formatDependencyIssue(issue)}</small>
-          </div>
-        ))}
-      </div>
-    </DialogShell>
-  );
-}
-
-function buildInstalledDependencyIndex(records: ModRecord[]) {
-  const index = new Map<string, ModRecord>();
-  for (const record of records) {
-    for (const alias of [
-      record.id,
-      record.name,
-      record.metadata.name,
-      record.fileName,
-      record.fileName.replace(/\.zip$/i, ""),
-      record.relativePath
-    ]) {
-      const normalized = normalizeDependencyName(alias);
-      if (normalized) index.set(normalized, record);
-    }
-  }
-  return index;
-}
-
-function updateCandidateFromRecord(entry: ModCatalogEntry, record: ModRecord): ModUpdateCandidate {
-  return {
-    entry,
-    installed: {
-      recordId: record.id,
-      name: record.name,
-      fileName: record.fileName,
-      relativePath: record.relativePath,
-      absolutePath: record.absolutePath,
-      version: record.metadata.version,
-      hash: ""
-    },
-    updateAvailable: true,
-    reason: "依赖版本需要更新"
-  };
-}
-
-function dependencyEntrySatisfies(entry: ModCatalogEntry, dependency: Dependency) {
-  return entry.downloadUrl.trim().length > 0 && !versionTooLow(entry.version, dependency.version);
-}
-
-function formatDependencyIssue(issue: DependencyIssue) {
-  const requiredVersion = issue.dependency.version.trim() || "未指定版本";
-  if (issue.reason === "missing") return `缺少 ${requiredVersion}`;
-  return `需要 ${requiredVersion}，本地 ${issue.installed?.metadata.version || "未知版本"}`;
-}
-
-function versionTooLow(installedVersion: string, requiredVersion: string) {
-  const installed = parseNumericVersion(installedVersion);
-  const required = parseNumericVersion(requiredVersion);
-  if (!installed || !required) return false;
-  return compareNumericVersions(installed, required) < 0;
-}
-
-function parseNumericVersion(value: string) {
-  const matches = value.match(/\d+/g);
-  return matches?.map((part) => Number.parseInt(part, 10)).filter((part) => Number.isFinite(part)) ?? null;
-}
-
-function compareNumericVersions(left: number[], right: number[]) {
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    const diff = (left[index] ?? 0) - (right[index] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
-
-function isBuiltinDependencyName(name: string) {
-  const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return (
-    isEverestDependencyName(name) ||
-    normalized === "celeste" ||
-    normalized === "monocle" ||
-    normalized === "fna" ||
-    normalized === "dotnet" ||
-    normalized === "netframework" ||
-    normalized === "microsoftnetframework"
-  );
-}
 
 const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);
 
