@@ -328,10 +328,12 @@ pub async fn install_staged_mod(
             &staged_id,
             entry,
             installed_path.as_deref().map(Path::new),
-            state.profiles_state(),
-            &state.protected_record_ids,
-            &state.selected_save_files,
-            None,
+            services::mod_catalog::ModInstallContext {
+                profiles: state.profiles_state(),
+                protected_record_ids: &state.protected_record_ids,
+                selected_save_files: &state.selected_save_files,
+                reporter: None,
+            },
         )
     })
     .await

@@ -32,6 +32,13 @@ pub struct ModDownloadReporter<'a> {
     pub task_total: usize,
 }
 
+pub struct ModInstallContext<'a> {
+    pub profiles: ProfilesState,
+    pub protected_record_ids: &'a [String],
+    pub selected_save_files: &'a [String],
+    pub reporter: Option<ModDownloadReporter<'a>>,
+}
+
 pub(crate) struct DownloadProgressThrottle {
     total: Option<u64>,
     last_emit: Instant,
@@ -232,10 +239,7 @@ pub fn install_staged(
     staged_id: &str,
     entry: ModCatalogEntry,
     replace_path: Option<&Path>,
-    profiles: ProfilesState,
-    protected_record_ids: &[String],
-    selected_save_files: &[String],
-    reporter: Option<ModDownloadReporter<'_>>,
+    context: ModInstallContext<'_>,
 ) -> Result<ModInstallResult, String> {
     let mods_dir = celeste_path.join("Mods");
     fs::create_dir_all(&mods_dir).map_err(|error| format!("创建 Mods 目录失败：{error}"))?;
@@ -260,7 +264,7 @@ pub fn install_staged(
         validate_zip_full_read(&temp_path)?;
     }
     read_zip_metadata(&temp_path)?;
-    if let Some(reporter) = reporter {
+    if let Some(reporter) = context.reporter {
         emit_download_progress(reporter, &entry.name, "installing", 0, None, 0.0, "");
     }
 
@@ -271,17 +275,17 @@ pub fn install_staged(
     let mut timings = vec![];
     let scan = crate::services::scan::full_scan(
         celeste_path,
-        profiles,
+        context.profiles,
         crate::services::scan::list_available_save_files(celeste_path),
-        selected_save_files.to_vec(),
+        context.selected_save_files.to_vec(),
         &mut timings,
     );
     let mut scan = scan;
     for record in scan.maps.iter_mut().chain(scan.other_mods.iter_mut()) {
-        record.protected = record.read_only || protected_record_ids.contains(&record.id);
+        record.protected = record.read_only || context.protected_record_ids.contains(&record.id);
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
-    if let Some(reporter) = reporter {
+    if let Some(reporter) = context.reporter {
         emit_download_progress(reporter, &entry.name, "done", 1, Some(1), 0.0, "");
     }
     Ok(ModInstallResult {

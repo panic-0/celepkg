@@ -94,7 +94,10 @@ export function ModSourcePicker({
     }
     const latestOrder = [...latestLayout.selected, ...latestLayout.unselected];
     const latestEnabledCount = latestLayout.selected.length;
-    if (!sameSources([...baseLayout.selected, ...baseLayout.unselected], latestOrder) || baseLayout.selected.length !== latestEnabledCount) {
+    if (
+      !sameSources([...baseLayout.selected, ...baseLayout.unselected], latestOrder) ||
+      baseLayout.selected.length !== latestEnabledCount
+    ) {
       onChange(latestOrder, latestEnabledCount);
     }
     resetDrag();

@@ -44,7 +44,11 @@ export type DownloadTaskGroups = {
   installFailed: DownloadTaskItem[];
 };
 
-export function createDownloadTask(id: string, items: DownloadTaskItem[], concurrencyLimit = defaultDownloadConcurrencyLimit): DownloadTask {
+export function createDownloadTask(
+  id: string,
+  items: DownloadTaskItem[],
+  concurrencyLimit = defaultDownloadConcurrencyLimit
+): DownloadTask {
   return {
     id,
     status: "running",
@@ -59,16 +63,16 @@ export function groupDownloadTaskItems(items: DownloadTaskItem[]): DownloadTaskG
   return {
     downloading: items.filter((item) => item.status === "queued" || item.status === "downloading"),
     downloadFailed: items.filter((item) => item.status === "downloadFailed" || item.status === "cancelled"),
-    waitingInstall: items.filter((item) => item.status === "downloaded" || item.status === "waitingInstall" || item.status === "installing"),
+    waitingInstall: items.filter(
+      (item) => item.status === "downloaded" || item.status === "waitingInstall" || item.status === "installing"
+    ),
     installed: items.filter((item) => item.status === "installed"),
     installFailed: items.filter((item) => item.status === "installFailed" || item.status === "skipped")
   };
 }
 
 export function activeDownloadOperationIds(task: DownloadTask): string[] {
-  return task.items
-    .filter((item) => item.status === "downloading" && item.operationId)
-    .map((item) => item.operationId as string);
+  return task.items.filter((item) => item.status === "downloading" && item.operationId).map((item) => item.operationId as string);
 }
 
 export function selectQueuedItemsForDownload(task: DownloadTask): DownloadTaskItem[] {
@@ -118,7 +122,10 @@ export function markPendingInstallsCancelled(task: DownloadTask): DownloadTask {
 export function skipItemsWithFailedDependencies(task: DownloadTask): DownloadTask {
   const failedIds = new Set(
     task.items
-      .filter((item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "cancelled" || item.status === "skipped")
+      .filter(
+        (item) =>
+          item.status === "downloadFailed" || item.status === "installFailed" || item.status === "cancelled" || item.status === "skipped"
+      )
       .map((item) => item.id)
   );
   if (!failedIds.size) return task;

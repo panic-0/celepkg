@@ -27,8 +27,10 @@ export function DownloadTaskPanel({
   const groups = groupDownloadTaskItems(task.items);
   const summary = summarizeDownloadTask(task);
   const failureCount = summary.downloadFailed + summary.installFailed;
-  const canCancelDownloads = task.status === "running" && task.items.some((item) => item.status === "queued" || item.status === "downloading");
-  const canCancelInstalls = task.status === "running" && task.items.some((item) => item.status === "downloaded" || item.status === "waitingInstall");
+  const canCancelDownloads =
+    task.status === "running" && task.items.some((item) => item.status === "queued" || item.status === "downloading");
+  const canCancelInstalls =
+    task.status === "running" && task.items.some((item) => item.status === "downloaded" || item.status === "waitingInstall");
   const canRetry = canRetryFailedTask(task);
 
   return (
@@ -36,17 +38,11 @@ export function DownloadTaskPanel({
       <div className="download-task-header">
         <strong>{`下载中 ${summary.downloading} · 等待安装 ${summary.waitingInstall} · 成功 ${summary.installed} · 失败 ${failureCount}`}</strong>
         <div className="download-task-actions">
-          <button
-            onClick={task.downloadPaused ? onResumeDownloads : onPauseDownloads}
-            type="button"
-          >
+          <button onClick={task.downloadPaused ? onResumeDownloads : onPauseDownloads} type="button">
             {task.downloadPaused ? <Play size={14} /> : <Pause size={14} />}
             {task.downloadPaused ? "恢复下载" : "停止下载"}
           </button>
-          <button
-            onClick={task.installPaused ? onResumeInstalls : onPauseInstalls}
-            type="button"
-          >
+          <button onClick={task.installPaused ? onResumeInstalls : onPauseInstalls} type="button">
             {task.installPaused ? <Play size={14} /> : <Pause size={14} />}
             {task.installPaused ? "恢复安装" : "停止安装"}
           </button>

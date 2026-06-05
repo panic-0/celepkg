@@ -74,19 +74,21 @@ npm run build
 
 ## 代码检查
 
+本地提交前至少执行：
+
 ```bash
-npm run lint
 npm run format:check
+npm run lint
+npm run test
 npm run build:web
 ```
 
-Rust 测试：
+Rust 检查使用和 CI 一致的命令：
 
 ```bash
-cd src-tauri
-cargo fmt -- --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml --locked
 ```
 
 自动格式化：
@@ -96,6 +98,51 @@ npm run format
 cd src-tauri
 cargo fmt
 ```
+
+## 发布流程
+
+发布前必须先在本地跑完 CI 同款检查：
+
+```bash
+npm run format:check
+npm run lint
+npm run test
+npm run build:web
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml --locked
+```
+
+确认通过后再更新版本号和 `CHANGELOG.md`，提交发布 commit，并创建 tag：
+
+```bash
+git commit -m "发布 vX.Y.Z"
+git tag vX.Y.Z
+```
+
+推送顺序：
+
+```bash
+git push origin main
+gh run list --limit 5
+git push origin vX.Y.Z
+gh run list --limit 5
+```
+
+推送 `main` 后先确认 CI 通过，再推送 tag 触发 Release。Release 推送后也要检查 Actions 状态：
+
+```bash
+gh run view <run-id> --json status,conclusion,jobs
+```
+
+如果 tag 已经推送但发布提交需要修正，应在修正提交完成并通过本地 CI 同款检查后，将 tag 移到修正后的提交并强制推送该 tag：
+
+```bash
+git tag -f vX.Y.Z
+git push origin vX.Y.Z --force
+```
+
+只强制更新 tag，不强推 `main`。如 GitHub Release 已经生成，需要确认 release 产物来自更新后的 tag run。
 
 ## 项目结构
 

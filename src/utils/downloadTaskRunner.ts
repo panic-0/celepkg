@@ -174,7 +174,13 @@ export class DownloadTaskRunner {
     try {
       const staged = await executable.download(operationId, taskIndex, taskTotal);
       if (this.cancelledDownloadItemIds.has(itemId)) {
-        this.updateItem(itemId, (item) => ({ ...item, status: "cancelled", operationId: undefined, progress: undefined, error: "已取消下载" }));
+        this.updateItem(itemId, (item) => ({
+          ...item,
+          status: "cancelled",
+          operationId: undefined,
+          progress: undefined,
+          error: "已取消下载"
+        }));
       } else if (this.pausedDownloadItemIds.has(itemId)) {
         this.pausedDownloadItemIds.delete(itemId);
         this.updateItem(itemId, (item) => ({ ...item, status: "queued", operationId: undefined, progress: undefined }));
@@ -184,7 +190,13 @@ export class DownloadTaskRunner {
       }
     } catch (error) {
       if (this.cancelledDownloadItemIds.has(itemId)) {
-        this.updateItem(itemId, (item) => ({ ...item, status: "cancelled", operationId: undefined, progress: undefined, error: "已取消下载" }));
+        this.updateItem(itemId, (item) => ({
+          ...item,
+          status: "cancelled",
+          operationId: undefined,
+          progress: undefined,
+          error: "已取消下载"
+        }));
       } else if (this.pausedDownloadItemIds.has(itemId)) {
         this.pausedDownloadItemIds.delete(itemId);
         this.updateItem(itemId, (item) => ({ ...item, status: "queued", operationId: undefined, progress: undefined }));

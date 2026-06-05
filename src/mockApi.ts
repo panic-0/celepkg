@@ -857,7 +857,13 @@ function profile(
   };
 }
 
-function backup(id: string, kind: BackupInfo["kind"], backupPath: string, blacklistExisted: boolean, favoritesExisted: boolean): BackupInfo {
+function backup(
+  id: string,
+  kind: BackupInfo["kind"],
+  backupPath: string,
+  blacklistExisted: boolean,
+  favoritesExisted: boolean
+): BackupInfo {
   return {
     id,
     createdAt: id,

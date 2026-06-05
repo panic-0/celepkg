@@ -283,11 +283,4 @@ function activeElement() {
   return typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null;
 }
 
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button",
-  "input",
-  "select",
-  "textarea",
-  "[tabindex]:not([tabindex='-1'])"
-].join(",");
+const FOCUSABLE_SELECTOR = ["a[href]", "button", "input", "select", "textarea", "[tabindex]:not([tabindex='-1'])"].join(",");

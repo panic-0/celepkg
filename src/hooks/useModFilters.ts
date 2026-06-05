@@ -73,7 +73,16 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
         .includes(normalizedQuery);
     });
     return [...mods].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-  }, [enabledModDraft, modEnabledFilter, modProgressFilter, modQuery, modReferenceFilter, optionalReferencedModIds, referencedModIds, scan.otherMods]);
+  }, [
+    enabledModDraft,
+    modEnabledFilter,
+    modProgressFilter,
+    modQuery,
+    modReferenceFilter,
+    optionalReferencedModIds,
+    referencedModIds,
+    scan.otherMods
+  ]);
 
   return {
     filteredMaps,

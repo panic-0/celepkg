@@ -100,7 +100,10 @@ describe("mod update task descriptors", () => {
       { name: "Right", version: "1.0.0" }
     ]);
 
-    const descriptors = createModUpdateTaskDescriptors([candidate(map), candidate(right), candidate(left), candidate(core)], [core, left, right, map]);
+    const descriptors = createModUpdateTaskDescriptors(
+      [candidate(map), candidate(right), candidate(left), candidate(core)],
+      [core, left, right, map]
+    );
 
     expect(descriptors.map((item) => item.name)).toEqual(["Core", "Right", "Left", "Map"]);
     expect(descriptors[1].dependsOn).toEqual([descriptors[0].id]);

@@ -59,7 +59,7 @@ pub fn download_to_staging(
     } else {
         release.mirror_download.clone()
     };
-    let staging = staging_download_path(celeste_path, &release, reporter.operation_id);
+    let staging = staging_download_path(celeste_path, release, reporter.operation_id);
     if let Some(parent) = staging.parent() {
         fs::create_dir_all(parent).map_err(|error| format!("创建下载目录失败：{error}"))?;
     }
@@ -69,7 +69,7 @@ pub fn download_to_staging(
         &client,
         &download_url,
         staging_guard.path(),
-        &release,
+        release,
         reporter,
     )?;
     emit_progress(

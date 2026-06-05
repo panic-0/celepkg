@@ -314,7 +314,9 @@ export function App() {
         { label: "更新数量", value: `${descriptors.length} 个` },
         { label: "可下载更新", value: `${downloadableModUpdates.length} 个` }
       ],
-      details: descriptors.map((descriptor) => `${descriptor.candidate.installed.name} -> ${descriptor.candidate.entry.version || "目录最新版本"}`),
+      details: descriptors.map(
+        (descriptor) => `${descriptor.candidate.installed.name} -> ${descriptor.candidate.entry.version || "目录最新版本"}`
+      ),
       variant: "danger"
     });
     if (!confirmed) return;
@@ -431,7 +433,9 @@ export function App() {
 
   function createDependencyExecutableItems(actions: DependencyUpdateAction[]): ExecutableDownloadTaskItem[] {
     const dedupedActions = dedupeDependencyActions(actions);
-    const updateActions = dedupedActions.filter((action): action is Extract<DependencyUpdateAction, { kind: "update" }> => action.kind === "update");
+    const updateActions = dedupedActions.filter(
+      (action): action is Extract<DependencyUpdateAction, { kind: "update" }> => action.kind === "update"
+    );
     const updateDescriptors = createModUpdateTaskDescriptors(
       updateActions.map((action) => action.candidate),
       [...scan.maps, ...scan.otherMods]
@@ -1091,13 +1095,7 @@ type EverestDependencyPromptState = {
   targetName: string;
 };
 
-function AppConfirmDialog({
-  prompt,
-  onClose
-}: {
-  prompt: AppConfirmPromptState;
-  onClose: (confirmed: boolean) => void;
-}) {
+function AppConfirmDialog({ prompt, onClose }: { prompt: AppConfirmPromptState; onClose: (confirmed: boolean) => void }) {
   return (
     <DialogShell
       actions={[

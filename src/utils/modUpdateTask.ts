@@ -92,7 +92,8 @@ function orderCandidatesByInstalledDependencyGraph(candidates: ModUpdateCandidat
         .filter((dependencyRecord): dependencyRecord is ModRecord => Boolean(dependencyRecord))
         .map((dependencyRecord) => candidateByRecordId.get(dependencyRecord.id))
         .filter((dependencyCandidate): dependencyCandidate is ModUpdateCandidate => Boolean(dependencyCandidate))
-        .sort((left, right) => (originalIndex.get(left.installed.recordId) ?? 0) - (originalIndex.get(right.installed.recordId) ?? 0)) ?? [];
+        .sort((left, right) => (originalIndex.get(left.installed.recordId) ?? 0) - (originalIndex.get(right.installed.recordId) ?? 0)) ??
+      [];
 
     for (const dependency of dependencies) visit(dependency);
     state.set(recordId, "visited");

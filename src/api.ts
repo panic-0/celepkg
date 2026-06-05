@@ -151,7 +151,12 @@ export async function installStagedMod(
   installedPath?: string
 ): Promise<ModInstallResult> {
   if (isMockMode()) return mockApi.installStagedMod(celestePath, stagedId, entry, installedPath);
-  return invokeChecked("install_staged_mod", validateModInstallResult, { celestePath, stagedId, entry, installedPath: installedPath ?? null });
+  return invokeChecked("install_staged_mod", validateModInstallResult, {
+    celestePath,
+    stagedId,
+    entry,
+    installedPath: installedPath ?? null
+  });
 }
 
 export async function cancelModDownload(operationId: string): Promise<boolean> {

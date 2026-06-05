@@ -58,9 +58,9 @@ describe("download task model", () => {
     const task = createDownloadTask("task", [item("everest", "downloaded"), item("map", "downloaded", ["everest"])]);
 
     expect(selectNextInstallItem(task)?.id).toBe("everest");
-    expect(selectNextInstallItem({ ...task, items: [{ ...item("everest", "installed") }, item("map", "downloaded", ["everest"])] })?.id).toBe(
-      "map"
-    );
+    expect(
+      selectNextInstallItem({ ...task, items: [{ ...item("everest", "installed") }, item("map", "downloaded", ["everest"])] })?.id
+    ).toBe("map");
     expect(selectNextInstallItem({ ...task, items: [item("everest", "installing"), item("map", "downloaded", ["everest"])] })).toBeNull();
     expect(selectNextInstallItem({ ...task, installPaused: true })).toBeNull();
   });
