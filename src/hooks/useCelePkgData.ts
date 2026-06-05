@@ -16,6 +16,7 @@ import {
 } from "../api";
 import type { AppNotice, AppNoticeTone, AppNotifier, ModCatalogSourceKind, ScanResult } from "../types";
 import { readError } from "../utils/format";
+import { createLatestRequestTracker } from "../utils/latestRequest";
 import { emptyLoadingState, nextLoadingState } from "../utils/loadingState";
 
 const emptyScan: ScanResult = {
@@ -55,6 +56,8 @@ export function useCelePkgData() {
   const noticeIdRef = useRef(0);
   const selectedSaveRequestRef = useRef(0);
   const startupCatalogCacheRefreshRef = useRef(false);
+  const configRequestTrackerRef = useRef(createLatestRequestTracker());
+  const scanRequestTrackerRef = useRef(createLatestRequestTracker());
 
   const showNotice = useCallback((tone: AppNoticeTone, text: string) => {
     noticeIdRef.current += 1;
@@ -84,15 +87,17 @@ export function useCelePkgData() {
 
   const refreshPath = useCallback(
     async (nextPath: string) => {
+      const requestId = scanRequestTrackerRef.current.begin();
       setLoading(true, "正在读取扫描缓存并扫描地图...");
       clearNotice();
       try {
         const result = await scanCeleste(nextPath);
+        if (!scanRequestTrackerRef.current.isLatest(requestId)) return undefined;
         setScan(result);
         setPathInput(result.celestePath);
         return result;
       } catch (error) {
-        showNotice("error", readError(error));
+        if (scanRequestTrackerRef.current.isLatest(requestId)) showNotice("error", readError(error));
         return undefined;
       } finally {
         setLoading(false);
@@ -103,16 +108,18 @@ export function useCelePkgData() {
 
   const rescanPath = useCallback(
     async (nextPath: string) => {
+      const requestId = scanRequestTrackerRef.current.begin();
       setLoading(true, "正在刷新缓存并重新扫描地图...");
       clearNotice();
       try {
         const result = await rescanCeleste(nextPath);
+        if (!scanRequestTrackerRef.current.isLatest(requestId)) return undefined;
         setScan(result);
         setPathInput(result.celestePath);
         showNotice("success", "已刷新缓存并重新扫描地图。");
         return result;
       } catch (error) {
-        showNotice("error", readError(error));
+        if (scanRequestTrackerRef.current.isLatest(requestId)) showNotice("error", readError(error));
         return undefined;
       } finally {
         setLoading(false);
@@ -124,7 +131,9 @@ export function useCelePkgData() {
   const refresh = useCallback((nextPath = celestePath) => refreshPath(nextPath), [celestePath, refreshPath]);
 
   const loadConfigAndRefresh = useCallback(async () => {
+    const requestId = configRequestTrackerRef.current.begin();
     const config = await getConfig();
+    if (!configRequestTrackerRef.current.isLatest(requestId)) return undefined;
     setConfigWarnings(config.warnings);
     setPathInput(config.celestePath);
     setAutoBackupEnabledState(config.autoBackupEnabled);
@@ -153,6 +162,7 @@ export function useCelePkgData() {
 
   const updateAutoBackupEnabled = useCallback(
     async (enabled: boolean) => {
+      configRequestTrackerRef.current.invalidate();
       setLoading(true, "正在更新备份设置...");
       clearNotice();
       try {
@@ -171,6 +181,7 @@ export function useCelePkgData() {
 
   const updateAutoBackupRetentionCount = useCallback(
     async (count: number) => {
+      configRequestTrackerRef.current.invalidate();
       const normalizedCount = Math.max(1, Math.min(100, Math.trunc(count)));
       setLoading(true, "正在更新备份设置...");
       clearNotice();
@@ -190,6 +201,7 @@ export function useCelePkgData() {
 
   const updateAutoBackupCleanupEnabled = useCallback(
     async (enabled: boolean) => {
+      configRequestTrackerRef.current.invalidate();
       setLoading(true, "正在更新备份设置...");
       clearNotice();
       try {
@@ -209,6 +221,7 @@ export function useCelePkgData() {
 
   const updateModCatalogSources = useCallback(
     async (sourceOrder: ModCatalogSourceKind[], enabledCount: number) => {
+      configRequestTrackerRef.current.invalidate();
       setLoading(true, "正在更新 Mod 设置...");
       clearNotice();
       try {
@@ -228,6 +241,7 @@ export function useCelePkgData() {
 
   const updateAutoCheckModUpdatesOnStartup = useCallback(
     async (enabled: boolean) => {
+      configRequestTrackerRef.current.invalidate();
       setLoading(true, "正在更新 Mod 设置...");
       clearNotice();
       try {
@@ -246,6 +260,7 @@ export function useCelePkgData() {
 
   const updateAutoRefreshModCatalogCacheOnStartup = useCallback(
     async (enabled: boolean) => {
+      configRequestTrackerRef.current.invalidate();
       setLoading(true, "正在更新 Mod 设置...");
       clearNotice();
       try {
@@ -286,33 +301,35 @@ export function useCelePkgData() {
 
   const updateSelectedSaveFiles = useCallback(
     async (saveFiles: string[]) => {
+      configRequestTrackerRef.current.invalidate();
       const requestId = selectedSaveRequestRef.current + 1;
       selectedSaveRequestRef.current = requestId;
+      const scanRequestId = scanRequestTrackerRef.current.begin();
+      const isLatestRequest = () => selectedSaveRequestRef.current === requestId && scanRequestTrackerRef.current.isLatest(scanRequestId);
       setScan((current) => ({ ...current, selectedSaveFiles: saveFiles }));
       setLoading(true, "正在更新存档统计...");
       clearNotice();
       try {
         const config = await setSelectedSaveFiles(saveFiles);
-        if (selectedSaveRequestRef.current !== requestId) return;
+        if (!isLatestRequest()) return;
         setScan((current) => ({ ...current, profiles: config.profiles, selectedSaveFiles: config.selectedSaveFiles }));
         const result = await scanCeleste(config.celestePath);
-        if (selectedSaveRequestRef.current !== requestId) return;
+        if (!isLatestRequest()) return;
         setScan(result);
         setPathInput(result.celestePath);
       } catch (error) {
-        if (selectedSaveRequestRef.current === requestId) {
+        if (isLatestRequest()) {
           showNotice("error", readError(error));
         }
       } finally {
-        if (selectedSaveRequestRef.current === requestId) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     },
     [clearNotice, setLoading, showNotice]
   );
 
   const savePathAndRefresh = useCallback(async () => {
+    configRequestTrackerRef.current.invalidate();
     setLoading(true, "正在保存目录...");
     clearNotice();
     try {
@@ -327,6 +344,7 @@ export function useCelePkgData() {
   }, [celestePath, clearNotice, refreshPath, setLoading, showNotice]);
 
   const savePathAndRescan = useCallback(async () => {
+    configRequestTrackerRef.current.invalidate();
     setLoading(true, "正在保存目录...");
     clearNotice();
     try {
@@ -341,6 +359,7 @@ export function useCelePkgData() {
   }, [celestePath, clearNotice, rescanPath, setLoading, showNotice]);
 
   const selectPathAndRefresh = useCallback(async () => {
+    configRequestTrackerRef.current.invalidate();
     setLoading(true, "正在选择目录...");
     clearNotice();
     try {
