@@ -28,7 +28,7 @@
   padding: 8px 12px;
   border: 1px solid #b7d7e4;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
   box-shadow: 0 8px 22px rgba(38, 58, 80, 0.13);
   overflow-wrap: anywhere;
 }
@@ -44,7 +44,7 @@
 
 .workspace-nav {
   overflow: auto;
-  border: 1px solid #cfd8e2;
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
   background: #f8fafc;
   padding: 8px;
@@ -57,8 +57,8 @@
 .settings-manager,
 .backup-manager,
 .download-manager {
-  border: 1px solid #cfd8e2;
-  background: #ffffff;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-panel);
   border-radius: 7px;
 }
 
@@ -103,13 +103,13 @@
 }
 
 .nav-item:hover:not(:disabled) {
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .nav-item.active {
   border-color: #9bc7d8;
   background: #eaf6fb;
-  color: #075b86;
+  color: var(--color-info);
   font-weight: 800;
 }
 
@@ -129,7 +129,7 @@
   min-width: 48px;
   border: 1px solid #d5dee7;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #4f6172;
   font-weight: 800;
   padding: 1px 7px;
@@ -138,8 +138,8 @@
 
 .nav-item.active .nav-count {
   border-color: #9bc7d8;
-  background: #ffffff;
-  color: #075b86;
+  background: var(--color-panel);
+  color: var(--color-info);
 }
 
 .nav-summary {
@@ -148,7 +148,7 @@
   padding: 8px;
   border: 1px solid #d8e0e8;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .nav-summary div {
@@ -182,14 +182,14 @@
   gap: 8px;
   border: 1px solid #d8e0e8;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
   padding: 8px;
 }
 
 .segmented button.active {
-  border-color: #0f77ad;
-  background: #eef8fc;
-  color: #075b86;
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  color: var(--color-info);
   font-weight: 800;
 }
 
@@ -212,8 +212,8 @@
   margin-left: auto;
   border: 1px solid #d3dce4;
   border-radius: 999px;
-  background: #eef8fc;
-  color: #075b86;
+  background: var(--color-primary-surface);
+  color: var(--color-info);
   font-size: 11px;
   font-weight: 800;
   line-height: 1.4;
@@ -281,9 +281,9 @@
 }
 
 .filter-segmented button.active {
-  border-color: #0f77ad;
-  background: #eef8fc;
-  color: #075b86;
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  color: var(--color-info);
 }
 
 .save-picker {
@@ -302,7 +302,7 @@
 }
 
 .select-label small {
-  color: #657384;
+  color: var(--color-text-muted);
 }
 
 .save-list {
@@ -323,9 +323,9 @@
 }
 
 .save-option.active {
-  border-color: #0f77ad;
-  background: #eef8fc;
-  color: #075b86;
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  color: var(--color-info);
 }
 
 .save-option span,
@@ -349,7 +349,7 @@
 
 .save-option small {
   grid-column: 1 / -1;
-  color: #657384;
+  color: var(--color-text-muted);
   font-size: 11px;
 }
 
@@ -409,14 +409,14 @@
 }
 
 .inline-toggle.active {
-  border-color: #0f77ad;
-  background: #eef8fc;
-  color: #075b86;
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
+  color: var(--color-info);
 }
 
 .inline-toggle small {
   margin-left: auto;
-  color: #657384;
+  color: var(--color-text-muted);
 }
 
 .profile-list {
@@ -453,10 +453,10 @@
   gap: 1px;
   min-height: 42px;
   padding: 7px 10px;
-  border: 1px solid #c7d0da;
-  border-radius: 5px;
-  background: #ffffff;
-  color: #233142;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  color: var(--color-text-strong);
   text-align: left;
 }
 
@@ -465,8 +465,8 @@ button.profile {
 }
 
 .profile-row.active .profile {
-  border-color: #0f77ad;
-  background: #eef8fc;
+  border-color: var(--color-primary);
+  background: var(--color-primary-surface);
 }
 
 .profile small {
@@ -507,13 +507,13 @@ button.profile {
   width: 28px;
   min-height: 42px;
   padding: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: #8a96a3;
 }
 
 .profile-action-button:hover:not(:disabled) {
-  background: #eef8fc;
-  color: #0f77ad;
+  background: var(--color-primary-surface);
+  color: var(--color-primary);
 }
 
 .profile-action-button.save {
@@ -530,12 +530,12 @@ button.profile {
 
 .profile-action-button.overwrite:hover:not(:disabled) {
   background: #fff8ed;
-  color: #8a4a12;
+  color: var(--color-warning);
 }
 
 .profile-action-button.danger:hover:not(:disabled) {
   background: #fff1f1;
-  color: #b42318;
+  color: var(--color-danger);
 }
 
 .profile-layout {
@@ -553,8 +553,8 @@ button.profile {
 
 .profile-editor {
   min-height: 0;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
   padding: 12px;
   overflow: auto;
 }
@@ -563,9 +563,9 @@ button.profile {
   display: grid;
   gap: 4px;
   padding: 9px;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
-  background: #f8fafb;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-panel-subtle);
 }
 
 .profile-current strong {
@@ -575,7 +575,7 @@ button.profile {
 }
 
 .profile-current span {
-  color: #657384;
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -585,12 +585,12 @@ button.profile {
   gap: 7px;
   margin-top: 10px;
   padding: 9px;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
 }
 
 .profile-stats span {
-  color: #657384;
+  color: var(--color-text-muted);
 }
 
 .wide-button {
@@ -631,7 +631,7 @@ button.profile {
 .overwrite-button {
   border-color: #e5c083;
   background: #fff8ed;
-  color: #8a4a12;
+  color: var(--color-warning);
 }
 
 .overwrite-button:hover:not(:disabled) {

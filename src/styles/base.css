@@ -1,7 +1,31 @@
 :root {
+  --color-text: #17202a;
+  --color-text-strong: #233142;
+  --color-text-muted: #657384;
+  --color-page: #e9edf2;
+  --color-panel: #ffffff;
+  --color-panel-subtle: #f8fafb;
+  --color-border: #c7d0da;
+  --color-border-soft: #dce4ec;
+  --color-border-strong: #cfd8e2;
+  --color-primary: #0f77ad;
+  --color-primary-hover: #0a4c75;
+  --color-primary-surface: #eef8fc;
+  --color-success: #16805a;
+  --color-warning: #8a4a12;
+  --color-danger: #b42318;
+  --color-info: #075b86;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --space-xs: 4px;
+  --space-sm: 6px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --shadow-focus-primary: 0 0 0 3px rgba(15, 119, 173, 0.14);
+
   font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
-  color: #17202a;
-  background: #e9edf2;
+  color: var(--color-text);
+  background: var(--color-page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -23,10 +47,10 @@ select {
 }
 
 button {
-  border: 1px solid #c7d0da;
-  background: #ffffff;
-  color: #233142;
-  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+  color: var(--color-text-strong);
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
   cursor: pointer;
   display: inline-flex;
@@ -38,7 +62,7 @@ button {
 
 button:hover:not(:disabled) {
   border-color: #7c9dbb;
-  color: #0a4c75;
+  color: var(--color-primary-hover);
 }
 
 button:disabled {
@@ -49,18 +73,18 @@ button:disabled {
 input,
 select {
   width: 100%;
-  border: 1px solid #c7d0da;
-  border-radius: 5px;
-  background: #ffffff;
-  color: #17202a;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  color: var(--color-text);
   padding: 8px 9px;
   outline: none;
 }
 
 input:focus,
 select:focus {
-  border-color: #0f77ad;
-  box-shadow: 0 0 0 3px rgba(15, 119, 173, 0.14);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus-primary);
 }
 
 .app-shell {
@@ -68,7 +92,7 @@ select:focus {
   min-width: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  background: #e9edf2;
+  background: var(--color-page);
 }
 
 .fatal-shell {
@@ -80,11 +104,11 @@ select:focus {
 .fatal-error {
   width: min(520px, 100%);
   display: grid;
-  gap: 12px;
+  gap: var(--space-lg);
   justify-items: start;
   padding: 22px;
   border: 1px solid #d6b48b;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fff8ef;
   color: #5c3218;
 }
@@ -100,9 +124,9 @@ select:focus {
   gap: 10px;
   align-items: center;
   min-width: 0;
-  padding: 8px 10px;
+  padding: var(--space-md) 10px;
   background: #f7f9fb;
-  border-bottom: 1px solid #cfd8e2;
+  border-bottom: 1px solid var(--color-border-strong);
 }
 
 h1,
@@ -145,9 +169,9 @@ h1 {
   grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
   min-width: 0;
-  border: 1px solid #c7d0da;
-  border-radius: 5px;
-  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
   overflow: hidden;
 }
 
@@ -163,20 +187,20 @@ h1 {
   border: 0;
   border-right: 1px solid #e0e6ec;
   border-radius: 0;
-  background: #f8fafb;
+  background: var(--color-panel-subtle);
   color: #536576;
   padding: 0;
 }
 
 .toolbar-path-browse:hover:not(:disabled) {
-  border-color: #c7d0da;
+  border-color: var(--color-border);
   border-right-color: #b8c7d5;
-  background: #eef8fc;
+  background: var(--color-primary-surface);
 }
 
 .toolbar-metrics {
   display: flex;
-  gap: 6px;
+  gap: var(--space-sm);
   align-items: center;
   min-width: 0;
   overflow-x: auto;
@@ -191,12 +215,12 @@ h1 {
   min-width: 66px;
   padding: 4px 7px;
   border: 1px solid #d8e0e8;
-  border-radius: 5px;
-  background: #ffffff;
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
 }
 
 .toolbar-pill small {
-  color: #657384;
+  color: var(--color-text-muted);
   font-size: 11px;
 }
 
@@ -221,7 +245,7 @@ h1 {
 }
 
 .toolbar-pill.ok strong {
-  color: #16805a;
+  color: var(--color-success);
 }
 
 .toolbar-pill.warn strong {
@@ -241,9 +265,9 @@ h1 {
 
 .cache-rescan-button {
   min-width: 106px;
-  gap: 6px;
-  padding-inline: 12px;
-  color: #8a4a12;
+  gap: var(--space-sm);
+  padding-inline: var(--space-lg);
+  color: var(--color-warning);
   border-color: #e2b36d;
   background: #fff8ed;
   font-weight: 700;
@@ -256,8 +280,8 @@ h1 {
 }
 
 .primary-button {
-  background: #0f77ad;
-  border-color: #0f77ad;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: white;
   font-weight: 700;
   min-width: 88px;

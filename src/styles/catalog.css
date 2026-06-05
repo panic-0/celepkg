@@ -5,7 +5,7 @@
   gap: 10px;
   overflow: auto;
   padding: 10px;
-  background: #f8fafb;
+  background: var(--color-panel-subtle);
 }
 
 .everest-layout {
@@ -15,15 +15,15 @@
   gap: 10px;
   overflow: auto;
   padding: 10px;
-  background: #f8fafb;
+  background: var(--color-panel-subtle);
 }
 
 .everest-status,
 .everest-channel-panel {
   min-width: 0;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
   padding: 10px;
 }
 
@@ -129,9 +129,9 @@
   align-items: center;
   min-height: 62px;
   padding: 9px;
-  border: 1px solid #dce4ec;
+  border: 1px solid var(--color-border-soft);
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .everest-release-row > div {
@@ -148,7 +148,7 @@
 
 .everest-light-button {
   border-color: #cbd7e3;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #526273;
 }
 
@@ -176,9 +176,9 @@
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   gap: 8px;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
   padding: 10px;
 }
 
@@ -209,7 +209,7 @@
 }
 
 .catalog-filter-bar .field span {
-  color: #657384;
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 900;
 }
@@ -227,9 +227,9 @@
   min-height: 31px;
   margin: 0;
   padding: 5px 9px;
-  border: 1px solid #cfd8e2;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #536273;
   font-size: 13px;
   font-weight: 800;
@@ -245,7 +245,7 @@
 .catalog-downloadable-toggle.active {
   border-color: #9bc7d8;
   background: #eaf6fb;
-  color: #075b86;
+  color: var(--color-info);
 }
 
 .catalog-download-summary {
@@ -293,7 +293,7 @@
   flex: 0 0 auto;
   width: 30px;
   min-height: 30px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 
 .pagination-numbers {
@@ -312,26 +312,26 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 850;
 }
 
 .pagination-page {
   border: 1px solid #d5dee7;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #526273;
 }
 
 .pagination-page:hover:not(:disabled) {
   border-color: #7c9dbb;
-  color: #0a4c75;
+  color: var(--color-primary-hover);
 }
 
 .pagination-page.active {
   border-color: #8cbfd2;
   background: #eaf6fb;
-  color: #075b86;
+  color: var(--color-info);
 }
 
 .pagination-ellipsis {
@@ -402,7 +402,7 @@
   flex: 0 0 auto;
   border: 1px solid #d5dee7;
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #607083;
   font-size: 11px;
   font-weight: 800;
@@ -462,7 +462,7 @@
 .catalog-row-actions .catalog-detail-button {
   width: 32px;
   min-height: 32px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 
 .catalog-row-actions a {
@@ -472,14 +472,14 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #d5dee7;
-  border-radius: 5px;
-  background: #ffffff;
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
   color: #526273;
 }
 
 .catalog-row-actions a:hover {
   border-color: #7c9dbb;
-  color: #0a4c75;
+  color: var(--color-primary-hover);
 }
 
 .catalog-detail-dialog {
@@ -507,7 +507,7 @@
   padding: 0 12px;
   border: 1px solid #cbd7e3;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #263849;
   font-size: 13px;
   font-weight: 800;
@@ -523,7 +523,7 @@
   border: 1px solid #f0c39a;
   border-radius: 7px;
   background: #fff8ed;
-  color: #8a4a12;
+  color: var(--color-warning);
   font-size: 12px;
   line-height: 1.45;
   padding: 7px 8px;
@@ -532,7 +532,7 @@
 .catalog-empty {
   min-height: 180px;
   border: 1px dashed #d4dde6;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #fbfcfd;
 }
 
@@ -543,7 +543,7 @@
   gap: 4px;
   min-height: 34px;
   border: 1px solid #cfdce7;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #eef5f9;
   padding: 2px;
 }
@@ -555,7 +555,7 @@
   min-height: 28px;
   border: 1px solid #d5dee7;
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--color-panel);
   padding: 4px 8px;
   color: #526273;
   font-size: 12px;
@@ -566,7 +566,7 @@
 .backup-retention-option.active {
   border-color: #78b8d4;
   background: #eaf8fc;
-  color: #075b86;
+  color: var(--color-info);
   box-shadow: inset 0 0 0 1px rgba(15, 119, 173, 0.14);
 }
 
@@ -580,7 +580,7 @@
   min-height: 22px;
   padding: 3px 5px;
   border-color: #b8d1df;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #203040;
   font-weight: 800;
   text-align: right;

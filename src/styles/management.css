@@ -15,8 +15,8 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   border: 1px solid #d7e0e9;
-  background: #ffffff;
-  border-radius: 8px;
+  background: var(--color-panel);
+  border-radius: var(--radius-md);
 }
 
 .settings-manager {
@@ -39,9 +39,9 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid #cfd8e2;
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .download-manager > .download-task-panel {
@@ -57,9 +57,9 @@
   min-width: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  border: 1px solid #cfd8e2;
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .everest-manager {
@@ -67,9 +67,9 @@
   min-width: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  border: 1px solid #cfd8e2;
+  border: 1px solid var(--color-border-strong);
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .backup-manager .list-header {
@@ -124,7 +124,7 @@
   align-items: center;
   border: 1px solid #d8e0e8;
   border-radius: 6px;
-  background: #f8fafb;
+  background: var(--color-panel-subtle);
   padding: 3px;
 }
 
@@ -141,7 +141,7 @@
 .record-view-switch button.active {
   border-color: #9bc7d8;
   background: #eaf6fb;
-  color: #075b86;
+  color: var(--color-info);
 }
 
 .update-all-button {
@@ -195,7 +195,7 @@
   padding: 5px 9px;
   border: 1px solid #d5dee8;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #526272;
   font-size: 12px;
   font-weight: 800;
@@ -254,7 +254,7 @@
   padding: 6px;
   border: 1px solid #e2e8ef;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .download-task-group li span {
@@ -316,7 +316,7 @@
 
 .profile-summary-item span,
 .profile-launch-field span {
-  color: #657384;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -372,7 +372,7 @@
   min-width: 0;
   border: 1px solid #d8e0e8;
   border-radius: 6px;
-  background: #f8fafb;
+  background: var(--color-panel-subtle);
   padding: 5px 6px;
   color: #667484;
 }
@@ -384,7 +384,7 @@
   gap: 4px;
   min-width: 0;
   min-height: 32px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   padding: 2px;
 }
 
@@ -402,7 +402,7 @@
   width: 32px;
   min-height: 24px;
   border: 1px dashed #cfd9e3;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.46);
 }
 
@@ -449,12 +449,12 @@
 .catalog-source-chip.selected {
   border-color: #9bc7d8;
   background: #eaf6fb;
-  color: #075b86;
+  color: var(--color-info);
 }
 
 .catalog-source-chip.unselected {
   border-color: #d6dee7;
-  background: #ffffff;
+  background: var(--color-panel);
   color: #647283;
 }
 
@@ -479,7 +479,7 @@
 }
 
 .settings-field-stack > span {
-  color: #657384;
+  color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 800;
 }
