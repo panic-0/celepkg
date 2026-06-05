@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, ModUpdateCandidate } from "../types";
+import type { DependencyReference } from "../utils/dependencies";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
 import { clampPage, paginateItems } from "../utils/pagination";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
@@ -36,6 +37,7 @@ type RecordListProps = {
   modUpdateChecking: boolean;
   modUpdateCount: number;
   modUpdatesByRecordId: Map<string, ModUpdateCandidate>;
+  requiredReferencesByModId: Map<string, DependencyReference[]>;
   visibleMapCount: number;
   modCount: number;
   onDisableAll: () => void;
@@ -68,6 +70,7 @@ export function RecordList({
   modUpdateChecking,
   modUpdateCount,
   modUpdatesByRecordId,
+  requiredReferencesByModId,
   visibleMapCount,
   modCount,
   onDisableAll,
@@ -167,6 +170,7 @@ export function RecordList({
             showWarningColumn={showWarningColumn}
             isEnabled={isModEnabled}
             updatesByRecordId={modUpdatesByRecordId}
+            requiredReferencesByModId={requiredReferencesByModId}
             onUpdate={onModUpdate}
           />
         )}
@@ -329,6 +333,7 @@ function ModTable({
   showWarningColumn,
   isEnabled,
   updatesByRecordId,
+  requiredReferencesByModId,
   onUpdate
 }: {
   mods: ModRecord[];
@@ -340,6 +345,7 @@ function ModTable({
   showWarningColumn: boolean;
   isEnabled: (id: string) => boolean;
   updatesByRecordId: Map<string, ModUpdateCandidate>;
+  requiredReferencesByModId: Map<string, DependencyReference[]>;
   onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
@@ -348,6 +354,7 @@ function ModTable({
         <col className="w-actions" />
         <col className="w-name" />
         <col className="w-kind" />
+        <col className="w-number" />
         <col className="w-number" />
         <col className="w-progress" />
         {showWarningColumn && <col className="w-warning" />}
@@ -358,6 +365,7 @@ function ModTable({
           <th>名称</th>
           <th>类型</th>
           <th className="num">依赖</th>
+          <th className="num">被依赖</th>
           <th>测试图</th>
           {showWarningColumn && <th>警告</th>}
         </tr>
@@ -366,6 +374,7 @@ function ModTable({
         {mods.map((modItem) => {
           const enabled = isEnabled(modItem.id);
           const updateCandidate = updatesByRecordId.get(modItem.id);
+          const requiredReferences = requiredReferencesByModId.get(modItem.id) ?? [];
           return (
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
@@ -403,6 +412,9 @@ function ModTable({
               </td>
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
+              <td className="num" title={formatDependencyReferenceTitle(requiredReferences)}>
+                {requiredReferences.length || "-"}
+              </td>
               <td>{modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "-"}</td>
               {showWarningColumn && (
                 <td>{modItem.warnings.length ? <span className="warning-pill">{modItem.warnings.length}</span> : "-"}</td>
@@ -413,6 +425,11 @@ function ModTable({
       </tbody>
     </table>
   );
+}
+
+function formatDependencyReferenceTitle(references: DependencyReference[]) {
+  if (!references.length) return "没有被其他地图或 Mod 声明为必需依赖";
+  return references.map((reference) => reference.name).join("、");
 }
 
 function InlineUpdateButton({ candidate, onUpdate }: { candidate: ModUpdateCandidate; onUpdate: (candidate: ModUpdateCandidate) => void }) {

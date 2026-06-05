@@ -26,6 +26,7 @@ import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
 import type { ModDownloadProgress } from "./types";
+import { findDependencyReferencesByModId } from "./utils/dependencies";
 import { isDraftEnabled } from "./utils/format";
 import { isMockMode } from "./mockApi";
 
@@ -164,6 +165,10 @@ export function App() {
     enabledModDraft: profileDraft.enabledModDraft,
     scan
   });
+  const dependencyReferences = useMemo(
+    () => findDependencyReferencesByModId([...scan.maps, ...scan.otherMods], scan.otherMods),
+    [scan.maps, scan.otherMods]
+  );
   const workspaceView = useWorkspaceView({
     enabledMapDraft: profileDraft.enabledMapDraft,
     enabledModDraft: profileDraft.enabledModDraft,
@@ -362,6 +367,8 @@ export function App() {
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
             map={workspaceView.selectedMap}
+            optionalReferences={dependencyReferences.optionalReferencesByModId.get(workspaceView.selectedMap?.id ?? "") ?? []}
+            requiredReferences={dependencyReferences.requiredReferencesByModId.get(workspaceView.selectedMap?.id ?? "") ?? []}
             mapDetailControls={mapDetailControls}
             strawberryDenominator={uiLayout.strawberryDenominator}
             draftEnabled={
@@ -377,6 +384,8 @@ export function App() {
           <ModDetail
             activeTab={uiLayout.modDetailTab}
             modItem={workspaceView.selectedMod}
+            optionalReferences={dependencyReferences.optionalReferencesByModId.get(workspaceView.selectedMod?.id ?? "") ?? []}
+            requiredReferences={dependencyReferences.requiredReferencesByModId.get(workspaceView.selectedMod?.id ?? "") ?? []}
             draftEnabled={
               workspaceView.selectedMod
                 ? workspaceView.selectedMod.readOnly || profileDraft.enabledModDraft.has(workspaceView.selectedMod.id)
@@ -403,6 +412,7 @@ export function App() {
             modUpdateChecking={modUpdateChecking}
             modUpdateCount={downloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
+            requiredReferencesByModId={dependencyReferences.requiredReferencesByModId}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}

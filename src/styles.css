@@ -2385,11 +2385,11 @@ button.profile {
 }
 
 .mod-table {
-  min-width: 706px;
+  min-width: 792px;
 }
 
 .mod-table.show-warning {
-  min-width: 782px;
+  min-width: 868px;
 }
 
 .record-table th,
@@ -2813,7 +2813,7 @@ button.profile {
 
 .overview-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(86px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
   gap: 7px;
 }
 

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ModRecord } from "../types";
-import { buildInstalledCatalogAliasSet, buildModAliasMap, isCatalogEntryInstalled, normalizeDependencyName } from "./dependencies";
+import {
+  buildInstalledCatalogAliasSet,
+  buildModAliasMap,
+  findDependencyReferencesByModId,
+  isCatalogEntryInstalled,
+  normalizeDependencyName
+} from "./dependencies";
 
 describe("normalizeDependencyName", () => {
   it("normalizes zip suffixes, separators, whitespace, and case", () => {
@@ -66,25 +72,104 @@ describe("catalog installed aliases", () => {
   });
 });
 
+describe("findDependencyReferencesByModId", () => {
+  it("groups required and optional references by resolved mod aliases", () => {
+    const helper = modRecord({
+      id: "helper",
+      name: "Helper One",
+      fileName: "Helper_One.zip",
+      metadataName: "Helper-One",
+      relativePath: "Mods/Helper_One.zip"
+    });
+    const map = modRecord({
+      id: "map",
+      kind: "map",
+      name: "Map Pack",
+      fileName: "MapPack.zip",
+      metadataName: "Map Pack",
+      relativePath: "Mods/MapPack.zip",
+      dependencies: [{ name: "Helper One", version: "1.0.0" }]
+    });
+    const mod = modRecord({
+      id: "skin",
+      name: "Skin Pack",
+      fileName: "SkinPack.zip",
+      metadataName: "Skin Pack",
+      relativePath: "Mods/SkinPack.zip",
+      optionalDependencies: [{ name: "Mods/Helper_One.zip", version: "" }]
+    });
+
+    const references = findDependencyReferencesByModId([map, mod], [helper]);
+
+    expect(references.requiredReferencesByModId.get("helper")).toEqual([
+      { fileName: "MapPack.zip", id: "map", kind: "map", name: "Map Pack" }
+    ]);
+    expect(references.optionalReferencesByModId.get("helper")).toEqual([
+      { fileName: "SkinPack.zip", id: "skin", kind: "mod", name: "Skin Pack" }
+    ]);
+  });
+
+  it("skips self references and deduplicates repeated dependency aliases", () => {
+    const helper = modRecord({
+      id: "helper",
+      name: "Helper One",
+      fileName: "Helper_One.zip",
+      metadataName: "Helper-One",
+      relativePath: "Mods/Helper_One.zip",
+      dependencies: [
+        { name: "Helper One", version: "" },
+        { name: "Helper_One.zip", version: "" }
+      ]
+    });
+    const map = modRecord({
+      id: "map",
+      kind: "map",
+      name: "Map Pack",
+      fileName: "MapPack.zip",
+      metadataName: "Map Pack",
+      relativePath: "Mods/MapPack.zip",
+      dependencies: [
+        { name: "Helper One", version: "1.0.0" },
+        { name: "Helper_One.zip", version: "1.0.0" }
+      ]
+    });
+
+    const references = findDependencyReferencesByModId([helper, map], [helper]);
+
+    expect(references.requiredReferencesByModId.get("helper")).toEqual([
+      { fileName: "MapPack.zip", id: "map", kind: "map", name: "Map Pack" }
+    ]);
+  });
+});
+
 function modRecord({
   id,
+  dependencies = [],
   name,
   fileName,
+  kind = "mod",
   metadataName,
+  optionalDependencies = [],
   readOnly = false,
   relativePath
 }: {
   id: string;
+  dependencies?: ModRecord["dependencies"];
   name: string;
   fileName: string;
+  kind?: ModRecord["kind"];
   metadataName: string;
+  optionalDependencies?: ModRecord["optionalDependencies"];
   readOnly?: boolean;
   relativePath: string;
 }) {
   return {
+    dependencies,
     id,
+    kind,
     name,
     fileName,
+    optionalDependencies,
     relativePath,
     readOnly,
     metadata: { name: metadataName }

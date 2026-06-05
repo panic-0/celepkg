@@ -3,6 +3,7 @@ import { Fragment, useMemo } from "react";
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
+import type { DependencyReference } from "../utils/dependencies";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
 import { sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
@@ -21,6 +22,8 @@ type MapDetailProps = {
   draftEnabled: boolean;
   map?: ModRecord;
   mapDetailControls: MapDetailControls;
+  optionalReferences: DependencyReference[];
+  requiredReferences: DependencyReference[];
   scrollMemory: ScrollMemory;
   strawberryDenominator: StrawberryDenominator;
   onBack: () => void;
@@ -32,6 +35,8 @@ export function MapDetail({
   draftEnabled,
   map,
   mapDetailControls,
+  optionalReferences,
+  requiredReferences,
   scrollMemory,
   strawberryDenominator,
   onBack,
@@ -313,6 +318,14 @@ export function MapDetail({
               </p>
             ))}
           </section>
+          <section className="detail-section">
+            <h3>被依赖</h3>
+            <DependencyReferenceList references={requiredReferences} emptyText="没有被其他地图或 Mod 声明为必需依赖。" />
+          </section>
+          <section className="detail-section">
+            <h3>被可选依赖</h3>
+            <DependencyReferenceList references={optionalReferences} emptyText="没有被其他地图或 Mod 声明为可选依赖。" />
+          </section>
         </div>
       )}
 
@@ -325,6 +338,20 @@ export function MapDetail({
         </div>
       )}
     </section>
+  );
+}
+
+function DependencyReferenceList({ emptyText, references }: { emptyText: string; references: DependencyReference[] }) {
+  if (!references.length) return <p className="muted">{emptyText}</p>;
+  return (
+    <div className="dependency-list">
+      {references.map((reference) => (
+        <span key={reference.id} title={`${reference.name} (${reference.fileName})`}>
+          <strong>{reference.name}</strong>
+          <small>{reference.kind === "map" ? "地图" : "Mod"}</small>
+        </span>
+      ))}
+    </div>
   );
 }
 

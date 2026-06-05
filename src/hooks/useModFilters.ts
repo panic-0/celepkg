@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
-import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
+import { findDependencyReferencesByModId } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
 
@@ -116,20 +116,14 @@ function strawberrySortValue(record: { stats: { strawberries: number; strawberri
 }
 
 function findReferencedModIds(scan: ScanResult) {
-  const aliasToModId = buildModAliasMap(scan.otherMods);
-  const referenced = new Set<string>();
-  const optionalReferenced = new Set<string>();
-  for (const record of [...scan.maps, ...scan.otherMods]) {
-    for (const dependency of record.dependencies) {
-      const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
-      if (modId && modId !== record.id) referenced.add(modId);
-    }
-    for (const dependency of record.optionalDependencies) {
-      const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
-      if (modId && modId !== record.id) optionalReferenced.add(modId);
-    }
-  }
-  return { optionalReferencedModIds: optionalReferenced, referencedModIds: referenced };
+  const { optionalReferencesByModId, requiredReferencesByModId } = findDependencyReferencesByModId(
+    [...scan.maps, ...scan.otherMods],
+    scan.otherMods
+  );
+  return {
+    optionalReferencedModIds: new Set(optionalReferencesByModId.keys()),
+    referencedModIds: new Set(requiredReferencesByModId.keys())
+  };
 }
 
 function mapSearchText(map: ModRecord) {

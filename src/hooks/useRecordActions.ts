@@ -1,7 +1,7 @@
 import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { setRecordFavorite, setRecordProtected } from "../api";
 import type { AppNotifier, ModRecord, ScanResult } from "../types";
-import { buildModAliasMap, normalizeDependencyName } from "../utils/dependencies";
+import { findDependencyReferencesByModId } from "../utils/dependencies";
 import { isDraftEnabled, readError } from "../utils/format";
 import type { ActiveView } from "../viewTypes";
 
@@ -173,22 +173,11 @@ export function useRecordActions({
 }
 
 function findDependentNamesByModId(scan: ScanResult, enabledMapDraft: Set<string>, enabledModDraft: Set<string>) {
-  const aliasToModId = buildModAliasMap(scan.otherMods);
-
-  const dependentNames = new Map<string, Set<string>>();
   const enabledItems = [
     ...scan.maps.filter((map) => map.protected || enabledMapDraft.has(map.id)),
     ...scan.otherMods.filter((modItem) => modItem.protected || enabledModDraft.has(modItem.id))
   ];
-  for (const item of enabledItems) {
-    for (const dependency of item.dependencies) {
-      const modId = aliasToModId.get(normalizeDependencyName(dependency.name));
-      if (!modId || modId === item.id) continue;
-      const names = dependentNames.get(modId) ?? new Set<string>();
-      names.add(item.name);
-      dependentNames.set(modId, names);
-    }
-  }
+  const { requiredReferencesByModId } = findDependencyReferencesByModId(enabledItems, scan.otherMods);
 
-  return new Map([...dependentNames].map(([modId, names]) => [modId, [...names].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"))]));
+  return new Map([...requiredReferencesByModId].map(([modId, records]) => [modId, records.map((record) => record.name)]));
 }

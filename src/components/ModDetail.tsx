@@ -1,6 +1,7 @@
 import { ArrowLeft, FolderOpen } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
+import type { DependencyReference } from "../utils/dependencies";
 import type { ModDetailTab } from "../hooks/useUiLayout";
 import { Info } from "./common";
 
@@ -8,12 +9,23 @@ type ModDetailProps = {
   activeTab: ModDetailTab;
   draftEnabled: boolean;
   modItem?: ModRecord;
+  optionalReferences: DependencyReference[];
+  requiredReferences: DependencyReference[];
   scrollMemory: ScrollMemory;
   onBack: () => void;
   onTabChange: (tab: ModDetailTab) => void;
 };
 
-export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBack, onTabChange }: ModDetailProps) {
+export function ModDetail({
+  activeTab,
+  draftEnabled,
+  modItem,
+  optionalReferences,
+  requiredReferences,
+  scrollMemory,
+  onBack,
+  onTabChange
+}: ModDetailProps) {
   const modId = modItem?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`mod:${modId}:${activeTab}:panel`, scrollMemory);
 
@@ -68,6 +80,7 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
             <div className="overview-metrics">
               <Metric label="类型" value={modItem.isArchive ? "zip" : "文件夹"} />
               <Metric label="依赖" value={modItem.dependencies.length} />
+              <Metric label="被依赖" value={requiredReferences.length} />
               <Metric label="可选依赖" value={modItem.optionalDependencies.length} />
               <Metric label="警告" value={modItem.warnings.length} tone={modItem.warnings.length ? "warn" : undefined} />
               <Metric label="测试图" value={modItem.subMaps.length ? `${modItem.subMaps.length} 张` : "无"} />
@@ -121,6 +134,16 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
               <p className="muted">没有声明可选依赖。</p>
             )}
           </section>
+
+          <section className="detail-section">
+            <h3>被依赖</h3>
+            <DependencyReferenceList references={requiredReferences} emptyText="没有被其他地图或 Mod 声明为必需依赖。" />
+          </section>
+
+          <section className="detail-section">
+            <h3>被可选依赖</h3>
+            <DependencyReferenceList references={optionalReferences} emptyText="没有被其他地图或 Mod 声明为可选依赖。" />
+          </section>
         </div>
       )}
 
@@ -146,6 +169,20 @@ export function ModDetail({ activeTab, draftEnabled, modItem, scrollMemory, onBa
         </div>
       )}
     </section>
+  );
+}
+
+function DependencyReferenceList({ emptyText, references }: { emptyText: string; references: DependencyReference[] }) {
+  if (!references.length) return <p className="muted">{emptyText}</p>;
+  return (
+    <div className="dependency-list">
+      {references.map((reference) => (
+        <span key={reference.id} title={`${reference.name} (${reference.fileName})`}>
+          <strong>{reference.name}</strong>
+          <small>{reference.kind === "map" ? "地图" : "Mod"}</small>
+        </span>
+      ))}
+    </div>
   );
 }
 
