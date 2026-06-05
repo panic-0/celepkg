@@ -129,8 +129,15 @@ h1 {
 }
 
 .brand-block span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   color: #667484;
   font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolbar-path {

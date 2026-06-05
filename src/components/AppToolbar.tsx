@@ -33,12 +33,15 @@ export function AppToolbar({
   onRescan
 }: AppToolbarProps) {
   const completedCount = scan.maps.filter((map) => map.completionStatus === "completed").length;
+  const statusText = loading ? loadingMessage || "正在处理" : scan.modsPath ? "已连接 Celeste" : "等待目录";
 
   return (
     <header className="app-toolbar">
       <div className="brand-block">
         <strong>CelePkg</strong>
-        <span>{loading ? loadingMessage || "正在处理" : scan.modsPath ? "已连接 Celeste" : "等待目录"}</span>
+        <span title={statusText} aria-label={statusText}>
+          {statusText}
+        </span>
       </div>
 
       <div className="toolbar-path">
