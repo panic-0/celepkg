@@ -15,7 +15,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
@@ -45,6 +45,13 @@ struct FileStamp {
 struct CachedScan {
     signature: ScanSignature,
     result: ScanResult,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CachedScanRef<'a> {
+    signature: &'a ScanSignature,
+    result: &'a ScanResult,
 }
 
 struct Blacklist {
@@ -146,13 +153,9 @@ fn scan_and_write_cache(
         apply_protected_flags(&mut result, protected_record_ids);
     });
     result.timings = timings.clone();
-    let cache = CachedScan {
-        signature,
-        result: result.clone(),
-    };
     let cache_path = scan_cache_path(celeste_path);
     time_stage(timings, "写入扫描缓存", || {
-        let _ = write_json(&cache_path, &cache);
+        let _ = write_cached_scan(&cache_path, &signature, &result);
     });
     result.timings = timings.clone();
     result
@@ -163,11 +166,17 @@ pub fn list_available_save_files(celeste_path: &Path) -> Vec<SaveFileInfo> {
 }
 
 pub fn write_scan_cache(celeste_path: &Path, result: &ScanResult) {
-    let cache = CachedScan {
-        signature: build_scan_signature(celeste_path, &result.selected_save_files),
-        result: result.clone(),
-    };
-    let _ = write_json(&scan_cache_path(celeste_path), &cache);
+    let signature = build_scan_signature(celeste_path, &result.selected_save_files);
+    let _ = write_cached_scan(&scan_cache_path(celeste_path), &signature, result);
+}
+
+fn write_cached_scan(
+    cache_path: &Path,
+    signature: &ScanSignature,
+    result: &ScanResult,
+) -> Result<(), String> {
+    let cache = CachedScanRef { signature, result };
+    write_json(cache_path, &cache)
 }
 
 pub fn full_scan(
@@ -690,21 +699,49 @@ fn read_everest_build_version(celeste_path: &Path) -> Option<String> {
 }
 
 fn read_everest_build_from_file(path: PathBuf) -> Option<u64> {
+    const CHUNK_SIZE: usize = 64 * 1024;
+    let file = File::open(path).ok()?;
+    read_everest_build_from_reader(BufReader::new(file), CHUNK_SIZE)
+}
+
+fn read_everest_build_from_reader(mut reader: impl Read, chunk_size: usize) -> Option<u64> {
     const MAGIC: &[u8] = b"EverestBuild";
-    let data = fs::read(path).ok()?;
-    let start = data
-        .windows(MAGIC.len())
-        .position(|window| window == MAGIC)?
-        + MAGIC.len();
-    let version_bytes: Vec<u8> = data[start..]
-        .iter()
-        .copied()
-        .take_while(|byte| byte.is_ascii_digit())
-        .collect();
-    if version_bytes.is_empty() {
-        return None;
+    let mut buffer = vec![0; chunk_size.max(1)];
+    let mut matched = 0;
+    let mut found_magic = false;
+    let mut version_bytes = Vec::new();
+
+    loop {
+        let read_len = reader.read(&mut buffer).ok()?;
+        if read_len == 0 {
+            break;
+        }
+
+        for byte in &buffer[..read_len] {
+            if found_magic {
+                if byte.is_ascii_digit() {
+                    version_bytes.push(*byte);
+                    continue;
+                }
+                return (!version_bytes.is_empty())
+                    .then(|| std::str::from_utf8(&version_bytes).ok()?.parse().ok())
+                    .flatten();
+            }
+
+            if *byte == MAGIC[matched] {
+                matched += 1;
+                if matched == MAGIC.len() {
+                    found_magic = true;
+                }
+            } else {
+                matched = usize::from(*byte == MAGIC[0]);
+            }
+        }
     }
-    std::str::from_utf8(&version_bytes).ok()?.parse().ok()
+
+    found_magic
+        .then(|| std::str::from_utf8(&version_bytes).ok()?.parse().ok())
+        .flatten()
 }
 
 fn read_everest_builtin_metadata(celeste_path: &Path) -> Option<ModMetadata> {
@@ -1561,6 +1598,7 @@ fn sub_map_chapter(sid: &str) -> String {
 mod tests {
     use super::*;
     use crate::domain::Dependency;
+    use std::io::{Cursor, Seek, SeekFrom, Write};
 
     fn metadata(name: &str) -> ModMetadata {
         ModMetadata {
@@ -1909,6 +1947,42 @@ CompleteScreen:
     }
 
     #[test]
+    fn write_scan_cache_round_trips_cached_scan() {
+        let root = temp_celeste_root("cache-write");
+        fs::create_dir_all(&root).expect("root dir");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+        let scan = ScanResult {
+            celeste_path: root.to_string_lossy().to_string(),
+            mods_path: root.join("Mods").to_string_lossy().to_string(),
+            blacklist_path: root
+                .join("Mods")
+                .join("blacklist.txt")
+                .to_string_lossy()
+                .to_string(),
+            blacklist_entries: vec![],
+            game_executable: String::new(),
+            maps: vec![record("map-id", "Map.zip", ModKind::Map)],
+            other_mods: vec![record("mod-id", "Helper.zip", ModKind::Mod)],
+            profiles: empty_profiles(),
+            available_save_files: vec![],
+            selected_save_files: vec!["0.celeste".to_string()],
+            warnings: vec![],
+            timings: vec![],
+        };
+
+        write_scan_cache(&root, &scan);
+        let cached = read_json::<CachedScan>(&cache_file).expect("cached scan");
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(cached.result.maps.len(), 1);
+        assert_eq!(cached.result.other_mods.len(), 1);
+        assert_eq!(cached.signature.selected_save_files, vec!["0.celeste"]);
+    }
+
+    #[test]
     fn cached_scan_invalidates_on_primary_save_change() {
         let root = temp_celeste_root("cache-save");
         write_dir_map(&root, "SaveMap", "maps/cache/save");
@@ -2086,6 +2160,41 @@ CompleteScreen:
         let _ = fs::remove_dir_all(root);
 
         assert_eq!(version, "1.4980.0");
+    }
+
+    #[test]
+    fn everest_build_version_is_read_from_late_file_section() {
+        let root = temp_celeste_root("everest-build-late");
+        fs::create_dir_all(&root).expect("root dir");
+        let mut file = File::create(root.join("Celeste.exe")).expect("game binary");
+        file.set_len(2 * 1024 * 1024).expect("file len");
+        file.seek(SeekFrom::Start(2 * 1024 * 1024 + 17))
+            .expect("seek");
+        file.write_all(b"EverestBuild4980\0").expect("build");
+
+        let version = read_everest_build_version(&root).expect("everest build");
+
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(version, "1.4980.0");
+    }
+
+    #[test]
+    fn everest_build_magic_can_cross_chunk_boundary() {
+        let build =
+            read_everest_build_from_reader(Cursor::new(b"prefix EverestBuild4980".as_slice()), 9)
+                .expect("everest build");
+
+        assert_eq!(build, 4980);
+    }
+
+    #[test]
+    fn everest_build_digits_can_cross_chunk_boundary() {
+        let build =
+            read_everest_build_from_reader(Cursor::new(b"EverestBuild123456789".as_slice()), 15)
+                .expect("everest build");
+
+        assert_eq!(build, 123456789);
     }
 
     #[test]
