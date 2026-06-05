@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   validateBackupInfo,
   validateConfigResponse,
+  validateEverestInstallResult,
+  validateEverestReleaseList,
   validateModCatalogSearchResult,
   validateModInstallResult,
   validateModUpdateCheckResult,
   validateScanResult,
   validateStagedDownload
 } from "./apiValidation";
+import apiContract from "./contractSamples/api-contract.json";
 
 const profiles = {
   activeMapProfileId: "default-maps",
@@ -68,6 +71,17 @@ const scanResult = {
 };
 
 describe("api validation", () => {
+  it("accepts the shared API contract samples", () => {
+    expect(validateConfigResponse(apiContract.configResponse)).toEqual(apiContract.configResponse);
+    expect(validateScanResult(apiContract.scanResult)).toEqual(apiContract.scanResult);
+    expect(validateModCatalogSearchResult(apiContract.modCatalogSearchResult)).toEqual(apiContract.modCatalogSearchResult);
+    expect(validateModUpdateCheckResult(apiContract.modUpdateCheckResult)).toEqual(apiContract.modUpdateCheckResult);
+    expect(validateModInstallResult(apiContract.modInstallResult)).toEqual(apiContract.modInstallResult);
+    expect(validateStagedDownload(apiContract.stagedDownload)).toEqual(apiContract.stagedDownload);
+    expect(validateEverestReleaseList(apiContract.everestReleaseList)).toEqual(apiContract.everestReleaseList);
+    expect(validateEverestInstallResult(apiContract.everestInstallResult)).toEqual(apiContract.everestInstallResult);
+  });
+
   it("accepts valid config responses", () => {
     expect(
       validateConfigResponse({

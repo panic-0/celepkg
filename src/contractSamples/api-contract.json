@@ -1,0 +1,359 @@
+{
+  "profiles": {
+    "activeMapProfileId": "maps-main",
+    "activeModProfileId": "mods-main",
+    "profiles": [
+      {
+        "id": "maps-main",
+        "name": "Main Maps",
+        "profileType": "maps",
+        "enabledMapIds": ["official-celeste", "sample-map"],
+        "enabledModIds": ["sample-helper"],
+        "launchArgs": "-debug",
+        "createdAt": "1770000000000000000",
+        "updatedAt": "1770000100000000000"
+      },
+      {
+        "id": "mods-main",
+        "name": "Main Mods",
+        "profileType": "mods",
+        "enabledMapIds": null,
+        "enabledModIds": ["sample-helper"],
+        "launchArgs": "",
+        "createdAt": "1770000000000000000",
+        "updatedAt": "1770000100000000000"
+      }
+    ]
+  },
+  "scanResult": {
+    "celestePath": "D:/Games/Celeste",
+    "modsPath": "D:/Games/Celeste/Mods",
+    "blacklistPath": "D:/Games/Celeste/Mods/blacklist.txt",
+    "blacklistEntries": ["DisabledMap.zip"],
+    "gameExecutable": "D:/Games/Celeste/Celeste.exe",
+    "maps": [
+      {
+        "id": "sample-map",
+        "name": "Sample Map",
+        "fileName": "SampleMap.zip",
+        "relativePath": "Mods/SampleMap.zip",
+        "absolutePath": "D:/Games/Celeste/Mods/SampleMap.zip",
+        "isArchive": true,
+        "kind": "map",
+        "enabled": true,
+        "favorite": true,
+        "protected": false,
+        "readOnly": false,
+        "metadata": {
+          "name": "Sample Map",
+          "version": "1.0.0",
+          "author": "Mapper",
+          "description": "Contract sample",
+          "dependencies": [{ "name": "SampleHelper", "version": "1.2.0" }],
+          "optionalDependencies": [{ "name": "SpeedrunTool", "version": "" }]
+        },
+        "mapIds": ["SampleMap/Start"],
+        "subMaps": [
+          {
+            "id": "sample-map-start",
+            "sid": "SampleMap/Start",
+            "modeIndex": 0,
+            "displayName": "Sample Map",
+            "chapter": "Start",
+            "filePath": "Mods/SampleMap.zip/Maps/SampleMap/Start.bin",
+            "difficulty": "advanced",
+            "strawberryCount": 3,
+            "strawberryTotalCount": 5,
+            "completionStatus": "unfinished",
+            "stats": {
+              "deaths": 12,
+              "strawberries": 3,
+              "strawberriesKnown": true,
+              "timePlayed": 3600,
+              "completed": false,
+              "completionKnown": true,
+              "cassettes": 0,
+              "hearts": 1,
+              "saveFiles": ["0.celeste"]
+            }
+          }
+        ],
+        "mapCount": 1,
+        "strawberryCount": 3,
+        "strawberryTotalCount": 5,
+        "completionStatus": "unfinished",
+        "dependencies": [{ "name": "SampleHelper", "version": "1.2.0" }],
+        "optionalDependencies": [{ "name": "SpeedrunTool", "version": "" }],
+        "stats": {
+          "deaths": 12,
+          "strawberries": 3,
+          "strawberriesKnown": true,
+          "timePlayed": 3600,
+          "completed": false,
+          "completionKnown": true,
+          "cassettes": 0,
+          "hearts": 1,
+          "saveFiles": ["0.celeste"]
+        },
+        "warnings": ["Sample warning"]
+      }
+    ],
+    "otherMods": [
+      {
+        "id": "sample-helper",
+        "name": "SampleHelper",
+        "fileName": "SampleHelper.zip",
+        "relativePath": "Mods/SampleHelper.zip",
+        "absolutePath": "D:/Games/Celeste/Mods/SampleHelper.zip",
+        "isArchive": true,
+        "kind": "mod",
+        "enabled": true,
+        "favorite": false,
+        "protected": true,
+        "readOnly": false,
+        "metadata": {
+          "name": "SampleHelper",
+          "version": "1.2.3",
+          "author": "Helper Author",
+          "description": "",
+          "dependencies": [],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "notApplicable",
+        "dependencies": [],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      }
+    ],
+    "profiles": {
+      "activeMapProfileId": "maps-main",
+      "activeModProfileId": "mods-main",
+      "profiles": [
+        {
+          "id": "maps-main",
+          "name": "Main Maps",
+          "profileType": "maps",
+          "enabledMapIds": ["official-celeste", "sample-map"],
+          "enabledModIds": ["sample-helper"],
+          "launchArgs": "-debug",
+          "createdAt": "1770000000000000000",
+          "updatedAt": "1770000100000000000"
+        },
+        {
+          "id": "mods-main",
+          "name": "Main Mods",
+          "profileType": "mods",
+          "enabledMapIds": null,
+          "enabledModIds": ["sample-helper"],
+          "launchArgs": "",
+          "createdAt": "1770000000000000000",
+          "updatedAt": "1770000100000000000"
+        }
+      ]
+    },
+    "availableSaveFiles": [
+      {
+        "name": "0.celeste",
+        "playerName": "Madeline",
+        "currentMap": "SampleMap/Start",
+        "lastModified": "1770000200000000000"
+      }
+    ],
+    "selectedSaveFiles": ["0.celeste"],
+    "warnings": ["Global warning"],
+    "timings": [{ "stage": "scan", "ms": 42 }]
+  },
+  "configResponse": {
+    "celestePath": "D:/Games/Celeste",
+    "autoBackupEnabled": true,
+    "autoBackupCleanupEnabled": true,
+    "autoBackupRetentionCount": 20,
+    "modCatalogSourceOrder": ["wegfan", "everestMirror", "everest"],
+    "modCatalogSourceEnabledCount": 2,
+    "autoCheckModUpdatesOnStartup": true,
+    "autoRefreshModCatalogCacheOnStartup": true,
+    "selectedSaveFiles": ["0.celeste"],
+    "profiles": {
+      "activeMapProfileId": "maps-main",
+      "activeModProfileId": "mods-main",
+      "profiles": [
+        {
+          "id": "maps-main",
+          "name": "Main Maps",
+          "profileType": "maps",
+          "enabledMapIds": ["official-celeste", "sample-map"],
+          "enabledModIds": ["sample-helper"],
+          "launchArgs": "-debug",
+          "createdAt": "1770000000000000000",
+          "updatedAt": "1770000100000000000"
+        },
+        {
+          "id": "mods-main",
+          "name": "Main Mods",
+          "profileType": "mods",
+          "enabledMapIds": null,
+          "enabledModIds": ["sample-helper"],
+          "launchArgs": "",
+          "createdAt": "1770000000000000000",
+          "updatedAt": "1770000100000000000"
+        }
+      ]
+    },
+    "warnings": ["Config warning"]
+  },
+  "modCatalogSearchResult": {
+    "sources": ["wegfan", "everestMirror"],
+    "entries": [
+      {
+        "source": "wegfan",
+        "id": "sample-map",
+        "name": "Sample Map",
+        "version": "1.0.1",
+        "downloadUrl": "https://example.invalid/sample-map.zip",
+        "pageUrl": "https://gamebanana.com/mods/sample-map",
+        "gameBananaType": "Mod",
+        "categoryName": "Maps",
+        "subCategoryName": "Standalone",
+        "gameBananaId": 1000,
+        "gameBananaFileId": 2000,
+        "size": 123456,
+        "lastUpdate": 1770000300,
+        "xxHash": ["abcdef"]
+      }
+    ],
+    "warnings": ["Catalog warning"]
+  },
+  "modUpdateCheckResult": {
+    "sources": ["wegfan"],
+    "updates": [
+      {
+        "entry": {
+          "source": "wegfan",
+          "id": "sample-map",
+          "name": "Sample Map",
+          "version": "1.0.1",
+          "downloadUrl": "https://example.invalid/sample-map.zip",
+          "pageUrl": "https://gamebanana.com/mods/sample-map",
+          "gameBananaType": "Mod",
+          "categoryName": "Maps",
+          "subCategoryName": "Standalone",
+          "gameBananaId": 1000,
+          "gameBananaFileId": 2000,
+          "size": 123456,
+          "lastUpdate": 1770000300,
+          "xxHash": ["abcdef"]
+        },
+        "installed": {
+          "recordId": "sample-map",
+          "name": "Sample Map",
+          "fileName": "SampleMap.zip",
+          "relativePath": "Mods/SampleMap.zip",
+          "absolutePath": "D:/Games/Celeste/Mods/SampleMap.zip",
+          "version": "1.0.0",
+          "hash": "oldhash"
+        },
+        "updateAvailable": true,
+        "reason": "hash changed"
+      }
+    ],
+    "matched": [],
+    "warnings": []
+  },
+  "modInstallResult": {
+    "entry": {
+      "source": "wegfan",
+      "id": "sample-map",
+      "name": "Sample Map",
+      "version": "1.0.1",
+      "downloadUrl": "https://example.invalid/sample-map.zip",
+      "pageUrl": "https://gamebanana.com/mods/sample-map",
+      "gameBananaType": "Mod",
+      "categoryName": "Maps",
+      "subCategoryName": "Standalone",
+      "gameBananaId": 1000,
+      "gameBananaFileId": 2000,
+      "size": 123456,
+      "lastUpdate": 1770000300,
+      "xxHash": ["abcdef"]
+    },
+    "destinationPath": "D:/Games/Celeste/Mods/SampleMap.zip",
+    "replacedPath": null,
+    "hash": "abcdef",
+    "scan": {
+      "celestePath": "D:/Games/Celeste",
+      "modsPath": "D:/Games/Celeste/Mods",
+      "blacklistPath": "D:/Games/Celeste/Mods/blacklist.txt",
+      "blacklistEntries": ["DisabledMap.zip"],
+      "gameExecutable": "D:/Games/Celeste/Celeste.exe",
+      "maps": [],
+      "otherMods": [],
+      "profiles": {
+        "activeMapProfileId": "maps-main",
+        "activeModProfileId": "mods-main",
+        "profiles": []
+      },
+      "availableSaveFiles": [],
+      "selectedSaveFiles": ["0.celeste"],
+      "warnings": [],
+      "timings": []
+    }
+  },
+  "stagedDownload": {
+    "stagedId": "sample-stage",
+    "name": "Sample Map",
+    "kind": "mod",
+    "size": 123456,
+    "hash": "abcdef"
+  },
+  "everestReleaseList": {
+    "releases": [
+      {
+        "branch": "stable",
+        "version": 4980,
+        "date": "2026-05-21T18:15:00Z",
+        "commit": "2f0a7cdb95ef",
+        "mainFileSize": 43600000,
+        "mainDownload": "https://example.invalid/everest.zip",
+        "mirrorDownload": "https://example.invalid/everest-mirror.zip",
+        "isNative": true
+      }
+    ],
+    "warnings": []
+  },
+  "everestInstallResult": {
+    "release": {
+      "branch": "stable",
+      "version": 4980,
+      "date": "2026-05-21T18:15:00Z",
+      "commit": "2f0a7cdb95ef",
+      "mainFileSize": 43600000,
+      "mainDownload": "https://example.invalid/everest.zip",
+      "mirrorDownload": "https://example.invalid/everest-mirror.zip",
+      "isNative": true
+    },
+    "scan": {
+      "celestePath": "D:/Games/Celeste",
+      "modsPath": "D:/Games/Celeste/Mods",
+      "blacklistPath": "D:/Games/Celeste/Mods/blacklist.txt",
+      "blacklistEntries": [],
+      "gameExecutable": "D:/Games/Celeste/Celeste.exe",
+      "maps": [],
+      "otherMods": [],
+      "profiles": {
+        "activeMapProfileId": "maps-main",
+        "activeModProfileId": "mods-main",
+        "profiles": []
+      },
+      "availableSaveFiles": [],
+      "selectedSaveFiles": ["0.celeste"],
+      "warnings": [],
+      "timings": []
+    }
+  }
+}

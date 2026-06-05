@@ -359,3 +359,76 @@ pub struct EverestInstallResult {
     pub release: EverestRelease,
     pub scan: ScanResult,
 }
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+    use serde::de::DeserializeOwned;
+    use serde_json::Value;
+
+    const API_CONTRACT: &str = include_str!("../../src/contractSamples/api-contract.json");
+
+    #[test]
+    fn shared_api_contract_samples_match_domain_serialization() {
+        let contract: Value = serde_json::from_str(API_CONTRACT).expect("api contract json");
+
+        assert_config_response_contract(&contract);
+        assert_round_trip::<ScanResult>(&contract, "scanResult");
+        assert_round_trip::<ModCatalogSearchResult>(&contract, "modCatalogSearchResult");
+        assert_round_trip::<ModUpdateCheckResult>(&contract, "modUpdateCheckResult");
+        assert_round_trip::<ModInstallResult>(&contract, "modInstallResult");
+        assert_round_trip::<StagedDownload>(&contract, "stagedDownload");
+        assert_round_trip::<EverestReleaseList>(&contract, "everestReleaseList");
+        assert_round_trip::<EverestInstallResult>(&contract, "everestInstallResult");
+    }
+
+    fn assert_round_trip<T>(contract: &Value, key: &str)
+    where
+        T: DeserializeOwned + serde::Serialize,
+    {
+        let expected = contract
+            .get(key)
+            .unwrap_or_else(|| panic!("missing contract sample {key}"));
+        let parsed: T = serde_json::from_value(expected.clone())
+            .unwrap_or_else(|error| panic!("deserialize {key}: {error}"));
+        let serialized =
+            serde_json::to_value(parsed).unwrap_or_else(|error| panic!("serialize {key}: {error}"));
+        assert_eq!(
+            serialized,
+            expected.clone(),
+            "contract sample changed shape: {key}"
+        );
+    }
+
+    fn assert_config_response_contract(contract: &Value) {
+        let expected = contract
+            .get("configResponse")
+            .expect("missing contract sample configResponse");
+        let profiles: ProfilesState =
+            serde_json::from_value(contract["profiles"].clone()).expect("profiles contract");
+        let response = ConfigResponse {
+            celeste_path: "D:/Games/Celeste".to_string(),
+            auto_backup_enabled: true,
+            auto_backup_cleanup_enabled: true,
+            auto_backup_retention_count: 20,
+            mod_catalog_source_order: vec![
+                ModCatalogSourceKind::Wegfan,
+                ModCatalogSourceKind::EverestMirror,
+                ModCatalogSourceKind::Everest,
+            ],
+            mod_catalog_source_enabled_count: 2,
+            auto_check_mod_updates_on_startup: true,
+            auto_refresh_mod_catalog_cache_on_startup: true,
+            selected_save_files: vec!["0.celeste".to_string()],
+            profiles,
+            warnings: vec!["Config warning".to_string()],
+        };
+
+        let serialized = serde_json::to_value(response).expect("serialize configResponse");
+        assert_eq!(
+            serialized,
+            expected.clone(),
+            "contract sample changed shape: configResponse"
+        );
+    }
+}
