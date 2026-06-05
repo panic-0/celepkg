@@ -14,6 +14,7 @@ import {
 } from "../api";
 import type { AppNotice, AppNoticeTone, AppNotifier, ModCatalogSourceKind, ScanResult } from "../types";
 import { readError } from "../utils/format";
+import { emptyLoadingState, nextLoadingState } from "../utils/loadingState";
 
 const emptyScan: ScanResult = {
   celestePath: "",
@@ -45,8 +46,7 @@ export function useCelePkgData() {
   const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(false);
   const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(false);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
-  const [loading, setLoadingState] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("");
+  const [loadingState, setLoadingState] = useState(emptyLoadingState);
   const [notice, setNotice] = useState<AppNotice | null>(null);
   const noticeIdRef = useRef(0);
   const selectedSaveRequestRef = useRef(0);
@@ -70,15 +70,16 @@ export function useCelePkgData() {
   );
 
   const setLoading = useCallback((nextLoading: boolean, message?: string) => {
-    setLoadingState(nextLoading);
-    if (message) setLoadingMessage(message);
-    if (!nextLoading) setLoadingMessage("");
+    setLoadingState((current) => nextLoadingState(current, nextLoading, message));
+  }, []);
+
+  const setLoadingMessage = useCallback((message: string) => {
+    setLoadingState((current) => (current.loading ? { ...current, message } : current));
   }, []);
 
   const refreshPath = useCallback(
     async (nextPath: string) => {
-      setLoading(true);
-      setLoadingMessage("正在读取扫描缓存并扫描地图...");
+      setLoading(true, "正在读取扫描缓存并扫描地图...");
       clearNotice();
       try {
         const result = await scanCeleste(nextPath);
@@ -97,8 +98,7 @@ export function useCelePkgData() {
 
   const rescanPath = useCallback(
     async (nextPath: string) => {
-      setLoading(true);
-      setLoadingMessage("正在刷新缓存并重新扫描地图...");
+      setLoading(true, "正在刷新缓存并重新扫描地图...");
       clearNotice();
       try {
         const result = await rescanCeleste(nextPath);
@@ -142,8 +142,7 @@ export function useCelePkgData() {
 
   const updateAutoBackupEnabled = useCallback(
     async (enabled: boolean) => {
-      setLoading(true);
-      setLoadingMessage("正在更新备份设置...");
+      setLoading(true, "正在更新备份设置...");
       clearNotice();
       try {
         const config = await setAutoBackupEnabled(enabled);
@@ -162,8 +161,7 @@ export function useCelePkgData() {
   const updateAutoBackupRetentionCount = useCallback(
     async (count: number) => {
       const normalizedCount = Math.max(1, Math.min(100, Math.trunc(count)));
-      setLoading(true);
-      setLoadingMessage("正在更新备份设置...");
+      setLoading(true, "正在更新备份设置...");
       clearNotice();
       try {
         const config = await setAutoBackupRetentionCount(normalizedCount);
@@ -181,8 +179,7 @@ export function useCelePkgData() {
 
   const updateAutoBackupCleanupEnabled = useCallback(
     async (enabled: boolean) => {
-      setLoading(true);
-      setLoadingMessage("正在更新备份设置...");
+      setLoading(true, "正在更新备份设置...");
       clearNotice();
       try {
         const config = await setAutoBackupCleanupEnabled(enabled);
@@ -201,8 +198,7 @@ export function useCelePkgData() {
 
   const updateModCatalogSources = useCallback(
     async (sourceOrder: ModCatalogSourceKind[], enabledCount: number) => {
-      setLoading(true);
-      setLoadingMessage("正在更新 Mod 设置...");
+      setLoading(true, "正在更新 Mod 设置...");
       clearNotice();
       try {
         const config = await setModCatalogSources(sourceOrder, enabledCount);
@@ -221,8 +217,7 @@ export function useCelePkgData() {
 
   const updateAutoCheckModUpdatesOnStartup = useCallback(
     async (enabled: boolean) => {
-      setLoading(true);
-      setLoadingMessage("正在更新 Mod 设置...");
+      setLoading(true, "正在更新 Mod 设置...");
       clearNotice();
       try {
         const config = await setAutoCheckModUpdatesOnStartup(enabled);
@@ -243,8 +238,7 @@ export function useCelePkgData() {
       const requestId = selectedSaveRequestRef.current + 1;
       selectedSaveRequestRef.current = requestId;
       setScan((current) => ({ ...current, selectedSaveFiles: saveFiles }));
-      setLoading(true);
-      setLoadingMessage("正在更新存档统计...");
+      setLoading(true, "正在更新存档统计...");
       clearNotice();
       try {
         const config = await setSelectedSaveFiles(saveFiles);
@@ -268,8 +262,7 @@ export function useCelePkgData() {
   );
 
   const savePathAndRefresh = useCallback(async () => {
-    setLoading(true);
-    setLoadingMessage("正在保存目录...");
+    setLoading(true, "正在保存目录...");
     clearNotice();
     try {
       await setCelestePath(celestePath);
@@ -277,13 +270,13 @@ export function useCelePkgData() {
       await refreshPath(celestePath);
     } catch (error) {
       showNotice("error", readError(error));
+    } finally {
       setLoading(false);
     }
   }, [celestePath, clearNotice, refreshPath, setLoading, showNotice]);
 
   const savePathAndRescan = useCallback(async () => {
-    setLoading(true);
-    setLoadingMessage("正在保存目录...");
+    setLoading(true, "正在保存目录...");
     clearNotice();
     try {
       await setCelestePath(celestePath);
@@ -291,18 +284,17 @@ export function useCelePkgData() {
       await rescanPath(celestePath);
     } catch (error) {
       showNotice("error", readError(error));
+    } finally {
       setLoading(false);
     }
   }, [celestePath, clearNotice, rescanPath, setLoading, showNotice]);
 
   const selectPathAndRefresh = useCallback(async () => {
-    setLoading(true);
-    setLoadingMessage("正在选择目录...");
+    setLoading(true, "正在选择目录...");
     clearNotice();
     try {
       const selectedPath = await selectCelesteDirectory();
       if (!selectedPath) {
-        setLoading(false);
         return undefined;
       }
       setPathInput(selectedPath);
@@ -312,10 +304,11 @@ export function useCelePkgData() {
       return await refreshPath(saved.celestePath);
     } catch (error) {
       showNotice("error", readError(error));
-      setLoading(false);
       return undefined;
+    } finally {
+      setLoading(false);
     }
-  }, [clearNotice, refreshPath, setLoading, showNotice]);
+  }, [clearNotice, refreshPath, setLoading, setLoadingMessage, showNotice]);
 
   useEffect(() => {
     loadConfigAndRefresh().catch((error) => showNotice("error", readError(error)));
@@ -337,8 +330,8 @@ export function useCelePkgData() {
     celestePath,
     clearNotice,
     configWarnings,
-    loading,
-    loadingMessage,
+    loading: loadingState.loading,
+    loadingMessage: loadingState.message,
     loadConfigAndRefresh,
     modCatalogSources,
     modCatalogSourceEnabledCount,
