@@ -1783,6 +1783,41 @@ button.profile {
   font-weight: 800;
 }
 
+.catalog-meta-stack {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.catalog-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #526273;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.catalog-pagination .icon-button {
+  width: 30px;
+  min-height: 30px;
+  border-radius: 5px;
+}
+
+.catalog-pagination span,
+.catalog-pagination small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalog-pagination small {
+  color: #6d7b8a;
+  font-weight: 700;
+}
+
 .catalog-list {
   min-height: 0;
   display: grid;

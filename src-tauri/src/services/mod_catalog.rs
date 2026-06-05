@@ -127,8 +127,7 @@ pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatal
     if !normalized_query.is_empty() {
         entries.retain(|entry| entry_matches_query(entry, &normalized_query, can_match_page_url));
     }
-    entries.sort_by_key(|entry| entry.name.to_lowercase());
-    entries.truncate(200);
+    sort_catalog_entries(&mut entries);
     ModCatalogSearchResult {
         sources: load.sources,
         entries,
@@ -139,13 +138,16 @@ pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatal
 pub fn refresh_catalog_cache(sources: &[ModCatalogSourceKind]) -> ModCatalogSearchResult {
     let load = load_catalogs_fresh(sources);
     let mut entries = load.entries;
-    entries.sort_by_key(|entry| entry.name.to_lowercase());
-    entries.truncate(200);
+    sort_catalog_entries(&mut entries);
     ModCatalogSearchResult {
         sources: load.sources,
         entries,
         warnings: load.warnings,
     }
+}
+
+fn sort_catalog_entries(entries: &mut [ModCatalogEntry]) {
+    entries.sort_by_key(|entry| entry.name.to_lowercase());
 }
 
 pub fn check_updates(
@@ -1436,6 +1438,22 @@ Helper:
             "https://gamebanana.com/mods/555"
         ));
         assert!(catalog_entry_matches_query(&entry, "gamebanana.com"));
+    }
+
+    #[test]
+    fn catalog_sorting_keeps_more_than_legacy_limit() {
+        let mut entries = (0..250)
+            .rev()
+            .map(|index| {
+                test_catalog_entry(&format!("entry-{index:03}"), &format!("Entry {index:03}"))
+            })
+            .collect::<Vec<_>>();
+
+        sort_catalog_entries(&mut entries);
+
+        assert_eq!(entries.len(), 250);
+        assert_eq!(entries[0].name, "Entry 000");
+        assert_eq!(entries[249].name, "Entry 249");
     }
 
     #[test]

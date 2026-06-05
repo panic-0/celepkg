@@ -1,15 +1,18 @@
-import { Download, ExternalLink, Info, PackageCheck, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, Info, PackageCheck, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
 import type { DownloadTask } from "../utils/downloadTask";
 import {
   buildCatalogEntryViews,
+  clampCatalogPage,
   filterCatalogEntryViews,
+  paginateCatalogEntryViews,
   normalizeCatalogType,
   sortCatalogEntryViews,
   type CatalogEntryView,
   type CatalogFilters,
+  type CatalogPage,
   type CatalogSortKey
 } from "../utils/catalogView";
 import { DialogFacts, DialogShell, SearchBox, Select } from "./common";
@@ -40,6 +43,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
   const [filters, setFilters] = useState<CatalogFilters>(defaultFilters);
   const [catalogSearching, setCatalogSearching] = useState(false);
   const [sortKey, setSortKey] = useState<CatalogSortKey>("relevance");
+  const [page, setPage] = useState(1);
   const searchRequestRef = useRef(0);
 
   const sourceList = useMemo(() => (sources.length ? sources : defaultSources), [sources]);
@@ -52,10 +56,12 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
     () => sortCatalogEntryViews(filterCatalogEntryViews(allViews, filters), sortKey),
     [allViews, filters, sortKey]
   );
+  const pagedViews = useMemo(() => paginateCatalogEntryViews(visibleViews, page), [page, visibleViews]);
   const detailView = detailEntry
     ? (allViews.find((view) => view.entry.source === detailEntry.source && view.entry.id === detailEntry.id) ?? null)
     : null;
   const activeSourceLabels = sourceList.map(sourceLabel).join("、");
+  const resultText = formatCatalogResultText(pagedViews, visibleViews.length, searchResult.entries.length, activeSourceLabels);
 
   useEffect(() => {
     const requestId = searchRequestRef.current + 1;
@@ -86,6 +92,14 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
     };
   }, [notifier, query, sourceList]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filters, query, sortKey, sourceList]);
+
+  useEffect(() => {
+    setPage((current) => clampCatalogPage(current, visibleViews.length));
+  }, [visibleViews.length]);
+
   function updateFilters(update: Partial<CatalogFilters>) {
     setFilters((current) => ({ ...current, ...update }));
   }
@@ -95,7 +109,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
       <div className="list-header catalog-header">
         <div>
           <h2>Mod 获取中心</h2>
-          <p>{`${visibleViews.length} / ${searchResult.entries.length} 个结果 · ${activeSourceLabels}`}</p>
+          <p>{resultText}</p>
         </div>
       </div>
 
@@ -116,10 +130,21 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
             onFiltersChange={updateFilters}
             onSortChange={setSortKey}
           />
-          <WarningStrip warnings={searchResult.warnings} />
-          <CatalogDownloadSummary task={downloadTask ?? null} />
+          <div className="catalog-meta-stack">
+            <WarningStrip warnings={searchResult.warnings} />
+            <CatalogDownloadSummary task={downloadTask ?? null} />
+            <CatalogPagination
+              end={pagedViews.end}
+              page={pagedViews.page}
+              pageCount={pagedViews.pageCount}
+              pageSize={pagedViews.pageSize}
+              start={pagedViews.start}
+              total={visibleViews.length}
+              onPageChange={setPage}
+            />
+          </div>
           <div className="catalog-list">
-            {visibleViews.map((view) => (
+            {pagedViews.items.map((view) => (
               <CatalogEntryRow
                 key={`${view.entry.source}:${view.entry.id}`}
                 view={view}
@@ -143,6 +168,38 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
         />
       )}
     </section>
+  );
+}
+
+function CatalogPagination({
+  end,
+  page,
+  pageCount,
+  pageSize,
+  start,
+  total,
+  onPageChange
+}: {
+  end: number;
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  start: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (total <= pageSize) return null;
+  return (
+    <div className="catalog-pagination" aria-label="目录结果分页">
+      <button className="icon-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} title="上一页">
+        <ChevronLeft size={16} />
+      </button>
+      <span>{`第 ${page} / ${pageCount} 页`}</span>
+      <small>{`${start}-${end} / ${total}`}</small>
+      <button className="icon-button" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} title="下一页">
+        <ChevronRight size={16} />
+      </button>
+    </div>
   );
 }
 
@@ -381,6 +438,12 @@ function catalogActionLabel(view: CatalogEntryView) {
   if (view.state === "installing") return "安装中";
   if (!view.downloadable) return "无下载";
   return "安装";
+}
+
+function formatCatalogResultText(page: CatalogPage<CatalogEntryView>, visibleCount: number, matchedCount: number, sourceLabels: string) {
+  const range = visibleCount ? `${page.start}-${page.end} / ${visibleCount}` : "0 / 0";
+  const matched = visibleCount === matchedCount ? "" : ` · ${matchedCount} 个匹配`;
+  return `${range} 个结果${matched} · ${sourceLabels}`;
 }
 
 function catalogTypeLabel(view: CatalogEntryView) {

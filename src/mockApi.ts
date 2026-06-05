@@ -728,8 +728,27 @@ function createMockCatalog(): ModCatalogEntry[] {
       "https://celeste.weg.fan/api/v2/download/files/loading",
       ["loading-hash"],
       "Other/Misc"
-    )
+    ),
+    ...createMockBulkCatalogEntries()
   ];
+}
+
+function createMockBulkCatalogEntries(): ModCatalogEntry[] {
+  return Array.from({ length: 135 }, (_, index) => {
+    const number = index + 1;
+    const source: ModCatalogSourceKind = number % 2 ? "wegfan" : "everestMirror";
+    const type = number % 3 === 0 ? "Tools" : number % 3 === 1 ? "Maps" : "Helpers";
+    return catalogEntry(
+      source,
+      `Mock Catalog Result ${number.toString().padStart(3, "0")}`,
+      `0.${number}.0`,
+      "Mod",
+      `https://example.invalid/mock-catalog/${number}`,
+      [`mock-catalog-hash-${number}`],
+      type,
+      type === "Maps" ? "Standalone" : ""
+    );
+  });
 }
 
 function createMockEverestReleases(): EverestRelease[] {

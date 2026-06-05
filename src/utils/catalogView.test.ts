@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ModCatalogEntry, ModRecord } from "../types";
 import { createDownloadTask } from "./downloadTask";
-import { buildCatalogEntryViews, filterCatalogEntryViews, sortCatalogEntryViews, type CatalogFilters } from "./catalogView";
+import {
+  buildCatalogEntryViews,
+  clampCatalogPage,
+  filterCatalogEntryViews,
+  paginateCatalogEntryViews,
+  sortCatalogEntryViews,
+  type CatalogFilters
+} from "./catalogView";
 
 function entry(name: string, partial: Partial<ModCatalogEntry> = {}): ModCatalogEntry {
   return {
@@ -131,5 +138,39 @@ describe("catalog view model", () => {
     expect(sortCatalogEntryViews(views, "updatedDesc").map((view) => view.entry.name)).toEqual(["A", "C", "B"]);
     expect(sortCatalogEntryViews(views, "nameAsc").map((view) => view.entry.name)).toEqual(["A", "B", "C"]);
     expect(sortCatalogEntryViews(views, "sizeDesc").map((view) => view.entry.name)).toEqual(["A", "C", "B"]);
+  });
+
+  it("paginates catalog results after filtering and sorting", () => {
+    const items = Array.from({ length: 101 }, (_, index) => index + 1);
+
+    const firstPage = paginateCatalogEntryViews(items, 1);
+    const secondPage = paginateCatalogEntryViews(items, 2);
+
+    expect(firstPage.pageCount).toBe(2);
+    expect(firstPage.items).toHaveLength(100);
+    expect(firstPage.start).toBe(1);
+    expect(firstPage.end).toBe(100);
+    expect(secondPage.items).toEqual([101]);
+    expect(secondPage.start).toBe(101);
+    expect(secondPage.end).toBe(101);
+  });
+
+  it("clamps catalog page when filtered results shrink", () => {
+    const items = Array.from({ length: 35 }, (_, index) => index + 1);
+
+    expect(clampCatalogPage(5, items.length, 10)).toBe(4);
+    expect(paginateCatalogEntryViews(items, 5, 10)).toMatchObject({
+      page: 4,
+      pageCount: 4,
+      start: 31,
+      end: 35
+    });
+    expect(paginateCatalogEntryViews([], 8)).toMatchObject({
+      page: 1,
+      pageCount: 1,
+      start: 0,
+      end: 0,
+      items: []
+    });
   });
 });
