@@ -1,9 +1,7 @@
-import { LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BackupManager } from "./components/BackupManager";
 import { DownloadManager } from "./components/DownloadManager";
 import { EverestManager } from "./components/EverestManager";
-import { IssueDrawer } from "./components/IssueDrawer";
 import { MapDetail } from "./components/MapDetail";
 import { ModCatalogManager } from "./components/ModCatalogManager";
 import { ModDetail } from "./components/ModDetail";
@@ -11,13 +9,14 @@ import { ProfileManager } from "./components/ProfileManager";
 import { RecordList } from "./components/RecordList";
 import { SettingsManager } from "./components/SettingsManager";
 import { AppToolbar } from "./components/AppToolbar";
-import { ToastHost } from "./components/ToastHost";
 import { WorkspaceNav } from "./components/WorkspaceNav";
-import { AppConfirmDialog, DependencyUpdateDialog, EverestDependencyDialog } from "./components/AppDialogs";
+import { AppOverlays } from "./components/AppOverlays";
+import { WorkspaceLoadingOverlay } from "./components/WorkspaceLoadingOverlay";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useDownloadTaskControls } from "./hooks/useDownloadTaskControls";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
+import { useModDownloadProgressListener } from "./hooks/useModDownloadProgressListener";
 import { useModInstallWorkflow } from "./hooks/useModInstallWorkflow";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
@@ -25,10 +24,9 @@ import { useRecordActions } from "./hooks/useRecordActions";
 import type { ScrollPosition } from "./hooks/useScrollMemory";
 import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
-import type { ModDownloadProgress } from "./types";
 import { findDependencyReferencesByModId } from "./utils/dependencies";
 import { isDraftEnabled } from "./utils/format";
-import { isMockMode } from "./mockApi";
+import type { ActiveView } from "./viewTypes";
 
 export function App() {
   const {
@@ -123,28 +121,7 @@ export function App() {
     if (configWarnings.length && !celestePath.trim()) setIssuesOpen(true);
   }, [celestePath, configWarnings.length]);
 
-  useEffect(() => {
-    if (isMockMode()) return;
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-    void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
-        listen<unknown>("mod-download-progress", (event) => {
-          const progress = toModDownloadProgress(event.payload);
-          if (!progress) return;
-          applyProgress(progress);
-        })
-      )
-      .then((listener) => {
-        if (disposed) listener();
-        else unlisten = listener;
-      })
-      .catch(() => undefined);
-    return () => {
-      disposed = true;
-      if (unlisten) unlisten();
-    };
-  }, [applyProgress]);
+  useModDownloadProgressListener(applyProgress);
 
   const backups = useBackups({
     celestePath,
@@ -222,18 +199,7 @@ export function App() {
         onRescan={savePathAndRescan}
       />
 
-      <section
-        className={`workspace ${
-          workspaceView.activeView === "profiles" ||
-          workspaceView.activeView === "settings" ||
-          workspaceView.activeView === "backups" ||
-          workspaceView.activeView === "downloads" ||
-          workspaceView.activeView === "everest" ||
-          workspaceView.activeView === "catalog"
-            ? "management-view"
-            : ""
-        }`}
-      >
+      <section className={`workspace ${isManagementView(workspaceView.activeView) ? "management-view" : ""}`}>
         <WorkspaceNav
           activeView={workspaceView.activeView}
           dependencyModCount={profileDraft.dependencyModDraft.size}
@@ -430,55 +396,34 @@ export function App() {
           />
         )}
 
-        {showWorkspaceLoading && (
-          <div className="workspace-loading" role="status" aria-live="polite">
-            <LoaderCircle className="spin-icon" size={34} />
-            <strong>{loadingMessage}</strong>
-          </div>
-        )}
+        {showWorkspaceLoading && <WorkspaceLoadingOverlay message={loadingMessage} />}
       </section>
 
-      <IssueDrawer
+      <AppOverlays
         configWarnings={configWarnings}
+        confirmPrompt={confirmPrompt}
+        dependencyPrompt={dependencyPrompt}
+        everestDependencyPrompt={everestDependencyPrompt}
+        issuesOpen={issuesOpen}
         itemWarnings={itemWarnings}
-        open={issuesOpen}
+        notice={notice}
         scanWarnings={scan.warnings}
-        onClose={() => setIssuesOpen(false)}
+        onConfirmPromptClose={closeConfirmPrompt}
+        onDependencyPromptClose={closeDependencyPrompt}
+        onEverestDependencyPromptClose={closeEverestDependencyPrompt}
+        onIssuesClose={() => setIssuesOpen(false)}
+        onNoticeClose={clearNotice}
       />
-      {dependencyPrompt && <DependencyUpdateDialog prompt={dependencyPrompt} onClose={closeDependencyPrompt} />}
-      {everestDependencyPrompt && <EverestDependencyDialog prompt={everestDependencyPrompt} onClose={closeEverestDependencyPrompt} />}
-      {confirmPrompt && <AppConfirmDialog prompt={confirmPrompt} onClose={closeConfirmPrompt} />}
-      <ToastHost notice={notice} onClose={clearNotice} />
     </main>
+  );
+}
+
+function isManagementView(view: ActiveView) {
+  return (
+    view === "profiles" || view === "settings" || view === "backups" || view === "downloads" || view === "everest" || view === "catalog"
   );
 }
 
 function isWorkspaceLoadingMessage(message: string) {
   return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
-}
-
-const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);
-
-function toModDownloadProgress(value: unknown): ModDownloadProgress | null {
-  if (!value || typeof value !== "object") return null;
-  const object = value as Record<string, unknown>;
-  if (
-    typeof object.operationId !== "string" ||
-    typeof object.phase !== "string" ||
-    !modDownloadPhases.has(object.phase) ||
-    typeof object.downloaded !== "number"
-  ) {
-    return null;
-  }
-  return {
-    operationId: object.operationId,
-    modName: typeof object.modName === "string" ? object.modName : "",
-    phase: object.phase as ModDownloadProgress["phase"],
-    downloaded: object.downloaded,
-    total: typeof object.total === "number" ? object.total : null,
-    speedBytesPerSec: typeof object.speedBytesPerSec === "number" ? object.speedBytesPerSec : 0,
-    taskIndex: typeof object.taskIndex === "number" ? object.taskIndex : 1,
-    taskTotal: typeof object.taskTotal === "number" ? object.taskTotal : 1,
-    url: typeof object.url === "string" ? object.url : ""
-  };
 }
