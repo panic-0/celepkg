@@ -51,6 +51,7 @@ import {
   createModUpdateTaskDescriptors,
   createSingleModUpdateTaskDescriptor
 } from "../utils/modUpdateTask";
+import { notifyWarning } from "../utils/notify";
 
 type ModInstallWorkflowOptions = {
   autoCheckModUpdatesOnStartup: boolean;
@@ -414,7 +415,7 @@ export function useModInstallWorkflow({
       release = selectEverestReleaseForBuild(result.releases, requiredBuild);
       if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
     } catch (error) {
-      notifier.showWarning(readError(error));
+      notifyWarning(notifier, error);
     } finally {
       setLoading(false);
     }
@@ -520,7 +521,7 @@ export function useModInstallWorkflow({
         null
       );
     } catch (error) {
-      notifier.showWarning(readError(error));
+      notifyWarning(notifier, error);
       return null;
     }
   }

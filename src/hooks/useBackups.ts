@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cleanupAutoBackups, createBackup, deleteBackup, listBackups, openBackupFolder, openBackupLocation, restoreBackup } from "../api";
 import type { AppNotifier, BackupInfo, RestoreScope, ScanResult } from "../types";
-import { readError } from "../utils/format";
+import { notifyError } from "../utils/notify";
 
 type BackupsOptions = {
   celestePath: string;
@@ -20,7 +20,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
     try {
       setBackups(await listBackups());
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setBackupsRefreshing(false);
     }
@@ -34,7 +34,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
       setBackups(await listBackups());
       notifier.showSuccess(`已创建备份：${backup.id}`);
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
       await refresh(celestePath);
       notifier.showSuccess("已还原游戏文件。");
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }
@@ -63,7 +63,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
       setBackups(await listBackups());
       notifier.showSuccess("已删除备份。");
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
       setBackups(nextBackups);
       notifier.showSuccess("已清理旧自动备份。");
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
     try {
       await openBackupFolder(celestePath);
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     }
   }
 
@@ -97,7 +97,7 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
     try {
       await openBackupLocation(backupPath);
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     }
   }
 

@@ -2,7 +2,7 @@ import { Download, LoaderCircle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listEverestReleases } from "../api";
 import type { AppNotifier, EverestRelease, EverestReleaseList, ModRecord } from "../types";
-import { readError } from "../utils/format";
+import { notifyError } from "../utils/notify";
 
 type EverestManagerProps = {
   loading: boolean;
@@ -45,7 +45,7 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
         setReleaseList(result);
         if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
       } catch (error) {
-        notifier.showError(readError(error));
+        notifyError(notifier, error);
       } finally {
         setLoadingReleases(false);
       }

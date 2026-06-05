@@ -2,7 +2,8 @@ import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { setRecordFavorite, setRecordProtected } from "../api";
 import type { AppNotifier, ModRecord, ScanResult } from "../types";
 import { findDependencyReferencesByModId } from "../utils/dependencies";
-import { isDraftEnabled, readError } from "../utils/format";
+import { isDraftEnabled } from "../utils/format";
+import { notifyError } from "../utils/notify";
 import type { ActiveView } from "../viewTypes";
 
 type RecordActionsOptions = {
@@ -94,7 +95,7 @@ export function useRecordActions({
       notifier.showSuccess(favorite ? "已加入收藏。" : "已取消收藏。");
     } catch (error) {
       setRecordFavoriteInScan(record.id, record.favorite);
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }
@@ -108,7 +109,7 @@ export function useRecordActions({
       setScan(result);
       notifier.showSuccess(record.protected ? "已取消始终启用。" : "已设为始终启用，应用 Profile 时不会写入 blacklist。");
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }

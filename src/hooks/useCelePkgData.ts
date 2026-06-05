@@ -15,9 +15,9 @@ import {
   setSelectedSaveFiles
 } from "../api";
 import type { AppNotice, AppNoticeTone, AppNotifier, ModCatalogSourceKind, ScanResult } from "../types";
-import { readError } from "../utils/format";
 import { createLatestRequestTracker } from "../utils/latestRequest";
 import { emptyLoadingState, nextLoadingState } from "../utils/loadingState";
+import { showErrorNotice } from "../utils/notify";
 
 const emptyScan: ScanResult = {
   celestePath: "",
@@ -97,7 +97,7 @@ export function useCelePkgData() {
         setPathInput(result.celestePath);
         return result;
       } catch (error) {
-        if (scanRequestTrackerRef.current.isLatest(requestId)) showNotice("error", readError(error));
+        if (scanRequestTrackerRef.current.isLatest(requestId)) showErrorNotice(showNotice, error);
         return undefined;
       } finally {
         setLoading(false);
@@ -119,7 +119,7 @@ export function useCelePkgData() {
         showNotice("success", "已刷新缓存并重新扫描地图。");
         return result;
       } catch (error) {
-        if (scanRequestTrackerRef.current.isLatest(requestId)) showNotice("error", readError(error));
+        if (scanRequestTrackerRef.current.isLatest(requestId)) showErrorNotice(showNotice, error);
         return undefined;
       } finally {
         setLoading(false);
@@ -171,7 +171,7 @@ export function useCelePkgData() {
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", config.autoBackupEnabled ? "已开启修改前自动备份。" : "已关闭修改前自动备份。");
       } catch (error) {
-        showNotice("error", readError(error));
+        showErrorNotice(showNotice, error);
       } finally {
         setLoading(false);
       }
@@ -191,7 +191,7 @@ export function useCelePkgData() {
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", `已设置为保留最近 ${config.autoBackupRetentionCount} 个自动备份。`);
       } catch (error) {
-        showNotice("error", readError(error));
+        showErrorNotice(showNotice, error);
       } finally {
         setLoading(false);
       }
@@ -211,7 +211,7 @@ export function useCelePkgData() {
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", config.autoBackupCleanupEnabled ? "已开启自动清理旧备份。" : "已关闭自动清理旧备份。");
       } catch (error) {
-        showNotice("error", readError(error));
+        showErrorNotice(showNotice, error);
       } finally {
         setLoading(false);
       }
@@ -231,7 +231,7 @@ export function useCelePkgData() {
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", "已更新 Mod 数据源。");
       } catch (error) {
-        showNotice("error", readError(error));
+        showErrorNotice(showNotice, error);
       } finally {
         setLoading(false);
       }
@@ -250,7 +250,7 @@ export function useCelePkgData() {
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", config.autoCheckModUpdatesOnStartup ? "已开启启动时自动检查 Mod 更新。" : "已关闭启动时自动检查 Mod 更新。");
       } catch (error) {
-        showNotice("error", readError(error));
+        showErrorNotice(showNotice, error);
       } finally {
         setLoading(false);
       }
@@ -272,7 +272,7 @@ export function useCelePkgData() {
           config.autoRefreshModCatalogCacheOnStartup ? "已开启启动时静默拉取 Mod 列表缓存。" : "已关闭启动时静默拉取 Mod 列表缓存。"
         );
       } catch (error) {
-        showNotice("error", readError(error));
+        showErrorNotice(showNotice, error);
       } finally {
         setLoading(false);
       }
@@ -292,7 +292,7 @@ export function useCelePkgData() {
       }
       return result;
     } catch (error) {
-      showNotice("error", readError(error));
+      showErrorNotice(showNotice, error);
       return undefined;
     } finally {
       setCatalogCacheRefreshing(false);
@@ -319,7 +319,7 @@ export function useCelePkgData() {
         setPathInput(result.celestePath);
       } catch (error) {
         if (isLatestRequest()) {
-          showNotice("error", readError(error));
+          showErrorNotice(showNotice, error);
         }
       } finally {
         setLoading(false);
@@ -337,7 +337,7 @@ export function useCelePkgData() {
       setConfigWarnings([]);
       await refreshPath(celestePath);
     } catch (error) {
-      showNotice("error", readError(error));
+      showErrorNotice(showNotice, error);
     } finally {
       setLoading(false);
     }
@@ -352,7 +352,7 @@ export function useCelePkgData() {
       setConfigWarnings([]);
       await rescanPath(celestePath);
     } catch (error) {
-      showNotice("error", readError(error));
+      showErrorNotice(showNotice, error);
     } finally {
       setLoading(false);
     }
@@ -373,7 +373,7 @@ export function useCelePkgData() {
       setConfigWarnings([]);
       return await refreshPath(saved.celestePath);
     } catch (error) {
-      showNotice("error", readError(error));
+      showErrorNotice(showNotice, error);
       return undefined;
     } finally {
       setLoading(false);
@@ -381,7 +381,7 @@ export function useCelePkgData() {
   }, [clearNotice, refreshPath, setLoading, setLoadingMessage, showNotice]);
 
   useEffect(() => {
-    loadConfigAndRefresh().catch((error) => showNotice("error", readError(error)));
+    loadConfigAndRefresh().catch((error) => showErrorNotice(showNotice, error));
   }, [loadConfigAndRefresh, showNotice]);
 
   useEffect(() => {

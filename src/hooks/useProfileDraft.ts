@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { applyProfile, deleteProfile, launchGame, saveProfile } from "../api";
 import type { AppNotifier, Profile, ScanResult } from "../types";
-import { readError } from "../utils/format";
+import { notifyError } from "../utils/notify";
 import {
   inferDependencyMods,
   nextCopyName,
@@ -90,7 +90,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
           })
         )
           .then((profiles) => setScan((value) => ({ ...value, profiles })))
-          .catch((error) => notifier.showError(readError(error)));
+          .catch((error) => notifyError(notifier, error));
       }
     },
     [enqueueProfileSave, notifier, scan.maps, scan.otherMods, setScan]
@@ -114,7 +114,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
           })
         )
           .then((profiles) => setScan((value) => ({ ...value, profiles })))
-          .catch((error) => notifier.showError(readError(error)));
+          .catch((error) => notifyError(notifier, error));
       }
     },
     [enqueueProfileSave, notifier, scan.otherMods, setScan]
@@ -190,7 +190,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     if (!mapAutoSaveReadyRef.current) return;
     const timer = window.setTimeout(() => {
       if (!mapAutoSaveReadyRef.current) return;
-      void persistMapProfile().catch((error) => notifier.showError(readError(error)));
+      void persistMapProfile().catch((error) => notifyError(notifier, error));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, notifier, persistMapProfile, selectedMapProfile]);
@@ -204,7 +204,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     if (!modAutoSaveReadyRef.current) return;
     const timer = window.setTimeout(() => {
       if (!modAutoSaveReadyRef.current) return;
-      void persistModProfile().catch((error) => notifier.showError(readError(error)));
+      void persistModProfile().catch((error) => notifyError(notifier, error));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [enabledExplicitModDraft, modDirty, notifier, persistModProfile, selectedModProfile]);
@@ -620,7 +620,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     try {
       await task();
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }

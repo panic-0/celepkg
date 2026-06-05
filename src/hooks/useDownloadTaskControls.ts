@@ -3,7 +3,7 @@ import { cancelModDownload, createOperationId } from "../api";
 import type { AppNotifier, ModDownloadProgress } from "../types";
 import type { DownloadTask } from "../utils/downloadTask";
 import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "../utils/downloadTaskRunner";
-import { readError } from "../utils/format";
+import { notifyError } from "../utils/notify";
 
 export type DownloadControlState = {
   downloadPaused: boolean;
@@ -51,7 +51,7 @@ export function useDownloadTaskControls({ notifier, setLoading }: DownloadTaskCo
         notifier.showSuccess(successMessage);
         return true;
       } catch (error) {
-        notifier.showError(readError(error));
+        notifyError(notifier, error);
         return false;
       } finally {
         setLoading(false);
@@ -79,7 +79,7 @@ export function useDownloadTaskControls({ notifier, setLoading }: DownloadTaskCo
       if (runner) await runner.pauseDownloads();
       notifier.showInfo("已停止下载，新项目会停在待下载列表");
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     }
   }, [notifier, updateDownloadControls]);
 
@@ -111,7 +111,7 @@ export function useDownloadTaskControls({ notifier, setLoading }: DownloadTaskCo
       await runner.cancelPendingDownloads();
       notifier.showInfo("已取消当前待下载项目");
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     }
   }, [notifier]);
 
@@ -137,7 +137,7 @@ export function useDownloadTaskControls({ notifier, setLoading }: DownloadTaskCo
       else if (failedCount) notifier.showWarning(`重试完成，成功 ${installedCount} 个，失败 ${failedCount} 个`);
       else notifier.showSuccess(`重试完成，成功 ${installedCount} 个`);
     } catch (error) {
-      notifier.showError(readError(error));
+      notifyError(notifier, error);
     } finally {
       setLoading(false);
     }
