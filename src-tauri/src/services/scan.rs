@@ -21,7 +21,7 @@ use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 14;
+const SCAN_CACHE_VERSION: u32 = 15;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -223,7 +223,7 @@ fn build_scan_signature(celeste_path: &Path, selected_save_files: &[String]) -> 
         &mut files,
     );
     collect_official_dialog_stamps(celeste_path, &mut files);
-    collect_tree_stamps(celeste_path, &celeste_path.join("Mods"), "Mods", &mut files);
+    collect_mods_tree_stamps(celeste_path, &celeste_path.join("Mods"), "Mods", &mut files);
     collect_save_stamps(celeste_path, &mut files);
     collect_file_stamp(&celeste_path.join("Celeste.exe"), "Celeste.exe", &mut files);
     collect_file_stamp(&celeste_path.join("Celeste"), "Celeste", &mut files);
@@ -256,6 +256,41 @@ fn collect_tree_stamps(root: &Path, dir: &Path, prefix: &str, files: &mut Vec<Fi
             files,
         );
     }
+}
+
+fn collect_mods_tree_stamps(root: &Path, dir: &Path, prefix: &str, files: &mut Vec<FileStamp>) {
+    if !dir.exists() {
+        files.push(FileStamp {
+            path: format!("{prefix}/"),
+            len: 0,
+            modified: 0,
+        });
+        return;
+    }
+    for entry in WalkDir::new(dir)
+        .into_iter()
+        .filter_entry(|entry| !is_top_level_mods_cache_entry(entry))
+        .flatten()
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let relative = entry.path().strip_prefix(root).unwrap_or(entry.path());
+        collect_file_stamp(
+            entry.path(),
+            &normalize_slash(&relative.to_string_lossy()),
+            files,
+        );
+    }
+}
+
+fn is_top_level_mods_cache_entry(entry: &walkdir::DirEntry) -> bool {
+    entry.depth() == 1
+        && entry.file_type().is_dir()
+        && entry
+            .file_name()
+            .to_string_lossy()
+            .eq_ignore_ascii_case("Cache")
 }
 
 fn collect_save_stamps(celeste_path: &Path, files: &mut Vec<FileStamp>) {
@@ -339,9 +374,7 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
                 .filter_map(|entry| {
                     let path = entry.path();
                     let file_name = entry.file_name().to_string_lossy().to_string();
-                    if file_name.eq_ignore_ascii_case("blacklist.txt")
-                        || file_name.eq_ignore_ascii_case("favorites.txt")
-                    {
+                    if should_ignore_mods_entry(&file_name, path.is_dir()) {
                         return None;
                     }
                     (path.is_dir()
@@ -420,6 +453,12 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         warnings,
         timings: vec![],
     }
+}
+
+fn should_ignore_mods_entry(file_name: &str, is_dir: bool) -> bool {
+    file_name.eq_ignore_ascii_case("blacklist.txt")
+        || file_name.eq_ignore_ascii_case("favorites.txt")
+        || (is_dir && file_name.eq_ignore_ascii_case("Cache"))
 }
 
 #[derive(Debug, Clone)]
@@ -1944,6 +1983,49 @@ CompleteScreen:
 
         assert!(cached_scan.maps.is_empty());
         assert_eq!(fresh_scan.maps.len(), 1);
+    }
+
+    #[test]
+    fn scan_ignores_mods_cache_directory() {
+        let root = temp_celeste_root("ignore-mods-cache");
+        let cache_path = root.join("Mods").join("Cache");
+        fs::create_dir_all(&cache_path).expect("cache dir");
+        fs::write(
+            cache_path.join("everest.yaml"),
+            "Name: Cache\nVersion: 1.0.0\n",
+        )
+        .expect("cache metadata");
+        fs::write(cache_path.join("Cache.dll"), "").expect("cache code");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let scan = full_scan_fresh(&root, empty_profiles(), &[], &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        assert!(!scan
+            .maps
+            .iter()
+            .chain(scan.other_mods.iter())
+            .any(|record| record.relative_path.eq_ignore_ascii_case("Cache")));
+    }
+
+    #[test]
+    fn scan_signature_ignores_mods_cache_changes() {
+        let root = temp_celeste_root("ignore-mods-cache-signature");
+        let cache_path = root.join("Mods").join("Cache");
+        fs::create_dir_all(&cache_path).expect("cache dir");
+        fs::write(cache_path.join("cache.bin"), "first").expect("cache file");
+
+        let first = build_scan_signature(&root, &[]);
+        fs::write(cache_path.join("cache.bin"), "second value").expect("cache file update");
+        fs::write(cache_path.join("nested.txt"), "nested").expect("cache nested file");
+        let second = build_scan_signature(&root, &[]);
+
+        let _ = fs::remove_dir_all(root);
+
+        assert_eq!(first, second);
     }
 
     #[test]
