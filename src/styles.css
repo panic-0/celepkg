@@ -1800,7 +1800,7 @@ button.profile {
 .pagination-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 6px;
   min-width: 0;
   overflow-x: auto;
@@ -1816,18 +1816,6 @@ button.profile {
   width: 30px;
   min-height: 30px;
   border-radius: 5px;
-}
-
-.pagination-bar small {
-  flex: 0 0 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pagination-bar small {
-  color: #6d7b8a;
-  font-weight: 700;
 }
 
 .pagination-numbers {

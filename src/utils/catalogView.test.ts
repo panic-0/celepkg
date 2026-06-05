@@ -146,14 +146,18 @@ describe("catalog view model", () => {
 
     const firstPage = paginateCatalogEntryViews(items, 1);
     const secondPage = paginateCatalogEntryViews(items, 2);
+    const thirdPage = paginateCatalogEntryViews(items, 3);
 
-    expect(firstPage.pageCount).toBe(2);
-    expect(firstPage.items).toHaveLength(100);
+    expect(firstPage.pageCount).toBe(3);
+    expect(firstPage.items).toHaveLength(50);
     expect(firstPage.start).toBe(1);
-    expect(firstPage.end).toBe(100);
-    expect(secondPage.items).toEqual([101]);
-    expect(secondPage.start).toBe(101);
-    expect(secondPage.end).toBe(101);
+    expect(firstPage.end).toBe(50);
+    expect(secondPage.items).toEqual(Array.from({ length: 50 }, (_, index) => index + 51));
+    expect(secondPage.start).toBe(51);
+    expect(secondPage.end).toBe(100);
+    expect(thirdPage.items).toEqual([101]);
+    expect(thirdPage.start).toBe(101);
+    expect(thirdPage.end).toBe(101);
   });
 
   it("clamps catalog page when filtered results shrink", () => {
@@ -177,13 +181,41 @@ describe("catalog view model", () => {
 
   it("builds compact catalog page numbers around the current page", () => {
     expect(buildPageItems(10, 20, 3)).toEqual([1, "ellipsis", 7, 8, 9, 10, 11, 12, 13, "ellipsis", 20]);
-    expect(buildPageItems(2, 20, 3)).toEqual([1, 2, 3, 4, 5, "ellipsis", 20]);
-    expect(buildPageItems(19, 20, 3)).toEqual([1, "ellipsis", 16, 17, 18, 19, 20]);
+    expect(buildPageItems(2, 20, 3)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, "ellipsis", 20]);
+    expect(buildPageItems(19, 20, 3)).toEqual([1, "ellipsis", 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   });
 
   it("avoids unnecessary ellipses for catalog page number boundaries", () => {
     expect(buildPageItems(5, 8, 3)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(buildPageItems(1, 1, 3)).toEqual([1]);
     expect(buildPageItems(99, 5, 3)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("keeps catalog page number control length stable for every current page", () => {
+    for (const pageCount of [12, 20, 100]) {
+      const lengths = Array.from({ length: pageCount }, (_, index) => buildPageItems(index + 1, pageCount, 3).length);
+      expect(new Set(lengths)).toEqual(new Set([11]));
+    }
+
+    for (const pageCount of [1, 2, 8, 11]) {
+      const lengths = Array.from({ length: pageCount }, (_, index) => buildPageItems(index + 1, pageCount, 3).length);
+      expect(new Set(lengths)).toEqual(new Set([pageCount]));
+    }
+  });
+
+  it("pads compact page numbers at both edges instead of shrinking controls", () => {
+    expect(buildPageItems(1, 12, 3)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, "ellipsis", 12]);
+    expect(buildPageItems(6, 12, 3)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, "ellipsis", 12]);
+    expect(buildPageItems(7, 12, 3)).toEqual([1, "ellipsis", 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(buildPageItems(12, 12, 3)).toEqual([1, "ellipsis", 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it("keeps compact page numbers stable with a zero radius", () => {
+    expect(buildPageItems(1, 20, 0)).toEqual([1, 2, 3, "ellipsis", 20]);
+    expect(buildPageItems(10, 20, 0)).toEqual([1, "ellipsis", 10, "ellipsis", 20]);
+    expect(buildPageItems(20, 20, 0)).toEqual([1, "ellipsis", 18, 19, 20]);
+
+    const lengths = Array.from({ length: 20 }, (_, index) => buildPageItems(index + 1, 20, 0).length);
+    expect(new Set(lengths)).toEqual(new Set([5]));
   });
 });

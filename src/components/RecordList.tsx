@@ -174,11 +174,8 @@ export function RecordList({
       </div>
       <Pagination
         ariaLabel={activeView === "maps" ? "地图列表分页" : "Mod 列表分页"}
-        end={pagedRecords.end}
         page={pagedRecords.page}
         pageCount={pagedRecords.pageCount}
-        start={pagedRecords.start}
-        total={records.length}
         onPageChange={setPage}
       />
     </section>

@@ -148,14 +148,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
             ))}
             {!visibleViews.length && <EmptyCatalog text={searchResult.entries.length ? "没有符合筛选的目录结果。" : "暂无目录结果。"} />}
           </div>
-          <CatalogPagination
-            end={pagedViews.end}
-            page={pagedViews.page}
-            pageCount={pagedViews.pageCount}
-            start={pagedViews.start}
-            total={visibleViews.length}
-            onPageChange={setPage}
-          />
+          <CatalogPagination page={pagedViews.page} pageCount={pagedViews.pageCount} onPageChange={setPage} />
         </section>
       </div>
       {detailEntry && detailView && (

@@ -1,4 +1,4 @@
-export const DEFAULT_PAGE_SIZE = 100;
+export const DEFAULT_PAGE_SIZE = 50;
 export const DEFAULT_PAGE_RADIUS = 3;
 
 export type Page<T> = {
@@ -39,24 +39,21 @@ export function buildPageItems(page: number, pageCount: number, radius = DEFAULT
   const safePageCount = normalizePageCount(pageCount);
   const currentPage = clampPageNumber(page, safePageCount);
   const safeRadius = normalizePageRadius(radius);
-  const pages = new Set<number>([1, safePageCount]);
-  const start = Math.max(1, currentPage - safeRadius);
-  const end = Math.min(safePageCount, currentPage + safeRadius);
+  const maxItems = safeRadius * 2 + 5;
 
-  for (let item = start; item <= end; item += 1) {
-    pages.add(item);
+  if (safePageCount <= maxItems) {
+    return pageRange(1, safePageCount);
   }
 
-  const sortedPages = [...pages].sort((left, right) => left - right);
-  const items: PageItem[] = [];
-  for (const item of sortedPages) {
-    const previous = typeof items[items.length - 1] === "number" ? (items[items.length - 1] as number) : null;
-    if (previous !== null && item - previous > 1) {
-      items.push(item - previous === 2 ? previous + 1 : "ellipsis");
-    }
-    items.push(item);
+  const edgeWindowSize = maxItems - 2;
+  if (currentPage - safeRadius <= 3) {
+    return [...pageRange(1, edgeWindowSize), "ellipsis", safePageCount];
   }
-  return items;
+  if (currentPage + safeRadius >= safePageCount - 2) {
+    return [1, "ellipsis", ...pageRange(safePageCount - edgeWindowSize + 1, safePageCount)];
+  }
+
+  return [1, "ellipsis", ...pageRange(currentPage - safeRadius, currentPage + safeRadius), "ellipsis", safePageCount];
 }
 
 function normalizePageSize(pageSize: number) {
@@ -77,4 +74,8 @@ function normalizePageRadius(radius: number) {
 function clampPageNumber(page: number, pageCount: number) {
   const safePage = Number.isFinite(page) ? Math.trunc(page) : 1;
   return Math.min(Math.max(1, safePage), pageCount);
+}
+
+function pageRange(start: number, end: number) {
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }

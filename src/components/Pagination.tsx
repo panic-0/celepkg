@@ -2,16 +2,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { buildPageItems } from "../utils/pagination";
 
 type PaginationProps = {
-  end: number;
   page: number;
   pageCount: number;
-  start: number;
-  total: number;
   ariaLabel: string;
   onPageChange: (page: number) => void;
 };
 
-export function Pagination({ end, page, pageCount, start, total, ariaLabel, onPageChange }: PaginationProps) {
+export function Pagination({ page, pageCount, ariaLabel, onPageChange }: PaginationProps) {
   const pageItems = buildPageItems(page, pageCount, 3);
   return (
     <div className="pagination-bar" aria-label={ariaLabel}>
@@ -37,7 +34,6 @@ export function Pagination({ end, page, pageCount, start, total, ariaLabel, onPa
           )
         )}
       </div>
-      <small>{`${start}-${end} / ${total}`}</small>
       <button className="icon-button" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} title="下一页">
         <ChevronRight size={16} />
       </button>

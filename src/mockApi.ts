@@ -568,7 +568,8 @@ function createMockScan(): ScanResult {
       dependencies: [{ name: "JungleHelper", version: "1.1.0" }],
       warnings: ["缺少依赖：JungleHelper 1.1.0"],
       subMaps: [subMap("china-1", "ChinaMirror/镜中城", "镜中城", "入口", "intermediate", 0, 9, "unknown")]
-    })
+    }),
+    ...createMockBulkMaps()
   ];
   const otherMods = [
     record({
@@ -649,7 +650,8 @@ function createMockScan(): ScanResult {
       enabled: true,
       description: "用于检查较长 Mod 名称与列表密度。",
       version: "0.5.0"
-    })
+    }),
+    ...createMockBulkMods()
   ];
   return {
     celestePath: mockCelestePath,
@@ -674,6 +676,79 @@ function createMockScan(): ScanResult {
     warnings: ["内置依赖版本无法确认：FNA 22.8.0，无法判断本地版本"],
     timings: createTimings()
   };
+}
+
+function createMockBulkMaps(): ModRecord[] {
+  return Array.from({ length: 596 }, (_, index) => {
+    const number = index + 1;
+    const id = `mock-map-${number.toString().padStart(3, "0")}`;
+    const strawberries = number % 12;
+    const totalStrawberries = 12 + (number % 18);
+    const completed = number % 5 === 0;
+    return record({
+      id,
+      name: `Mock Map Pack ${number.toString().padStart(3, "0")}`,
+      fileName: `MockMapPack${number.toString().padStart(3, "0")}.zip`,
+      relativePath: `Mods/MockMapPack${number.toString().padStart(3, "0")}.zip`,
+      kind: "map",
+      enabled: number % 4 !== 0,
+      favorite: number % 13 === 0,
+      description: "Mock 批量地图，用于检查本地内容分页。",
+      version: `0.${number}.0`,
+      mapCount: 1 + (number % 6),
+      strawberryCount: totalStrawberries,
+      strawberryTotalCount: totalStrawberries + 6,
+      completionStatus: completed ? "completed" : number % 3 === 0 ? "unfinished" : "unknown",
+      stats: stats(40 + number * 3, strawberries, totalStrawberries, 3200 + number * 90, completed, number % 2, number % 4),
+      subMaps: [
+        subMap(
+          `${id}-sub-1`,
+          `MockMapPack${number.toString().padStart(3, "0")}/Main`,
+          `Mock Map Pack ${number.toString().padStart(3, "0")}`,
+          "Main",
+          number % 3 === 0 ? "advanced" : number % 3 === 1 ? "intermediate" : "expert",
+          strawberries,
+          totalStrawberries,
+          completed ? "completed" : "unfinished"
+        )
+      ]
+    });
+  });
+}
+
+function createMockBulkMods(): ModRecord[] {
+  return Array.from({ length: 593 }, (_, index) => {
+    const number = index + 1;
+    const padded = number.toString().padStart(3, "0");
+    return record({
+      id: `mock-helper-${padded}`,
+      name: `Mock Helper ${padded}`,
+      fileName: `MockHelper${padded}.zip`,
+      relativePath: `Mods/MockHelper${padded}.zip`,
+      kind: "mod",
+      enabled: number % 3 !== 0,
+      favorite: number % 17 === 0,
+      description: "Mock 批量 Mod，用于检查本地内容分页。",
+      version: `1.${number}.0`,
+      dependencies: number % 4 === 0 ? [{ name: "EverestCore", version: "1.4980.0" }] : [],
+      warnings: number % 19 === 0 ? ["Mock：用于检查警告筛选和分页。"] : [],
+      subMaps:
+        number % 7 === 0
+          ? [
+              subMap(
+                `mock-helper-${padded}-test`,
+                `MockHelper${padded}/Test`,
+                `Mock Helper ${padded}`,
+                "Test",
+                "test",
+                0,
+                0,
+                "notApplicable"
+              )
+            ]
+          : []
+    });
+  });
 }
 
 function createMockCatalog(): ModCatalogEntry[] {
@@ -734,7 +809,7 @@ function createMockCatalog(): ModCatalogEntry[] {
 }
 
 function createMockBulkCatalogEntries(): ModCatalogEntry[] {
-  return Array.from({ length: 135 }, (_, index) => {
+  return Array.from({ length: 635 }, (_, index) => {
     const number = index + 1;
     const source: ModCatalogSourceKind = number % 2 ? "wegfan" : "everestMirror";
     const type = number % 3 === 0 ? "Tools" : number % 3 === 1 ? "Maps" : "Helpers";
