@@ -1,28 +1,64 @@
-import { Download, ExternalLink, Info, PackageCheck, Search } from "lucide-react";
+import { Download, ExternalLink, Info, PackageCheck, RotateCcw, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
-import { buildInstalledCatalogAliasSet, isCatalogEntryInstalled } from "../utils/dependencies";
-import { DialogFacts, DialogShell } from "./common";
+import type { DownloadTask } from "../utils/downloadTask";
+import {
+  buildCatalogEntryViews,
+  filterCatalogEntryViews,
+  normalizeCatalogType,
+  sortCatalogEntryViews,
+  type CatalogEntryView,
+  type CatalogFilters,
+  type CatalogSortKey
+} from "../utils/catalogView";
+import { DialogFacts, DialogShell, Select } from "./common";
 
 type ModCatalogManagerProps = {
+  downloadTask?: DownloadTask | null;
   loading: boolean;
   notifier: AppNotifier;
   scan: ScanResult;
   sources: ModCatalogSourceKind[];
   setLoading: (loading: boolean, message?: string) => void;
   onInstall: (entry: ModCatalogEntry) => void;
+  onRetryFailed?: () => void;
 };
 
 const defaultSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror"];
 
-export function ModCatalogManager({ loading, notifier, scan, sources, setLoading, onInstall }: ModCatalogManagerProps) {
+const defaultFilters: CatalogFilters = {
+  type: "all",
+  source: "all",
+  install: "all",
+  downloadableOnly: false
+};
+
+export function ModCatalogManager({
+  downloadTask,
+  loading,
+  notifier,
+  scan,
+  sources,
+  setLoading,
+  onInstall,
+  onRetryFailed
+}: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
-  const installedAliases = useMemo(() => buildInstalledCatalogAliasSet([...scan.maps, ...scan.otherMods]), [scan.maps, scan.otherMods]);
+  const [filters, setFilters] = useState<CatalogFilters>(defaultFilters);
+  const [sortKey, setSortKey] = useState<CatalogSortKey>("relevance");
 
   const sourceList = sources.length ? sources : defaultSources;
+  const allViews = useMemo(
+    () => buildCatalogEntryViews(searchResult.entries, [...scan.maps, ...scan.otherMods], downloadTask ?? null, query),
+    [downloadTask, query, scan.maps, scan.otherMods, searchResult.entries]
+  );
+  const typeOptions = useMemo(() => catalogTypeOptions(allViews), [allViews]);
+  const visibleViews = useMemo(() => sortCatalogEntryViews(filterCatalogEntryViews(allViews, filters), sortKey), [allViews, filters, sortKey]);
+  const detailView = detailEntry ? allViews.find((view) => view.entry.source === detailEntry.source && view.entry.id === detailEntry.id) ?? null : null;
+  const activeSourceLabels = sourceList.map(sourceLabel).join("、");
 
   async function runSearch() {
     try {
@@ -37,29 +73,22 @@ export function ModCatalogManager({ loading, notifier, scan, sources, setLoading
     }
   }
 
+  function clearSearch() {
+    setQuery("");
+    setSearchResult({ sources: [], entries: [], warnings: [] });
+    setDetailEntry(null);
+  }
+
+  function updateFilters(update: Partial<CatalogFilters>) {
+    setFilters((current) => ({ ...current, ...update }));
+  }
+
   return (
     <section className="mod-catalog-manager">
       <div className="list-header catalog-header">
         <div>
-          <h2>搜索与下载新 Mod</h2>
-          <p>{`${searchResult.entries.length} 个搜索结果`}</p>
-        </div>
-        <div className="catalog-actions">
-          <label className="search-box catalog-search">
-            <Search size={17} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void runSearch();
-              }}
-              placeholder="搜索 Mod、地图、Helper"
-            />
-          </label>
-          <button onClick={runSearch} disabled={loading}>
-            <Search size={16} />
-            搜索
-          </button>
+          <h2>Mod 获取中心</h2>
+          <p>{`${visibleViews.length} / ${searchResult.entries.length} 个结果 · ${activeSourceLabels}`}</p>
         </div>
       </div>
 
@@ -69,55 +98,144 @@ export function ModCatalogManager({ loading, notifier, scan, sources, setLoading
             <PackageCheck size={17} />
             <h3>目录结果</h3>
           </div>
+          <div className="catalog-actions">
+            <label className="search-box catalog-search">
+              <Search size={17} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void runSearch();
+                }}
+                placeholder="搜索 Mod、地图、Helper"
+              />
+            </label>
+            <button onClick={clearSearch} disabled={loading || (!query && !searchResult.entries.length)} title="清空">
+              <X size={16} />
+              清空
+            </button>
+            <button onClick={runSearch} disabled={loading}>
+              <Search size={16} />
+              搜索
+            </button>
+          </div>
+          <CatalogFilterBar
+            filters={filters}
+            sortKey={sortKey}
+            typeOptions={typeOptions}
+            onFiltersChange={updateFilters}
+            onSortChange={setSortKey}
+          />
           <WarningStrip warnings={searchResult.warnings} />
+          <CatalogDownloadSummary task={downloadTask ?? null} />
           <div className="catalog-list">
-            {searchResult.entries.map((entry) => (
+            {visibleViews.map((view) => (
               <CatalogEntryRow
-                entry={entry}
-                installed={isCatalogEntryInstalled(entry.name, installedAliases)}
-                key={`${entry.source}:${entry.id}`}
-                onInstall={() => onInstall(entry)}
-                onOpenDetail={() => setDetailEntry(entry)}
+                key={`${view.entry.source}:${view.entry.id}`}
+                view={view}
+                loading={loading}
+                onInstall={() => onInstall(view.entry)}
+                onOpenDetail={() => setDetailEntry(view.entry)}
+                onRetryFailed={onRetryFailed}
               />
             ))}
-            {!searchResult.entries.length && <EmptyCatalog text="输入关键字搜索可下载的新 Mod。" />}
+            {!visibleViews.length && <EmptyCatalog text={searchResult.entries.length ? "没有符合筛选的目录结果。" : "暂无目录结果。"} />}
           </div>
         </section>
       </div>
-      {detailEntry && (
+      {detailEntry && detailView && (
         <CatalogEntryDetailDialog
-          entry={detailEntry}
-          installed={isCatalogEntryInstalled(detailEntry.name, installedAliases)}
+          view={detailView}
           loading={loading}
           onClose={() => setDetailEntry(null)}
           onInstall={() => onInstall(detailEntry)}
+          onRetryFailed={onRetryFailed}
         />
       )}
     </section>
   );
 }
 
-function CatalogEntryRow({
-  entry,
-  installed,
-  onInstall,
-  onOpenDetail
+function CatalogFilterBar({
+  filters,
+  sortKey,
+  typeOptions,
+  onFiltersChange,
+  onSortChange
 }: {
-  entry: ModCatalogEntry;
-  installed: boolean;
-  onInstall: () => void;
-  onOpenDetail: () => void;
+  filters: CatalogFilters;
+  sortKey: CatalogSortKey;
+  typeOptions: Array<{ label: string; value: string }>;
+  onFiltersChange: (update: Partial<CatalogFilters>) => void;
+  onSortChange: (sortKey: CatalogSortKey) => void;
 }) {
   return (
-    <article className="catalog-row catalog-row-clickable" onClick={onOpenDetail}>
+    <div className="catalog-filter-bar">
+      <Select label="类型" value={filters.type} onChange={(value) => onFiltersChange({ type: value as CatalogFilters["type"] })}>
+        <option value="all">全部</option>
+        {typeOptions.map((option) => (
+          <option value={option.value} key={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+      <Select label="来源" value={filters.source} onChange={(value) => onFiltersChange({ source: value as CatalogFilters["source"] })}>
+        <option value="all">全部</option>
+        <option value="wegfan">WEGFan</option>
+        <option value="everestMirror">Everest 镜像</option>
+        <option value="everest">Everest 官方</option>
+      </Select>
+      <Select label="状态" value={filters.install} onChange={(value) => onFiltersChange({ install: value as CatalogFilters["install"] })}>
+        <option value="all">全部</option>
+        <option value="installed">已安装</option>
+        <option value="notInstalled">未安装</option>
+      </Select>
+      <Select label="排序" value={sortKey} onChange={(value) => onSortChange(value as CatalogSortKey)}>
+        <option value="relevance">相关度</option>
+        <option value="updatedDesc">更新时间</option>
+        <option value="nameAsc">名称</option>
+        <option value="sizeDesc">大小</option>
+      </Select>
+      <label className={`catalog-downloadable-toggle ${filters.downloadableOnly ? "active" : ""}`}>
+        <input
+          type="checkbox"
+          checked={filters.downloadableOnly}
+          onChange={(event) => onFiltersChange({ downloadableOnly: event.target.checked })}
+        />
+        <span>可下载</span>
+      </label>
+    </div>
+  );
+}
+
+function CatalogEntryRow({
+  view,
+  loading,
+  onInstall,
+  onOpenDetail,
+  onRetryFailed
+}: {
+  view: CatalogEntryView;
+  loading: boolean;
+  onInstall: () => void;
+  onOpenDetail: () => void;
+  onRetryFailed?: () => void;
+}) {
+  const entry = view.entry;
+  const installDisabled = loading || view.installed || view.queued || !view.downloadable;
+  return (
+    <article className={`catalog-row catalog-row-clickable ${view.queued ? "queued-row" : ""} ${view.failed ? "failed-row" : ""}`} onClick={onOpenDetail}>
       <div className="catalog-row-main">
         <strong title={entry.name}>{entry.name}</strong>
         <span>{sourceLabel(entry.source)}</span>
+        <span className={`catalog-state-chip ${view.state}`}>{catalogStateLabel(view)}</span>
       </div>
       <div className="catalog-row-meta">
         <small>{entry.version || "无版本号"}</small>
-        <small>{entry.gameBananaType || "Mod"}</small>
+        <small>{catalogTypeLabel(view)}</small>
         <small>{formatSize(entry.size)}</small>
+        <small>{formatCatalogTime(entry.lastUpdate)}</small>
+        {view.taskItem?.progress && <small>{formatProgress(view.taskItem.progress.downloaded, view.taskItem.progress.total)}</small>}
       </div>
       <div className="catalog-row-actions">
         <button className="icon-button catalog-detail-button" onClick={stopAndRun(onOpenDetail)} title="查看详情">
@@ -128,40 +246,50 @@ function CatalogEntryRow({
             <ExternalLink size={15} />
           </a>
         )}
-        <button onClick={stopAndRun(onInstall)} disabled={installed || !entry.downloadUrl}>
-          <Download size={15} />
-          {installed ? "已安装" : "安装"}
-        </button>
+        {view.failed && onRetryFailed ? (
+          <button onClick={stopAndRun(onRetryFailed)} disabled={loading}>
+            <RotateCcw size={15} />
+            重试
+          </button>
+        ) : (
+          <button onClick={stopAndRun(onInstall)} disabled={installDisabled}>
+            <Download size={15} />
+            {catalogActionLabel(view)}
+          </button>
+        )}
       </div>
     </article>
   );
 }
 
 function CatalogEntryDetailDialog({
-  entry,
-  installed,
+  view,
   loading,
   onClose,
-  onInstall
+  onInstall,
+  onRetryFailed
 }: {
-  entry: ModCatalogEntry;
-  installed: boolean;
+  view: CatalogEntryView;
   loading: boolean;
   onClose: () => void;
   onInstall: () => void;
+  onRetryFailed?: () => void;
 }) {
+  const entry = view.entry;
+  const action = view.failed && onRetryFailed ? onRetryFailed : onInstall;
+  const actionIcon = view.failed && onRetryFailed ? <RotateCcw size={15} /> : <Download size={15} />;
   return (
     <DialogShell
       actions={[
         {
           label: (
             <>
-              <Download size={15} />
-              {installed ? "已安装" : "安装"}
+              {actionIcon}
+              {view.failed && onRetryFailed ? "重试" : catalogActionLabel(view)}
             </>
           ),
-          onClick: onInstall,
-          disabled: loading || installed || !entry.downloadUrl,
+          onClick: action,
+          disabled: loading || view.installed || view.queued || (!view.failed && !entry.downloadUrl),
           variant: "primary"
         }
       ]}
@@ -177,10 +305,12 @@ function CatalogEntryDetailDialog({
         facts={[
           { label: "版本", value: entry.version || "无版本号" },
           { label: "来源", value: sourceLabel(entry.source) },
-          { label: "类型", value: entry.gameBananaType || "Mod" },
+          { label: "状态", value: catalogStateLabel(view) },
+          { label: "类型", value: catalogTypeLabel(view) },
           { label: "大小", value: formatSize(entry.size) },
           { label: "更新", value: formatCatalogTime(entry.lastUpdate) },
           { label: "GameBanana", value: formatGameBananaInfo(entry) },
+          { label: "任务", value: view.taskItem?.error ?? formatTaskDetail(view) },
           { label: "下载地址", value: entry.downloadUrl || "无下载地址" },
           { label: "来源页面", value: entry.pageUrl || "无来源页面" }
         ]}
@@ -192,6 +322,22 @@ function CatalogEntryDetailDialog({
         </a>
       )}
     </DialogShell>
+  );
+}
+
+function CatalogDownloadSummary({ task }: { task: DownloadTask | null }) {
+  if (!task?.items.length) return null;
+  const modItems = task.items.filter((item) => item.kind === "mod");
+  if (!modItems.length) return null;
+  const active = modItems.filter((item) => ["queued", "downloading", "downloaded", "waitingInstall", "installing"].includes(item.status)).length;
+  const failed = modItems.filter((item) => ["downloadFailed", "installFailed", "cancelled", "skipped"].includes(item.status)).length;
+  const done = modItems.filter((item) => item.status === "installed").length;
+  return (
+    <div className="catalog-download-summary" aria-live="polite">
+      <span>队列 {active}</span>
+      <span>完成 {done}</span>
+      <span>失败 {failed}</span>
+    </div>
   );
 }
 
@@ -221,6 +367,38 @@ function EmptyCatalog({ text }: { text: string }) {
   );
 }
 
+function catalogStateLabel(view: CatalogEntryView) {
+  if (view.state === "installed") return "已安装";
+  if (view.state === "queued") return "等待下载";
+  if (view.state === "downloading") return "下载中";
+  if (view.state === "waitingInstall") return "待安装";
+  if (view.state === "installing") return "安装中";
+  if (view.state === "failed") return "失败";
+  if (!view.downloadable) return "不可下载";
+  return "未安装";
+}
+
+function catalogActionLabel(view: CatalogEntryView) {
+  if (view.installed) return "已安装";
+  if (view.state === "queued") return "已入队";
+  if (view.state === "downloading") return "下载中";
+  if (view.state === "waitingInstall") return "待安装";
+  if (view.state === "installing") return "安装中";
+  if (!view.downloadable) return "无下载";
+  return "安装";
+}
+
+function catalogTypeLabel(view: CatalogEntryView) {
+  const category = formatCatalogTypeLabel(view.typeLabel);
+  const subCategory = view.entry.subCategoryName.trim();
+  return subCategory ? `${category} / ${subCategory}` : category;
+}
+
+function formatTaskDetail(view: CatalogEntryView) {
+  if (!view.taskItem) return "未加入队列";
+  return catalogStateLabel(view);
+}
+
 function sourceLabel(source: ModCatalogSourceKind) {
   if (source === "everest") return "Everest 官方";
   if (source === "everestMirror") return "Everest 镜像";
@@ -236,6 +414,35 @@ function formatSize(size: number | null) {
 function formatCatalogTime(value: number | null) {
   if (!value) return "未知";
   return new Date(value * 1000).toLocaleString();
+}
+
+function formatProgress(downloaded: number, total: number | null) {
+  if (!total || total <= 0) return formatSize(downloaded);
+  return `${Math.round((downloaded / total) * 100)}%`;
+}
+
+function catalogTypeOptions(views: CatalogEntryView[]) {
+  const options = new Map<string, string>();
+  for (const view of views) {
+    const value = normalizeCatalogType(view.typeLabel);
+    if (!options.has(value)) options.set(value, formatCatalogTypeLabel(view.typeLabel));
+  }
+  return [...options.entries()]
+    .map(([value, label]) => ({ label, value }))
+    .sort((left, right) => typeSortRank(left.value) - typeSortRank(right.value) || left.label.localeCompare(right.label, "zh-Hans-CN"));
+}
+
+function typeSortRank(value: string) {
+  if (value === "map" || value === "maps") return 0;
+  if (value === "mod") return 1;
+  return 2;
+}
+
+function formatCatalogTypeLabel(value: string) {
+  const normalized = normalizeCatalogType(value);
+  if (normalized === "map" || normalized === "maps") return "地图";
+  if (normalized === "mod") return "Mod";
+  return value.trim() || "Mod";
 }
 
 function formatGameBananaInfo(entry: ModCatalogEntry) {

@@ -249,6 +249,10 @@ pub struct ModCatalogEntry {
     pub download_url: String,
     pub page_url: String,
     pub game_banana_type: String,
+    #[serde(default)]
+    pub category_name: String,
+    #[serde(default)]
+    pub sub_category_name: String,
     pub game_banana_id: Option<u64>,
     pub game_banana_file_id: Option<u64>,
     pub size: Option<u64>,

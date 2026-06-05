@@ -221,6 +221,8 @@ function validateModCatalogEntry(value: unknown, path: string): ModCatalogEntry 
     downloadUrl: stringAt(object.downloadUrl, `${path}.downloadUrl`),
     pageUrl: stringAt(object.pageUrl, `${path}.pageUrl`),
     gameBananaType: stringAt(object.gameBananaType, `${path}.gameBananaType`),
+    categoryName: stringAt(object.categoryName ?? "", `${path}.categoryName`),
+    subCategoryName: stringAt(object.subCategoryName ?? "", `${path}.subCategoryName`),
     gameBananaId: nullableNumberAt(object.gameBananaId, `${path}.gameBananaId`),
     gameBananaFileId: nullableNumberAt(object.gameBananaFileId, `${path}.gameBananaFileId`),
     size: nullableNumberAt(object.size, `${path}.size`),

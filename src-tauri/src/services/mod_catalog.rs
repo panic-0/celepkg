@@ -838,6 +838,8 @@ fn parse_everest_catalog(
                 .map(|id| format!("https://gamebanana.com/mods/{id}"))
                 .unwrap_or_default(),
             game_banana_type: item.game_banana_type.unwrap_or_default(),
+            category_name: String::new(),
+            sub_category_name: String::new(),
             game_banana_id: item.game_banana_id,
             game_banana_file_id: item.game_banana_file_id,
             size: item.size,
@@ -880,6 +882,8 @@ struct WegfanSubmission {
     page_url: Option<String>,
     game_banana_section: Option<String>,
     game_banana_id: Option<u64>,
+    category_name: Option<String>,
+    sub_category_name: Option<String>,
     latest_update_added_time: Option<String>,
 }
 
@@ -903,6 +907,14 @@ fn parse_wegfan_catalog(text: &str) -> Result<Vec<ModCatalogEntry>, String> {
                 .as_ref()
                 .and_then(|submission| submission.game_banana_id)
                 .or(item.submission_file.game_banana_id);
+            let category_name = submission
+                .as_ref()
+                .and_then(|submission| submission.category_name.clone())
+                .unwrap_or_default();
+            let sub_category_name = submission
+                .as_ref()
+                .and_then(|submission| submission.sub_category_name.clone())
+                .unwrap_or_default();
             let name = submission
                 .as_ref()
                 .map(|submission| submission.name.clone())
@@ -919,6 +931,8 @@ fn parse_wegfan_catalog(text: &str) -> Result<Vec<ModCatalogEntry>, String> {
                 download_url: item.submission_file.url,
                 page_url,
                 game_banana_type,
+                category_name,
+                sub_category_name,
                 game_banana_id,
                 game_banana_file_id: item.submission_file.game_banana_id,
                 size: item.submission_file.size,
@@ -1055,6 +1069,8 @@ Helper:
                 "pageUrl": "https://gamebanana.com/mods/555",
                 "gameBananaSection": "Map",
                 "gameBananaId": 555,
+                "categoryName": "Maps",
+                "subCategoryName": "Standalone",
                 "latestUpdateAddedTime": "2024-04-11T22:16:10Z"
               }
             }
@@ -1066,6 +1082,8 @@ Helper:
         assert_eq!(entries[0].name, "Pretty Name");
         assert_eq!(entries[0].download_url, "https://example.test/file.zip");
         assert_eq!(entries[0].game_banana_type, "Map");
+        assert_eq!(entries[0].category_name, "Maps");
+        assert_eq!(entries[0].sub_category_name, "Standalone");
         assert_eq!(entries[0].last_update, Some(1712873770));
     }
 
@@ -1085,6 +1103,8 @@ Helper:
             download_url: "https://example.test/helper.zip".to_string(),
             page_url: String::new(),
             game_banana_type: "Mod".to_string(),
+            category_name: String::new(),
+            sub_category_name: String::new(),
             game_banana_id: None,
             game_banana_file_id: None,
             size: None,
@@ -1110,6 +1130,8 @@ Helper:
             download_url: String::new(),
             page_url: String::new(),
             game_banana_type: "Mod".to_string(),
+            category_name: String::new(),
+            sub_category_name: String::new(),
             game_banana_id: None,
             game_banana_file_id: None,
             size: None,
@@ -1488,6 +1510,8 @@ Helper:
             download_url: String::new(),
             page_url: String::new(),
             game_banana_type: String::new(),
+            category_name: String::new(),
+            sub_category_name: String::new(),
             game_banana_id: None,
             game_banana_file_id: None,
             size: None,

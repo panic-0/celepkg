@@ -132,7 +132,10 @@ export const mockApi = {
     const needle = query.trim().toLowerCase();
     const entries = catalogEntries
       .filter((entry) => selectedSources.includes(entry.source))
-      .filter((entry) => !needle || `${entry.name} ${entry.version} ${entry.gameBananaType}`.toLowerCase().includes(needle));
+      .filter(
+        (entry) =>
+          !needle || `${entry.name} ${entry.version} ${entry.gameBananaType} ${entry.categoryName} ${entry.subCategoryName}`.toLowerCase().includes(needle)
+      );
     return clone({
       sources: selectedSources,
       entries,
@@ -174,7 +177,9 @@ export const mockApi = {
         `1.${index + 1}.0`,
         "Mod",
         `https://gamebanana.com/mmdl/${9000 + index}`,
-        [`mock-bulk-hash-${index + 1}`]
+        [`mock-bulk-hash-${index + 1}`],
+        index % 3 === 0 ? "Helpers" : index % 3 === 1 ? "Maps" : "Tools",
+        index % 3 === 1 ? "Standalone" : ""
       );
       return {
         entry,
@@ -273,7 +278,7 @@ export const mockApi = {
         name: entry.name,
         fileName: `${entry.name}.zip`,
         relativePath: `Mods/${entry.name}.zip`,
-        kind: entry.gameBananaType.toLowerCase() === "map" ? "map" : "mod",
+        kind: entry.categoryName.toLowerCase() === "maps" || entry.gameBananaType.toLowerCase() === "map" ? "map" : "mod",
         enabled: false,
         description: "Mock 安装的目录条目。",
         version: entry.version
@@ -658,14 +663,15 @@ function createMockScan(): ScanResult {
 
 function createMockCatalog(): ModCatalogEntry[] {
   return [
-    catalogEntry("everestMirror", "CommunalHelper", "1.24.3", "Mod", "https://gamebanana.com/mmdl/1111", ["new-communal-hash"]),
-    catalogEntry("everestMirror", "Galactica", "2.1.0", "Map", "https://gamebanana.com/mmdl/2222", ["new-galactica-hash"]),
-    catalogEntry("wegfan", "Strawberry Jam Collab", "1.2.9", "Map", "https://celeste.weg.fan/api/v2/download/files/sj", [
+    catalogEntry("everestMirror", "CommunalHelper", "1.24.3", "Mod", "https://gamebanana.com/mmdl/1111", ["new-communal-hash"], "Helpers"),
+    catalogEntry("everestMirror", "Galactica", "2.1.0", "Mod", "https://gamebanana.com/mmdl/2222", ["new-galactica-hash"], "Maps", "Campaign"),
+    catalogEntry("wegfan", "Strawberry Jam Collab", "1.2.9", "Mod", "https://celeste.weg.fan/api/v2/download/files/sj", [
       "current-sj-hash"
-    ]),
-    catalogEntry("everestMirror", "Everest Gate", "1.0.0", "Map", "https://gamebanana.com/mmdl/4444", ["everest-gate-hash"]),
-    catalogEntry("wegfan", "Aqua Shrine", "1.0.0", "Map", "https://celeste.weg.fan/api/v2/download/files/aqua", ["aqua-hash"]),
-    catalogEntry("everestMirror", "SpeedrunTool", "3.18.2", "Mod", "https://gamebanana.com/mmdl/3333", ["speedrun-hash"])
+    ], "Maps", "Campaign"),
+    catalogEntry("everestMirror", "Everest Gate", "1.0.0", "Mod", "https://gamebanana.com/mmdl/4444", ["everest-gate-hash"], "Maps", "Standalone"),
+    catalogEntry("wegfan", "Aqua Shrine", "1.0.0", "Mod", "https://celeste.weg.fan/api/v2/download/files/aqua", ["aqua-hash"], "Maps", "Standalone"),
+    catalogEntry("everestMirror", "SpeedrunTool", "3.18.2", "Mod", "https://gamebanana.com/mmdl/3333", ["speedrun-hash"], "Tools"),
+    catalogEntry("wegfan", "Loading time optimizer", "0.1.0", "Mod", "https://celeste.weg.fan/api/v2/download/files/loading", ["loading-hash"], "Other/Misc")
   ];
 }
 
@@ -699,7 +705,9 @@ function catalogEntry(
   version: string,
   gameBananaType: string,
   downloadUrl: string,
-  xxHash: string[]
+  xxHash: string[],
+  categoryName = gameBananaType,
+  subCategoryName = ""
 ): ModCatalogEntry {
   return {
     source,
@@ -709,6 +717,8 @@ function catalogEntry(
     downloadUrl,
     pageUrl: `https://gamebanana.com/mods/mock-${encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"))}`,
     gameBananaType,
+    categoryName,
+    subCategoryName,
     gameBananaId: 1000,
     gameBananaFileId: 2000,
     size: 12_345_678,

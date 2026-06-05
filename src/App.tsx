@@ -920,12 +920,14 @@ export function App() {
           />
         ) : workspaceView.activeView === "catalog" ? (
           <ModCatalogManager
+            downloadTask={downloadTask}
             loading={loading}
             notifier={notifier}
             scan={scan}
             sources={modCatalogSources}
             setLoading={setLoading}
             onInstall={installCatalogEntry}
+            onRetryFailed={retryFailedDownloadTask}
           />
         ) : workspaceView.activeView === "everest" ? (
           <EverestManager loading={loading} mods={scan.otherMods} notifier={notifier} onInstall={installEverestRelease} />

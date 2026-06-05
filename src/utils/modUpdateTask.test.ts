@@ -11,6 +11,8 @@ function entry(name: string): ModCatalogEntry {
     downloadUrl: `https://example.test/${name}.zip`,
     pageUrl: "",
     gameBananaType: "Mod",
+    categoryName: "Helpers",
+    subCategoryName: "",
     gameBananaId: null,
     gameBananaFileId: null,
     size: null,

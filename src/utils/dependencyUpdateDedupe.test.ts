@@ -10,6 +10,8 @@ const helperEntry: ModCatalogEntry = {
   downloadUrl: "https://example.test/helper.zip",
   pageUrl: "",
   gameBananaType: "Mod",
+  categoryName: "Helpers",
+  subCategoryName: "",
   gameBananaId: null,
   gameBananaFileId: null,
   size: null,

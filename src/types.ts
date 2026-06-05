@@ -158,6 +158,8 @@ export type ModCatalogEntry = {
   downloadUrl: string;
   pageUrl: string;
   gameBananaType: string;
+  categoryName: string;
+  subCategoryName: string;
   gameBananaId: number | null;
   gameBananaFileId: number | null;
   size: number | null;

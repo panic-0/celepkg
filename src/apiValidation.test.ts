@@ -43,6 +43,8 @@ const catalogEntry = {
   downloadUrl: "https://gamebanana.com/mmdl/1",
   pageUrl: "https://gamebanana.com/mods/1",
   gameBananaType: "Mod",
+  categoryName: "Helpers",
+  subCategoryName: "",
   gameBananaId: 1,
   gameBananaFileId: 2,
   size: 1024,

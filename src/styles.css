@@ -1071,8 +1071,8 @@ button.profile {
 }
 
 .catalog-header {
-  grid-template-columns: minmax(170px, 0.45fr) minmax(520px, 1.55fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 }
 
 .list-header {
@@ -1343,10 +1343,14 @@ button.profile {
 
 .catalog-actions {
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) auto;
+  grid-template-columns: minmax(280px, 1fr) auto auto;
   gap: 7px;
   align-items: center;
   min-width: 0;
+  padding: 8px;
+  border: 1px solid #e2e9f0;
+  border-radius: 7px;
+  background: #fbfcfd;
 }
 
 .catalog-search {
@@ -1671,7 +1675,7 @@ button.profile {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 8px;
   border: 1px solid #dce4ec;
   border-radius: 8px;
@@ -1687,6 +1691,79 @@ button.profile {
 
 .catalog-column-heading h3 {
   font-size: 15px;
+}
+
+.catalog-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(118px, 1fr)) minmax(96px, max-content);
+  gap: 7px;
+  align-items: end;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e2e9f0;
+  border-radius: 7px;
+  background: #fbfcfd;
+}
+
+.catalog-filter-bar .field {
+  min-width: 0;
+}
+
+.catalog-filter-bar .field span {
+  color: #657384;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.catalog-filter-bar .field select {
+  min-height: 31px;
+  padding: 5px 8px;
+}
+
+.catalog-downloadable-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-content: center;
+  min-height: 31px;
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid #cfd8e2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #536273;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.catalog-downloadable-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.catalog-downloadable-toggle.active {
+  border-color: #9bc7d8;
+  background: #eaf6fb;
+  color: #075b86;
+}
+
+.catalog-download-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.catalog-download-summary span {
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid #d9e4ed;
+  border-radius: 999px;
+  background: #f6fafc;
+  color: #526273;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .catalog-list {
@@ -1724,6 +1801,16 @@ button.profile {
   background: #f1f9fd;
 }
 
+.catalog-row.queued-row {
+  border-color: #a9cad8;
+  background: #f3fafc;
+}
+
+.catalog-row.failed-row {
+  border-color: #e5b9a2;
+  background: #fff8f4;
+}
+
 .catalog-row-main {
   display: flex;
   align-items: baseline;
@@ -1750,8 +1837,35 @@ button.profile {
   padding: 1px 6px;
 }
 
+.catalog-row-main .catalog-state-chip {
+  border-color: #cfd9e3;
+  color: #526273;
+}
+
+.catalog-row-main .catalog-state-chip.installed {
+  border-color: #b8d9c4;
+  background: #f2fbf5;
+  color: #22713d;
+}
+
+.catalog-row-main .catalog-state-chip.queued,
+.catalog-row-main .catalog-state-chip.downloading,
+.catalog-row-main .catalog-state-chip.waitingInstall,
+.catalog-row-main .catalog-state-chip.installing {
+  border-color: #acd0de;
+  background: #eff8fc;
+  color: #17617f;
+}
+
+.catalog-row-main .catalog-state-chip.failed {
+  border-color: #e3b49e;
+  background: #fff4ee;
+  color: #8a3d18;
+}
+
 .catalog-row-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
   color: #667484;
@@ -3248,6 +3362,10 @@ button.profile {
     width: 100%;
   }
 
+  .catalog-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .everest-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3315,6 +3433,14 @@ button.profile {
 
   .catalog-actions {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-downloadable-toggle {
+    width: 100%;
   }
 
   .download-task-lists {
