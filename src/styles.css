@@ -2505,7 +2505,8 @@ button.profile {
   color: #12805a;
 }
 
-.record-toggle:disabled {
+.record-toggle:disabled,
+.record-toggle.blocked {
   border-color: #d9e1e8;
   background: #f4f7f9;
   color: #73808d;

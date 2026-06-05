@@ -267,7 +267,12 @@ function MapTable({
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <td className="action-cell">
                 <div className="record-actions">
-                  <ToggleButton disabled={map.readOnly} enabled={enabled} label="地图" onClick={() => onToggle(map)} />
+                  <ToggleButton
+                    blockedReason={map.readOnly ? `${map.name} 是内置项目，不能通过 Profile 启用或禁用。` : undefined}
+                    enabled={enabled}
+                    label="地图"
+                    onClick={() => onToggle(map)}
+                  />
                   <div className="record-flag-actions" aria-label="地图标记">
                     <FlagButton
                       active={map.favorite}
@@ -379,7 +384,12 @@ function ModTable({
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <td className="action-cell">
                 <div className="record-actions">
-                  <ToggleButton disabled={modItem.readOnly} enabled={enabled} label="Mod" onClick={() => onToggle(modItem)} />
+                  <ToggleButton
+                    blockedReason={modItem.readOnly ? `${modItem.name} 是内置项目，不能通过 Profile 启用或禁用。` : undefined}
+                    enabled={enabled}
+                    label="Mod"
+                    onClick={() => onToggle(modItem)}
+                  />
                   <div className="record-flag-actions" aria-label="Mod 标记">
                     <FlagButton
                       active={modItem.favorite}
@@ -482,17 +492,27 @@ function FlagButton({
   );
 }
 
-function ToggleButton({ disabled, enabled, label, onClick }: { disabled?: boolean; enabled: boolean; label: string; onClick: () => void }) {
+function ToggleButton({
+  blockedReason,
+  enabled,
+  label,
+  onClick
+}: {
+  blockedReason?: string;
+  enabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  const blocked = Boolean(blockedReason);
   return (
     <button
-      className={enabled ? "record-toggle enabled" : "record-toggle disabled"}
-      disabled={disabled}
+      aria-disabled={blocked}
+      className={`${enabled ? "record-toggle enabled" : "record-toggle disabled"}${blocked ? " blocked" : ""}`}
       onClick={(event) => {
         event.stopPropagation();
-        if (disabled) return;
         onClick();
       }}
-      title={disabled ? `${label}不能修改启用状态` : enabled ? `禁用${label}` : `启用${label}`}
+      title={blockedReason ?? (enabled ? `禁用${label}` : `启用${label}`)}
     >
       {enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
     </button>

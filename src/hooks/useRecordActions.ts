@@ -73,8 +73,13 @@ export function useRecordActions({
     if (activeView === "maps") {
       disableVisibleMaps();
     } else if (activeView === "mods") {
-      const modIds = new Set(filteredMods.filter((modItem) => !modItem.readOnly).map((modItem) => modItem.id));
+      const blockedMods = blockedVisibleMods(filteredMods);
+      const blockedModIds = new Set(blockedMods.map((modItem) => modItem.id));
+      const modIds = new Set(
+        filteredMods.filter((modItem) => !modItem.readOnly && !blockedModIds.has(modItem.id)).map((modItem) => modItem.id)
+      );
       setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+      showBlockedDisableWarning(blockedMods);
     }
   }
 
@@ -127,9 +132,13 @@ export function useRecordActions({
 
   function disableVisibleMaps() {
     const mapIds = new Set(filteredMaps.filter((record) => record.kind === "map" && !record.readOnly).map((record) => record.id));
-    const modIds = new Set(filteredMaps.filter((record) => record.kind === "mod" && !record.readOnly).map((record) => record.id));
+    const visibleMods = filteredMaps.filter((record) => record.kind === "mod");
+    const blockedMods = blockedVisibleMods(visibleMods);
+    const blockedModIds = new Set(blockedMods.map((modItem) => modItem.id));
+    const modIds = new Set(visibleMods.filter((record) => !record.readOnly && !blockedModIds.has(record.id)).map((record) => record.id));
     setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
     setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+    showBlockedDisableWarning(blockedMods);
   }
 
   function canToggleProfileRecord(record: ModRecord) {
@@ -150,6 +159,20 @@ export function useRecordActions({
     if (!names.length) return "未知项目";
     const visible = names.slice(0, 6).join("、");
     return names.length > 6 ? `${visible} 等 ${names.length} 个项目` : visible;
+  }
+
+  function blockedVisibleMods(records: ModRecord[]) {
+    return records.filter((record) => record.readOnly || (enabledModDraft.has(record.id) && dependencyModDraft.has(record.id)));
+  }
+
+  function showBlockedDisableWarning(records: ModRecord[]) {
+    if (!records.length) return;
+    const reasons = records.slice(0, 4).map((record) => {
+      if (record.readOnly) return `${record.name} 是内置项目`;
+      return `${record.name} 被 ${dependentSummary(record)} 依赖`;
+    });
+    const suffix = records.length > 4 ? `，另有 ${records.length - 4} 个 Mod` : "";
+    notifier.showWarning(`部分 Mod 未禁用：${reasons.join("；")}${suffix}。`);
   }
 
   function setRecordFavoriteInScan(recordId: string, favorite: boolean) {
