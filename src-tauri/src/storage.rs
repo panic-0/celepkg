@@ -346,7 +346,7 @@ fn normalize_source_order(sources: &[ModCatalogSourceKind]) -> Vec<ModCatalogSou
 }
 
 fn default_auto_check_mod_updates_on_startup() -> bool {
-    false
+    true
 }
 
 fn default_auto_refresh_mod_catalog_cache_on_startup() -> bool {
@@ -461,7 +461,7 @@ mod tests {
             ]
         );
         assert_eq!(state.mod_catalog_source_enabled_count, 2);
-        assert!(!state.auto_check_mod_updates_on_startup);
+        assert!(state.auto_check_mod_updates_on_startup);
         assert!(state.auto_refresh_mod_catalog_cache_on_startup);
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
