@@ -11,6 +11,7 @@ type SettingsManagerProps = {
   autoBackupRetentionCount: number;
   autoCheckModUpdatesOnStartup: boolean;
   autoRefreshModCatalogCacheOnStartup: boolean;
+  catalogCacheRefreshing: boolean;
   loading: boolean;
   modCatalogSourceEnabledCount: number;
   modCatalogSourceOrder: ModCatalogSourceKind[];
@@ -36,6 +37,7 @@ export function SettingsManager({
   autoBackupRetentionCount,
   autoCheckModUpdatesOnStartup,
   autoRefreshModCatalogCacheOnStartup,
+  catalogCacheRefreshing,
   loading,
   modCatalogSourceEnabledCount,
   modCatalogSourceOrder,
@@ -214,8 +216,8 @@ export function SettingsManager({
                 <PackageSearch size={16} />
                 启动时拉取列表
               </button>
-              <button className="inline-toggle" disabled={loading} onClick={onModCatalogCacheRefresh} title="立即重新拉取并覆盖本地 Mod 列表缓存">
-                <RefreshCw size={16} />
+              <button className="inline-toggle" disabled={catalogCacheRefreshing} onClick={onModCatalogCacheRefresh} title="立即重新拉取并覆盖本地 Mod 列表缓存">
+                <RefreshCw size={16} className={catalogCacheRefreshing ? "spin-icon" : ""} />
                 刷新列表缓存
               </button>
             </section>

@@ -12,16 +12,17 @@ type BackupsOptions = {
 
 export function useBackups({ celestePath, notifier, refresh, setLoading }: BackupsOptions) {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
+  const [backupsRefreshing, setBackupsRefreshing] = useState(false);
 
   async function refreshBackups() {
-    setLoading(true);
+    setBackupsRefreshing(true);
     notifier.clearNotice();
     try {
       setBackups(await listBackups());
     } catch (error) {
       notifier.showError(readError(error));
     } finally {
-      setLoading(false);
+      setBackupsRefreshing(false);
     }
   }
 
@@ -83,31 +84,26 @@ export function useBackups({ celestePath, notifier, refresh, setLoading }: Backu
   }
 
   async function openCurrentBackupFolder() {
-    setLoading(true);
     notifier.clearNotice();
     try {
       await openBackupFolder(celestePath);
     } catch (error) {
       notifier.showError(readError(error));
-    } finally {
-      setLoading(false);
     }
   }
 
   async function openSelectedBackupLocation(backupPath: string) {
-    setLoading(true);
     notifier.clearNotice();
     try {
       await openBackupLocation(backupPath);
     } catch (error) {
       notifier.showError(readError(error));
-    } finally {
-      setLoading(false);
     }
   }
 
   return {
     backups,
+    backupsRefreshing,
     cleanupOldAutoBackups,
     createManualBackup,
     deleteSelectedBackup,

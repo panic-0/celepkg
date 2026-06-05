@@ -17,8 +17,11 @@ const channels = [
   { key: "dev", label: "Dev" }
 ];
 
+let everestReleaseCache: EverestReleaseList | null = null;
+let everestReleaseRequest: Promise<EverestReleaseList> | null = null;
+
 export function EverestManager({ loading, mods, notifier, onInstall }: EverestManagerProps) {
-  const [releaseList, setReleaseList] = useState<EverestReleaseList>({ releases: [], warnings: [] });
+  const [releaseList, setReleaseList] = useState<EverestReleaseList>(everestReleaseCache ?? { releases: [], warnings: [] });
   const [activeChannel, setActiveChannel] = useState("stable");
   const [loadingReleases, setLoadingReleases] = useState(false);
   const currentEverest = mods.find((mod) => mod.name.toLowerCase() === "everest");
@@ -30,10 +33,14 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
     [activeChannel, releaseList.releases]
   );
 
-  const refreshReleases = useCallback(async () => {
-    setLoadingReleases(true);
+  const refreshReleases = useCallback(async (forceRefresh = true) => {
+    if (!forceRefresh && everestReleaseCache) {
+      setReleaseList(everestReleaseCache);
+      return;
+    }
+    setLoadingReleases(!everestReleaseCache || forceRefresh);
     try {
-      const result = await listEverestReleases();
+      const result = await loadEverestReleaseList(forceRefresh);
       setReleaseList(result);
       if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
     } catch (error) {
@@ -44,7 +51,7 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
   }, [notifier]);
 
   useEffect(() => {
-    void refreshReleases();
+    void refreshReleases(false);
   }, [refreshReleases]);
 
   return (
@@ -54,7 +61,7 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
           <h2>Everest</h2>
           <p>{currentVersion ? `当前版本 ${currentVersion}` : "未识别到 Everest 版本"}</p>
         </div>
-        <button onClick={refreshReleases} disabled={loadingReleases || loading} title="刷新 Everest 版本列表">
+        <button onClick={() => void refreshReleases(true)} disabled={loadingReleases} title="刷新 Everest 版本列表">
           <RefreshCw size={16} className={loadingReleases ? "spin-icon" : ""} />
           刷新
         </button>
@@ -127,6 +134,21 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
       </div>
     </section>
   );
+}
+
+function loadEverestReleaseList(forceRefresh: boolean) {
+  if (!forceRefresh && everestReleaseCache) return Promise.resolve(everestReleaseCache);
+  if (!forceRefresh && everestReleaseRequest) return everestReleaseRequest;
+  const request = listEverestReleases()
+    .then((result) => {
+      everestReleaseCache = result;
+      return result;
+    })
+    .finally(() => {
+      if (everestReleaseRequest === request) everestReleaseRequest = null;
+    });
+  everestReleaseRequest = request;
+  return request;
 }
 
 function formatEverestVersion(version: number) {

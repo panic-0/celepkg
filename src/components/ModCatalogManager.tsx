@@ -20,7 +20,6 @@ type ModCatalogManagerProps = {
   notifier: AppNotifier;
   scan: ScanResult;
   sources: ModCatalogSourceKind[];
-  setLoading: (loading: boolean, message?: string) => void;
   onInstall: (entry: ModCatalogEntry) => void;
   onRetryFailed?: () => void;
 };
@@ -40,7 +39,6 @@ export function ModCatalogManager({
   notifier,
   scan,
   sources,
-  setLoading,
   onInstall,
   onRetryFailed
 }: ModCatalogManagerProps) {
@@ -48,6 +46,7 @@ export function ModCatalogManager({
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
   const [filters, setFilters] = useState<CatalogFilters>(defaultFilters);
+  const [catalogSearching, setCatalogSearching] = useState(false);
   const [sortKey, setSortKey] = useState<CatalogSortKey>("relevance");
   const searchRequestRef = useRef(0);
 
@@ -66,7 +65,7 @@ export function ModCatalogManager({
     searchRequestRef.current = requestId;
     let disposed = false;
     const timer = window.setTimeout(() => {
-      setLoading(true, "搜索 Mod 目录...");
+      setCatalogSearching(true);
       searchModCatalog(query, sourceList)
         .then((result) => {
           if (disposed || searchRequestRef.current !== requestId) return;
@@ -81,14 +80,14 @@ export function ModCatalogManager({
           notifier.showError(error instanceof Error ? error.message : "搜索 Mod 目录失败。");
         })
         .finally(() => {
-          if (!disposed && searchRequestRef.current === requestId) setLoading(false);
+          if (!disposed && searchRequestRef.current === requestId) setCatalogSearching(false);
         });
     }, 300);
     return () => {
       disposed = true;
       window.clearTimeout(timer);
     };
-  }, [notifier, query, setLoading, sourceList]);
+  }, [notifier, query, sourceList]);
 
   function updateFilters(update: Partial<CatalogFilters>) {
     setFilters((current) => ({ ...current, ...update }));
@@ -108,6 +107,7 @@ export function ModCatalogManager({
           <div className="catalog-column-heading">
             <PackageCheck size={17} />
             <h3>目录结果</h3>
+            {catalogSearching && <small>搜索中...</small>}
           </div>
           <div className="catalog-actions">
             <SearchBox className="catalog-search" value={query} onChange={setQuery} placeholder="搜索 Mod、地图、Helper" />

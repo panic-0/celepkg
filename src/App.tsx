@@ -71,6 +71,7 @@ export function App() {
     autoBackupRetentionCount,
     autoCheckModUpdatesOnStartup,
     autoRefreshModCatalogCacheOnStartup,
+    catalogCacheRefreshing,
     celestePath,
     clearNotice,
     configWarnings,
@@ -101,6 +102,7 @@ export function App() {
   } = useCelePkgData();
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
+  const [modUpdateChecking, setModUpdateChecking] = useState(false);
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
   const [downloadControls, setDownloadControls] = useState<DownloadControlState>({ downloadPaused: false, installPaused: false });
   const [confirmPrompt, setConfirmPrompt] = useState<AppConfirmPromptState | null>(null);
@@ -109,6 +111,8 @@ export function App() {
   const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
   const downloadControlsRef = useRef<DownloadControlState>(downloadControls);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
+  const modUpdateCheckRequest = useRef(0);
+  const manualModUpdateCheckRequest = useRef(0);
   const startupModUpdateCheckDone = useRef(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
@@ -216,26 +220,30 @@ export function App() {
       if (!celestePath.trim()) return;
       const startupMode = mode === "startup";
       const sources = modCatalogSources;
-      const previousLoading = loading;
-      if (!startupMode || !previousLoading) {
-        setLoading(true, "正在检查 Mod 更新...");
+      const requestId = modUpdateCheckRequest.current + 1;
+      modUpdateCheckRequest.current = requestId;
+      const manualRequestId = startupMode ? 0 : manualModUpdateCheckRequest.current + 1;
+      if (!startupMode) {
+        manualModUpdateCheckRequest.current = manualRequestId;
+        setModUpdateChecking(true);
       }
       try {
         const result = await checkModUpdates(celestePath, sources);
-        setModUpdateResult(result);
-        if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
-        else if (result.updates.length) notifier.showSuccess(`发现 ${result.updates.length} 个可更新 Mod`);
-        else if (!startupMode) notifier.showSuccess("本地 Mod 已是最新");
+        const latestResultRequest = modUpdateCheckRequest.current === requestId;
+        if (latestResultRequest) setModUpdateResult(result);
+        if (!startupMode) {
+          if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+          else if (result.updates.length) notifier.showSuccess(`发现 ${result.updates.length} 个可更新 Mod`);
+          else notifier.showSuccess("本地 Mod 已是最新");
+        }
       } catch (error) {
         const message = readError(error);
-        notifier.showError(message);
+        if (!startupMode) notifier.showError(message);
       } finally {
-        if (!startupMode || !previousLoading) {
-          setLoading(false);
-        }
+        if (!startupMode && manualModUpdateCheckRequest.current === manualRequestId) setModUpdateChecking(false);
       }
     },
-    [celestePath, loading, modCatalogSources, notifier, setLoading]
+    [celestePath, modCatalogSources, notifier]
   );
 
   useEffect(() => {
@@ -243,7 +251,6 @@ export function App() {
       startupModUpdateCheckDone.current ||
       !startupAutoCheckModUpdatesOnStartup ||
       !autoCheckModUpdatesOnStartup ||
-      loading ||
       !celestePath.trim() ||
       !scan.modsPath
     ) {
@@ -251,7 +258,7 @@ export function App() {
     }
     startupModUpdateCheckDone.current = true;
     void checkUpdatesForMods("startup");
-  }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, loading, scan.modsPath, startupAutoCheckModUpdatesOnStartup]);
+  }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, scan.modsPath, startupAutoCheckModUpdatesOnStartup]);
 
   async function updateSingleMod(candidate: ModUpdateCandidate) {
     const confirmed = await requestAppConfirm({
@@ -879,6 +886,7 @@ export function App() {
             autoBackupRetentionCount={autoBackupRetentionCount}
             autoCheckModUpdatesOnStartup={autoCheckModUpdatesOnStartup}
             autoRefreshModCatalogCacheOnStartup={autoRefreshModCatalogCacheOnStartup}
+            catalogCacheRefreshing={catalogCacheRefreshing}
             loading={loading}
             modCatalogSourceEnabledCount={modCatalogSourceEnabledCount}
             modCatalogSourceOrder={modCatalogSourceOrder}
@@ -901,6 +909,7 @@ export function App() {
           <BackupManager
             autoBackupCleanupEnabled={autoBackupCleanupEnabled}
             backups={backups.backups}
+            backupsRefreshing={backups.backupsRefreshing}
             celestePath={celestePath}
             loading={loading}
             onBackupCreate={backups.createManualBackup}
@@ -931,7 +940,6 @@ export function App() {
             notifier={notifier}
             scan={scan}
             sources={modCatalogSources}
-            setLoading={setLoading}
             onInstall={installCatalogEntry}
             onRetryFailed={retryFailedDownloadTask}
           />
@@ -979,6 +987,7 @@ export function App() {
             scrollMemory={scrollMemory}
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
+            modUpdateChecking={modUpdateChecking}
             modUpdateCount={downloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
             onDisableAll={recordActions.disableAllInCurrentView}

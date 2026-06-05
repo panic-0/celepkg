@@ -30,6 +30,7 @@ type RecordListProps = {
   scrollMemory: ScrollMemory;
   loading: boolean;
   loadingMessage: string;
+  modUpdateChecking: boolean;
   modUpdateCount: number;
   modUpdatesByRecordId: Map<string, ModUpdateCandidate>;
   visibleMapCount: number;
@@ -61,6 +62,7 @@ export function RecordList({
   scrollMemory,
   loading,
   loadingMessage,
+  modUpdateChecking,
   modUpdateCount,
   modUpdatesByRecordId,
   visibleMapCount,
@@ -111,8 +113,8 @@ export function RecordList({
           <ToggleLeft size={16} />
           禁用当前结果
         </button>
-        <button onClick={onCheckModUpdates} disabled={loading} title="检查本地 zip Mod 是否有更新">
-          <SearchCheck size={16} />
+        <button onClick={onCheckModUpdates} disabled={modUpdateChecking} title="检查本地 zip Mod 是否有更新">
+          {modUpdateChecking ? <LoaderCircle className="spin-icon" size={16} /> : <SearchCheck size={16} />}
           检查更新
         </button>
         <button

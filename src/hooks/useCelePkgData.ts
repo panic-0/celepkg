@@ -48,6 +48,7 @@ export function useCelePkgData() {
   const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(false);
   const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(false);
   const [autoRefreshModCatalogCacheOnStartup, setAutoRefreshModCatalogCacheOnStartupState] = useState(true);
+  const [catalogCacheRefreshing, setCatalogCacheRefreshing] = useState(false);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loadingState, setLoadingState] = useState(emptyLoadingState);
   const [notice, setNotice] = useState<AppNotice | null>(null);
@@ -265,7 +266,7 @@ export function useCelePkgData() {
   );
 
   const refreshModCatalogCacheNow = useCallback(async () => {
-    setLoading(true, "正在刷新 Mod 列表缓存...");
+    setCatalogCacheRefreshing(true);
     clearNotice();
     try {
       const result = await refreshModCatalogCache(modCatalogSources);
@@ -279,9 +280,9 @@ export function useCelePkgData() {
       showNotice("error", readError(error));
       return undefined;
     } finally {
-      setLoading(false);
+      setCatalogCacheRefreshing(false);
     }
-  }, [clearNotice, modCatalogSources, setLoading, showNotice]);
+  }, [clearNotice, modCatalogSources, showNotice]);
 
   const updateSelectedSaveFiles = useCallback(
     async (saveFiles: string[]) => {
@@ -378,6 +379,7 @@ export function useCelePkgData() {
     autoBackupRetentionCount,
     autoCheckModUpdatesOnStartup,
     autoRefreshModCatalogCacheOnStartup,
+    catalogCacheRefreshing,
     celestePath,
     clearNotice,
     configWarnings,

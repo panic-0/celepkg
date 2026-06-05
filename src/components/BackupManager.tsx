@@ -7,6 +7,7 @@ import { ConfirmDialog } from "./common";
 type BackupManagerProps = {
   autoBackupCleanupEnabled: boolean;
   backups: BackupInfo[];
+  backupsRefreshing: boolean;
   celestePath: string;
   loading: boolean;
   onBackupCreate: () => void;
@@ -21,6 +22,7 @@ type BackupManagerProps = {
 export function BackupManager({
   autoBackupCleanupEnabled,
   backups,
+  backupsRefreshing,
   celestePath,
   loading,
   onBackupCreate,
@@ -66,12 +68,12 @@ export function BackupManager({
             <Archive size={16} />
             备份
           </button>
-          <button onClick={onBackupFolderOpen} disabled={loading}>
+          <button onClick={onBackupFolderOpen}>
             <FolderOpen size={16} />
             文件夹
           </button>
-          <button className="icon-button" onClick={onBackupsRefresh} disabled={loading} title="刷新备份列表">
-            <RefreshCw size={16} />
+          <button className="icon-button" onClick={onBackupsRefresh} disabled={backupsRefreshing} title="刷新备份列表">
+            <RefreshCw size={16} className={backupsRefreshing ? "spin-icon" : ""} />
           </button>
         </div>
       </div>
@@ -99,7 +101,7 @@ export function BackupManager({
                 <Archive size={16} />
                 立即备份
               </button>
-              <button onClick={onBackupFolderOpen} disabled={loading}>
+              <button onClick={onBackupFolderOpen}>
                 <FolderOpen size={16} />
                 打开文件夹
               </button>
@@ -142,7 +144,7 @@ function BackupItem({
         <small>{`Mod 清单 ${backup.mods.length} 个，受管文件 ${managedFiles}/${totalManagedFiles}`}</small>
       </div>
       <div className="backup-actions">
-        <button onClick={() => onLocationOpen(backup.backupPath)} disabled={loading}>
+        <button onClick={() => onLocationOpen(backup.backupPath)}>
           <FolderOpen size={16} />
           位置
         </button>
