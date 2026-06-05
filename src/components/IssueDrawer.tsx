@@ -21,7 +21,7 @@ export function IssueDrawer({ configWarnings, itemWarnings, open, scanWarnings, 
             <h2 id="issue-drawer-title">问题</h2>
             <p>{hasIssues ? "这些信息需要处理或确认，重新加载配置/扫描后会刷新。" : "当前没有需要处理的问题。"}</p>
           </div>
-          <button className="icon-button" onClick={onClose} title="关闭问题面板">
+          <button className="ui-icon-button icon-button" onClick={onClose} title="关闭问题面板">
             <X size={18} />
           </button>
         </header>

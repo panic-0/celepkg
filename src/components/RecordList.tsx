@@ -106,7 +106,7 @@ export function RecordList({
   }, [records.length]);
 
   return (
-    <section className="record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
+    <section className="ui-panel record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
       <div className="list-header">
         <div className="record-list-heading">
           <div className="record-list-title">
@@ -194,7 +194,7 @@ function formatUpdateAllLabel(count: number) {
 
 function RecordListEmpty({ activeView, loading, loadingMessage }: { activeView: RecordView; loading: boolean; loadingMessage: string }) {
   return (
-    <div className="empty-state table-empty">
+    <div className="ui-empty-state empty-state table-empty">
       {loading ? <LoaderCircle className="spin-icon" size={28} /> : <FolderOpen size={28} />}
       <p>{loading ? loadingMessage || "正在加载..." : activeView === "maps" ? "没有找到符合条件的地图。" : "没有找到符合条件的 Mod。"}</p>
     </div>

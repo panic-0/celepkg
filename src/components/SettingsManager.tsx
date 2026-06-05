@@ -83,7 +83,7 @@ export function SettingsManager({
   }
 
   return (
-    <section className="settings-manager">
+    <section className="ui-panel settings-manager">
       <div className="list-header">
         <div>
           <h2>设置</h2>
@@ -124,7 +124,7 @@ export function SettingsManager({
                   })}
                 </div>
               ) : (
-                <div className="empty-state compact settings-empty">
+                <div className="ui-empty-state empty-state compact settings-empty">
                   <Save size={22} />
                   <p>没有找到数字存档。</p>
                 </div>

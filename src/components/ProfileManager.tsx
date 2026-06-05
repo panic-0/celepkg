@@ -79,7 +79,7 @@ export function ProfileManager({
   const selectedModProfile = modProfiles.find((profile) => profile.id === selectedModProfileId);
 
   return (
-    <section className="profile-manager">
+    <section className="ui-panel profile-manager">
       <div className="list-header">
         <div>
           <h2>Profile</h2>
@@ -372,7 +372,7 @@ function ProfileColumn({
             );
           })
         ) : (
-          <div className="empty-state compact profile-list-empty">
+          <div className="ui-empty-state empty-state compact profile-list-empty">
             <p>还没有 Profile。</p>
           </div>
         )}

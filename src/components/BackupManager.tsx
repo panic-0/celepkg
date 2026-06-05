@@ -49,7 +49,7 @@ export function BackupManager({
   }
 
   return (
-    <section className="backup-manager">
+    <section className="ui-panel backup-manager">
       <div className="list-header">
         <div>
           <h2>备份还原</h2>
@@ -72,7 +72,7 @@ export function BackupManager({
             <FolderOpen size={16} />
             文件夹
           </button>
-          <button className="icon-button" onClick={onBackupsRefresh} disabled={backupsRefreshing} title="刷新备份列表">
+          <button className="ui-icon-button icon-button" onClick={onBackupsRefresh} disabled={backupsRefreshing} title="刷新备份列表">
             <RefreshCw size={16} className={backupsRefreshing ? "spin-icon" : ""} />
           </button>
         </div>
@@ -93,7 +93,7 @@ export function BackupManager({
             ))}
           </div>
         ) : (
-          <div className="empty-state table-empty backup-empty">
+          <div className="ui-empty-state empty-state table-empty backup-empty">
             <Archive size={28} />
             <p>暂无备份。</p>
             <div className="empty-actions">

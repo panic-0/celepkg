@@ -68,7 +68,7 @@ export function AppToolbar({
       </div>
 
       <div className="toolbar-actions">
-        <button className="icon-button" onClick={onRefresh} disabled={loading} title="保存路径并扫描">
+        <button className="ui-icon-button icon-button" onClick={onRefresh} disabled={loading} title="保存路径并扫描">
           <RefreshCcw size={18} />
         </button>
         <button className="cache-rescan-button" onClick={onRescan} disabled={loading} title="刷新缓存并重新扫描地图">

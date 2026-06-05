@@ -258,9 +258,25 @@ h1 {
   align-items: center;
 }
 
+.ui-icon-button,
 .icon-button {
   width: 36px;
   padding: 0;
+}
+
+.ui-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  border-radius: 999px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ui-long-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .cache-rescan-button {

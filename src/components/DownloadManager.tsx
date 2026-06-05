@@ -36,7 +36,7 @@ export function DownloadManager({
   };
 
   return (
-    <section className="download-manager">
+    <section className="ui-panel download-manager">
       <div className="list-header">
         <div>
           <h2>下载管理</h2>

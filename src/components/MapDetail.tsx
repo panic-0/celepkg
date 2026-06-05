@@ -96,12 +96,12 @@ export function MapDetail({
 
   if (!map) {
     return (
-      <section className="detail-pane">
+      <section className="ui-panel detail-pane">
         <button className="back-button" onClick={onBack}>
           <ArrowLeft size={17} />
           返回列表
         </button>
-        <div className="empty-state compact">
+        <div className="ui-empty-state empty-state compact">
           <FolderOpen size={24} />
           <p>选择一个地图查看详情。</p>
         </div>
@@ -110,7 +110,7 @@ export function MapDetail({
   }
 
   return (
-    <section className="detail-pane">
+    <section className="ui-panel detail-pane">
       <div className="detail-heading">
         <div className="detail-topline">
           <button className="back-button" onClick={onBack}>
@@ -301,6 +301,7 @@ export function MapDetail({
               <div className="dependency-list">
                 {map.dependencies.map((dependency) => (
                   <span
+                    className="ui-chip"
                     key={`${dependency.name}-${dependency.version}`}
                     title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
                   >
@@ -346,7 +347,7 @@ function DependencyReferenceList({ emptyText, references }: { emptyText: string;
   return (
     <div className="dependency-list">
       {references.map((reference) => (
-        <span key={reference.id} title={`${reference.name} (${reference.fileName})`}>
+        <span className="ui-chip" key={reference.id} title={`${reference.name} (${reference.fileName})`}>
           <strong>{reference.name}</strong>
           <small>{reference.kind === "map" ? "地图" : "Mod"}</small>
         </span>
@@ -414,7 +415,7 @@ function subMapSidName(sid: string) {
 
 function LongValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="long-field">
+    <div className="ui-long-value long-field">
       <span>{label}</span>
       <code title={value}>{value || "-"}</code>
     </div>
@@ -423,7 +424,7 @@ function LongValue({ label, value }: { label: string; value: string }) {
 
 function LongList({ label, values, emptyText }: { label?: string; values: string[]; emptyText: string }) {
   return (
-    <div className="long-list-field">
+    <div className="ui-long-value long-list-field">
       {label && <span>{label}</span>}
       {values.length ? (
         <div className="long-list">

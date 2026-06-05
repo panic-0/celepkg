@@ -99,7 +99,7 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
 
           <div className="everest-release-list">
             {loadingReleases ? (
-              <div className="empty-state compact">
+              <div className="ui-empty-state empty-state compact">
                 <LoaderCircle className="spin-icon" size={24} />
                 <p>正在加载 Everest 版本...</p>
               </div>
@@ -127,7 +127,7 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
                 );
               })
             ) : (
-              <div className="empty-state compact">
+              <div className="ui-empty-state empty-state compact">
                 <Download size={24} />
                 <p>这个通道暂时没有版本数据。</p>
               </div>

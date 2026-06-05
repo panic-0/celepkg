@@ -67,10 +67,12 @@ export function DetailStat({ icon, label, value }: { icon: ReactNode; label: str
 }
 
 export function Info({ label, value }: { label: string; value: string }) {
+  const valueClassName = value.length > 32 ? "ui-long-value long-value" : "";
+
   return (
     <div className="info-line">
       <span>{label}</span>
-      <strong className={value.length > 32 ? "long-value" : ""} title={value}>
+      <strong className={valueClassName} title={value}>
         {value}
       </strong>
     </div>
@@ -198,7 +200,7 @@ export function DialogShell({
           {showCloseButton && (
             <button
               autoFocus
-              className="icon-button dialog-close-button"
+              className="ui-icon-button icon-button dialog-close-button"
               onClick={onClose}
               disabled={closeDisabled}
               title="关闭"

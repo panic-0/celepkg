@@ -31,12 +31,12 @@ export function ModDetail({
 
   if (!modItem) {
     return (
-      <section className="detail-pane">
+      <section className="ui-panel detail-pane">
         <button className="back-button" onClick={onBack}>
           <ArrowLeft size={17} />
           返回列表
         </button>
-        <div className="empty-state compact">
+        <div className="ui-empty-state empty-state compact">
           <FolderOpen size={24} />
           <p>选择一个 Mod 查看详情。</p>
         </div>
@@ -45,7 +45,7 @@ export function ModDetail({
   }
 
   return (
-    <section className="detail-pane">
+    <section className="ui-panel detail-pane">
       <div className="detail-heading">
         <div className="detail-topline">
           <button className="back-button" onClick={onBack}>
@@ -103,6 +103,7 @@ export function ModDetail({
               <div className="dependency-list">
                 {modItem.dependencies.map((dependency) => (
                   <span
+                    className="ui-chip"
                     key={`${dependency.name}-${dependency.version}`}
                     title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
                   >
@@ -122,6 +123,7 @@ export function ModDetail({
               <div className="dependency-list">
                 {modItem.optionalDependencies.map((dependency) => (
                   <span
+                    className="ui-chip"
                     key={`${dependency.name}-${dependency.version}`}
                     title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
                   >
@@ -177,7 +179,7 @@ function DependencyReferenceList({ emptyText, references }: { emptyText: string;
   return (
     <div className="dependency-list">
       {references.map((reference) => (
-        <span key={reference.id} title={`${reference.name} (${reference.fileName})`}>
+        <span className="ui-chip" key={reference.id} title={`${reference.name} (${reference.fileName})`}>
           <strong>{reference.name}</strong>
           <small>{reference.kind === "map" ? "地图" : "Mod"}</small>
         </span>
@@ -197,7 +199,7 @@ function Metric({ label, tone, value }: { label: string; tone?: "warn"; value: R
 
 function LongValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="long-field">
+    <div className="ui-long-value long-field">
       <span>{label}</span>
       <code title={value}>{value || "-"}</code>
     </div>

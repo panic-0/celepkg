@@ -12,7 +12,7 @@ export function Pagination({ page, pageCount, ariaLabel, onPageChange }: Paginat
   const pageItems = buildPageItems(page, pageCount, 3);
   return (
     <div className="pagination-bar" aria-label={ariaLabel}>
-      <button className="icon-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} title="上一页">
+      <button className="ui-icon-button icon-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} title="上一页">
         <ChevronLeft size={16} />
       </button>
       <div className="pagination-numbers">
@@ -34,7 +34,7 @@ export function Pagination({ page, pageCount, ariaLabel, onPageChange }: Paginat
           )
         )}
       </div>
-      <button className="icon-button" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} title="下一页">
+      <button className="ui-icon-button icon-button" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} title="下一页">
         <ChevronRight size={16} />
       </button>
     </div>

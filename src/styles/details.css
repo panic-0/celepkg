@@ -265,13 +265,14 @@
   word-break: break-word;
 }
 
-.info-line strong:not(.long-value) {
+.info-line strong:not(.long-value):not(.ui-long-value) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.info-line strong.long-value {
+.info-line strong.long-value,
+.info-line strong.ui-long-value {
   display: block;
   max-height: 7.4em;
   overflow: auto;
@@ -501,6 +502,7 @@
   overflow: auto;
 }
 
+.ui-empty-state,
 .empty-state {
   min-height: 160px;
   display: grid;

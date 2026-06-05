@@ -246,8 +246,8 @@ function CatalogEntryRow({
     >
       <div className="catalog-row-main">
         <strong title={entry.name}>{entry.name}</strong>
-        <span>{sourceLabel(entry.source)}</span>
-        <span className={`catalog-state-chip ${view.state}`}>{catalogStateLabel(view)}</span>
+        <span className="ui-chip">{sourceLabel(entry.source)}</span>
+        <span className={`ui-chip catalog-state-chip ${view.state}`}>{catalogStateLabel(view)}</span>
       </div>
       <div className="catalog-row-meta">
         <small>{entry.version || "无版本号"}</small>
@@ -257,7 +257,7 @@ function CatalogEntryRow({
         {view.taskItem?.progress && <small>{formatProgress(view.taskItem.progress.downloaded, view.taskItem.progress.total)}</small>}
       </div>
       <div className="catalog-row-actions">
-        <button className="icon-button catalog-detail-button" onClick={stopAndRun(onOpenDetail)} title="查看详情">
+        <button className="ui-icon-button icon-button catalog-detail-button" onClick={stopAndRun(onOpenDetail)} title="查看详情">
           <Info size={15} />
         </button>
         {entry.pageUrl && (
@@ -382,7 +382,7 @@ function WarningStrip({ warnings }: { warnings: string[] }) {
 
 function EmptyCatalog({ text }: { text: string }) {
   return (
-    <div className="empty-state compact catalog-empty">
+    <div className="ui-empty-state empty-state compact catalog-empty">
       <p>{text}</p>
     </div>
   );
