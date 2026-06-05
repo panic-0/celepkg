@@ -119,9 +119,10 @@ pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
 pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatalogSearchResult {
     let load = load_catalogs(sources);
     let normalized_query = normalize_dependency_name(query);
+    let can_match_page_url = query_looks_like_url_or_domain(query);
     let mut entries = load.entries;
     if !normalized_query.is_empty() {
-        entries.retain(|entry| entry_matches_query(entry, &normalized_query));
+        entries.retain(|entry| entry_matches_query(entry, &normalized_query, can_match_page_url));
     }
     entries.sort_by_key(|entry| entry.name.to_lowercase());
     entries.truncate(200);
@@ -717,15 +718,73 @@ fn safe_zip_file_name(name: &str) -> String {
     safe
 }
 
-fn entry_matches_query(entry: &ModCatalogEntry, normalized_query: &str) -> bool {
-    let haystack = [
-        entry.name.as_str(),
-        entry.version.as_str(),
-        entry.game_banana_type.as_str(),
-        entry.page_url.as_str(),
-    ]
-    .join(" ");
-    normalize_dependency_name(&haystack).contains(normalized_query)
+fn entry_matches_query(
+    entry: &ModCatalogEntry,
+    normalized_query: &str,
+    can_match_page_url: bool,
+) -> bool {
+    [entry.name.as_str(), entry.id.as_str()]
+        .iter()
+        .any(|value| normalize_dependency_name(value).contains(normalized_query))
+        || (can_match_page_url
+            && normalize_dependency_name(&entry.page_url).contains(normalized_query))
+}
+
+fn query_looks_like_url_or_domain(query: &str) -> bool {
+    query
+        .split_whitespace()
+        .map(trim_url_query_token)
+        .any(token_looks_like_url_or_domain)
+}
+
+fn trim_url_query_token(token: &str) -> &str {
+    token.trim_matches(|ch: char| {
+        matches!(
+            ch,
+            '<' | '>' | '(' | ')' | '[' | ']' | '{' | '}' | '"' | '\'' | ',' | ';'
+        )
+    })
+}
+
+fn token_looks_like_url_or_domain(token: &str) -> bool {
+    let token = token.trim();
+    if token.is_empty() {
+        return false;
+    }
+    let lower = token.to_ascii_lowercase();
+    let without_scheme = lower
+        .strip_prefix("https://")
+        .or_else(|| lower.strip_prefix("http://"))
+        .unwrap_or(&lower);
+    let without_www = without_scheme
+        .strip_prefix("www.")
+        .unwrap_or(without_scheme);
+    let host = without_www
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or_default()
+        .split(':')
+        .next()
+        .unwrap_or_default();
+    let labels = host.split('.').collect::<Vec<_>>();
+    labels.len() >= 2
+        && labels.iter().all(|label| {
+            !label.is_empty()
+                && label
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+                && label
+                    .chars()
+                    .next()
+                    .is_some_and(|ch| ch.is_ascii_alphanumeric())
+                && label
+                    .chars()
+                    .last()
+                    .is_some_and(|ch| ch.is_ascii_alphanumeric())
+        })
+        && labels.last().is_some_and(|label| {
+            label.len() >= 2 && label.chars().any(|ch| ch.is_ascii_alphabetic())
+        })
 }
 
 struct CatalogLoad {
@@ -1248,6 +1307,38 @@ Helper:
     }
 
     #[test]
+    fn catalog_query_ignores_version_type_and_page_url_for_plain_terms() {
+        let mut entry = test_catalog_entry("helper", "Visible Name");
+        entry.version = "1.2.3".to_string();
+        entry.game_banana_type = "Map".to_string();
+        entry.page_url = "https://gamebanana.com/mods/555/only-page-hit".to_string();
+
+        assert!(!catalog_entry_matches_query(&entry, "1.2.3"));
+        assert!(!catalog_entry_matches_query(&entry, "map"));
+        assert!(!catalog_entry_matches_query(&entry, "only-page-hit"));
+    }
+
+    #[test]
+    fn catalog_query_matches_name_and_id() {
+        let entry = test_catalog_entry("hidden-helper", "Visible Name");
+
+        assert!(catalog_entry_matches_query(&entry, "visible"));
+        assert!(catalog_entry_matches_query(&entry, "hidden helper"));
+    }
+
+    #[test]
+    fn catalog_url_query_matches_page_url() {
+        let mut entry = test_catalog_entry("helper", "Helper");
+        entry.page_url = "https://gamebanana.com/mods/555".to_string();
+
+        assert!(catalog_entry_matches_query(
+            &entry,
+            "https://gamebanana.com/mods/555"
+        ));
+        assert!(catalog_entry_matches_query(&entry, "gamebanana.com"));
+    }
+
+    #[test]
     fn update_check_uses_xxhash_not_version() {
         let dir = tempfile::tempdir().unwrap();
         let mod_path = dir.path().join("Helper.zip");
@@ -1671,6 +1762,14 @@ Helper:
             last_update: None,
             xx_hash: vec![],
         }
+    }
+
+    fn catalog_entry_matches_query(entry: &ModCatalogEntry, query: &str) -> bool {
+        entry_matches_query(
+            entry,
+            &normalize_dependency_name(query),
+            query_looks_like_url_or_domain(query),
+        )
     }
 
     fn write_zip(path: &Path, entries: &[(&str, &str)]) {
