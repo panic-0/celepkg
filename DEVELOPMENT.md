@@ -74,6 +74,14 @@ npm run build
 
 ## 代码检查
 
+提交前流程：
+
+1. 先阅读本文件，确认当前改动需要覆盖的检查范围。
+2. 查看 `.github/workflows/ci.yml`，确认本地检查没有漏掉 CI 步骤。
+3. 运行下面的前端检查。`git diff --check` 只能检查 Git 空白问题，不能替代 `npm run format:check`。
+4. 如果改动涉及 `src-tauri/`、Rust 配置、CI、发布流程，或准备发布，还要运行 Rust 检查。
+5. 提交前用 `git status --short` 和 `git diff --cached --name-only` 确认暂存范围。
+
 本地提交前至少执行：
 
 ```bash
@@ -90,6 +98,15 @@ cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 ```
+
+推送后检查最新 CI：
+
+```bash
+gh run list --limit 5
+gh run view <run-id> --json status,conclusion,jobs
+```
+
+如果 CI 失败，先读取失败 step 的日志并在本地复现；修复后重新运行对应本地检查，再提交并推送。
 
 自动格式化：
 
