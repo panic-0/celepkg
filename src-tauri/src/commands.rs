@@ -427,7 +427,7 @@ pub async fn set_record_protected(
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut state = load_state()?;
-        let path = resolve_input_path_from_state(&celeste_path, &state);
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
         let mut scan = services::scan::full_scan_cached(
             &path,
             state.profiles_state(),
