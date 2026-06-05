@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Info, PackageCheck, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, ExternalLink, Info, PackageCheck, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
 import type { DownloadTask } from "../utils/downloadTask";
@@ -16,6 +16,7 @@ import {
   type CatalogSortKey
 } from "../utils/catalogView";
 import { DialogFacts, DialogShell, SearchBox, Select } from "./common";
+import { Pagination } from "./Pagination";
 
 type ModCatalogManagerProps = {
   downloadTask?: DownloadTask | null;
@@ -133,15 +134,6 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
           <div className="catalog-meta-stack">
             <WarningStrip warnings={searchResult.warnings} />
             <CatalogDownloadSummary task={downloadTask ?? null} />
-            <CatalogPagination
-              end={pagedViews.end}
-              page={pagedViews.page}
-              pageCount={pagedViews.pageCount}
-              pageSize={pagedViews.pageSize}
-              start={pagedViews.start}
-              total={visibleViews.length}
-              onPageChange={setPage}
-            />
           </div>
           <div className="catalog-list">
             {pagedViews.items.map((view) => (
@@ -156,6 +148,14 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
             ))}
             {!visibleViews.length && <EmptyCatalog text={searchResult.entries.length ? "没有符合筛选的目录结果。" : "暂无目录结果。"} />}
           </div>
+          <CatalogPagination
+            end={pagedViews.end}
+            page={pagedViews.page}
+            pageCount={pagedViews.pageCount}
+            start={pagedViews.start}
+            total={visibleViews.length}
+            onPageChange={setPage}
+          />
         </section>
       </div>
       {detailEntry && detailView && (
@@ -171,34 +171,10 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
   );
 }
 
-function CatalogPagination({
-  end,
-  page,
-  pageCount,
-  pageSize,
-  start,
-  total,
-  onPageChange
-}: {
-  end: number;
-  page: number;
-  pageCount: number;
-  pageSize: number;
-  start: number;
-  total: number;
-  onPageChange: (page: number) => void;
-}) {
-  if (total <= pageSize) return null;
+function CatalogPagination(props: Omit<ComponentProps<typeof Pagination>, "ariaLabel">) {
   return (
-    <div className="catalog-pagination" aria-label="目录结果分页">
-      <button className="icon-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} title="上一页">
-        <ChevronLeft size={16} />
-      </button>
-      <span>{`第 ${page} / ${pageCount} 页`}</span>
-      <small>{`${start}-${end} / ${total}`}</small>
-      <button className="icon-button" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)} title="下一页">
-        <ChevronRight size={16} />
-      </button>
+    <div className="catalog-pagination">
+      <Pagination {...props} ariaLabel="目录结果分页" />
     </div>
   );
 }

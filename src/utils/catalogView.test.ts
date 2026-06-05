@@ -9,6 +9,7 @@ import {
   sortCatalogEntryViews,
   type CatalogFilters
 } from "./catalogView";
+import { buildPageItems } from "./pagination";
 
 function entry(name: string, partial: Partial<ModCatalogEntry> = {}): ModCatalogEntry {
   return {
@@ -172,5 +173,17 @@ describe("catalog view model", () => {
       end: 0,
       items: []
     });
+  });
+
+  it("builds compact catalog page numbers around the current page", () => {
+    expect(buildPageItems(10, 20, 3)).toEqual([1, "ellipsis", 7, 8, 9, 10, 11, 12, 13, "ellipsis", 20]);
+    expect(buildPageItems(2, 20, 3)).toEqual([1, 2, 3, 4, 5, "ellipsis", 20]);
+    expect(buildPageItems(19, 20, 3)).toEqual([1, "ellipsis", 16, 17, 18, 19, 20]);
+  });
+
+  it("avoids unnecessary ellipses for catalog page number boundaries", () => {
+    expect(buildPageItems(5, 8, 3)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(buildPageItems(1, 1, 3)).toEqual([1]);
+    expect(buildPageItems(99, 5, 3)).toEqual([1, 2, 3, 4, 5]);
   });
 });

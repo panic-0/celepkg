@@ -1016,7 +1016,11 @@ button.profile {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.record-panel > .pagination-bar {
+  padding: 8px 10px 10px;
 }
 
 .profile-manager {
@@ -1692,7 +1696,7 @@ button.profile {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   gap: 8px;
   border: 1px solid #dce4ec;
   border-radius: 8px;
@@ -1790,32 +1794,82 @@ button.profile {
 }
 
 .catalog-pagination {
+  min-width: 0;
+}
+
+.pagination-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
   min-width: 0;
+  overflow-x: auto;
+  border-top: 1px solid #e2e9f0;
+  padding-top: 8px;
   color: #526273;
   font-size: 12px;
   font-weight: 800;
 }
 
-.catalog-pagination .icon-button {
+.pagination-bar .icon-button {
+  flex: 0 0 auto;
   width: 30px;
   min-height: 30px;
   border-radius: 5px;
 }
 
-.catalog-pagination span,
-.catalog-pagination small {
-  min-width: 0;
+.pagination-bar small {
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.catalog-pagination small {
+.pagination-bar small {
   color: #6d7b8a;
   font-weight: 700;
+}
+
+.pagination-numbers {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pagination-page,
+.pagination-ellipsis {
+  width: 30px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pagination-page {
+  border: 1px solid #d5dee7;
+  background: #ffffff;
+  color: #526273;
+}
+
+.pagination-page:hover:not(:disabled) {
+  border-color: #7c9dbb;
+  color: #0a4c75;
+}
+
+.pagination-page.active {
+  border-color: #8cbfd2;
+  background: #eaf6fb;
+  color: #075b86;
+}
+
+.pagination-ellipsis {
+  color: #778594;
 }
 
 .catalog-list {

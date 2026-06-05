@@ -12,10 +12,13 @@ import {
   ToggleLeft,
   ToggleRight
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, ModUpdateCandidate } from "../types";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
+import { clampPage, paginateItems } from "../utils/pagination";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
+import { Pagination } from "./Pagination";
 
 type RecordView = Extract<ActiveView, "maps" | "mods">;
 
@@ -86,7 +89,18 @@ export function RecordList({
   const total = activeView === "maps" ? visibleMapCount : modCount;
   const title = activeView === "maps" ? "地图" : "其他 Mod";
   const hasRecords = records.length > 0;
+  const [page, setPage] = useState(1);
+  const pagedRecords = useMemo(() => paginateItems(records, page), [page, records]);
+  const recordsKey = useMemo(() => records.map((record) => record.id).join("\n"), [records]);
   const tableScrollRef = useScrollMemory<HTMLDivElement>(`records:${activeView}`, scrollMemory);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeView, recordsKey]);
+
+  useEffect(() => {
+    setPage((current) => clampPage(current, records.length));
+  }, [records.length]);
 
   return (
     <section className="record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
@@ -130,7 +144,7 @@ export function RecordList({
       <div className="record-table-scroll" ref={tableScrollRef}>
         {activeView === "maps" ? (
           <MapTable
-            maps={filteredMaps}
+            maps={pagedRecords.items}
             selectedMap={selectedMap}
             onSelect={onMapSelect}
             onToggle={onMapToggle}
@@ -144,7 +158,7 @@ export function RecordList({
           />
         ) : (
           <ModTable
-            mods={filteredMods}
+            mods={pagedRecords.items}
             selectedMod={selectedMod}
             onSelect={onModSelect}
             onToggle={onModToggle}
@@ -158,6 +172,15 @@ export function RecordList({
         )}
         {!hasRecords && <RecordListEmpty activeView={activeView} loading={loading} loadingMessage={loadingMessage} />}
       </div>
+      <Pagination
+        ariaLabel={activeView === "maps" ? "地图列表分页" : "Mod 列表分页"}
+        end={pagedRecords.end}
+        page={pagedRecords.page}
+        pageCount={pagedRecords.pageCount}
+        start={pagedRecords.start}
+        total={records.length}
+        onPageChange={setPage}
+      />
     </section>
   );
 }

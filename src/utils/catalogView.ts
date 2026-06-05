@@ -1,13 +1,14 @@
 import type { ModCatalogEntry, ModRecord } from "../types";
 import type { DownloadTask, DownloadTaskItem } from "./downloadTask";
 import { buildInstalledCatalogAliasSet, isCatalogEntryInstalled, normalizeDependencyName } from "./dependencies";
+import { DEFAULT_PAGE_SIZE, clampPage, paginateItems, type Page } from "./pagination";
 
 export type CatalogTypeFilter = "all" | string;
 export type CatalogSourceFilter = "all" | ModCatalogEntry["source"];
 export type CatalogInstallFilter = "all" | "installed" | "notInstalled";
 export type CatalogSortKey = "relevance" | "updatedDesc" | "nameAsc" | "sizeDesc";
 
-export const CATALOG_PAGE_SIZE = 100;
+export const CATALOG_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export type CatalogFilters = {
   type: CatalogTypeFilter;
@@ -32,14 +33,7 @@ export type CatalogEntryView = {
   originalIndex: number;
 };
 
-export type CatalogPage<T> = {
-  page: number;
-  pageSize: number;
-  pageCount: number;
-  start: number;
-  end: number;
-  items: T[];
-};
+export type CatalogPage<T> = Page<T>;
 
 export function buildCatalogEntryViews(
   entries: ModCatalogEntry[],
@@ -68,27 +62,11 @@ export function buildCatalogEntryViews(
 }
 
 export function clampCatalogPage(page: number, totalItems: number, pageSize = CATALOG_PAGE_SIZE) {
-  const safePageSize = normalizeCatalogPageSize(pageSize);
-  const safeTotal = Math.max(0, Math.trunc(totalItems));
-  const pageCount = Math.max(1, Math.ceil(safeTotal / safePageSize));
-  const safePage = Number.isFinite(page) ? Math.trunc(page) : 1;
-  return Math.min(Math.max(1, safePage), pageCount);
+  return clampPage(page, totalItems, pageSize);
 }
 
 export function paginateCatalogEntryViews<T>(views: T[], page: number, pageSize = CATALOG_PAGE_SIZE): CatalogPage<T> {
-  const safePageSize = normalizeCatalogPageSize(pageSize);
-  const pageCount = Math.max(1, Math.ceil(views.length / safePageSize));
-  const currentPage = clampCatalogPage(page, views.length, safePageSize);
-  const startIndex = (currentPage - 1) * safePageSize;
-  const items = views.slice(startIndex, startIndex + safePageSize);
-  return {
-    page: currentPage,
-    pageSize: safePageSize,
-    pageCount,
-    start: views.length ? startIndex + 1 : 0,
-    end: views.length ? startIndex + items.length : 0,
-    items
-  };
+  return paginateItems(views, page, pageSize);
 }
 
 export function filterCatalogEntryViews(views: CatalogEntryView[], filters: CatalogFilters) {
@@ -183,9 +161,4 @@ function findTaskItemForEntry(entry: ModCatalogEntry, task: DownloadTask | null)
 
 function compareByOriginalIndex(left: CatalogEntryView, right: CatalogEntryView) {
   return left.originalIndex - right.originalIndex;
-}
-
-function normalizeCatalogPageSize(pageSize: number) {
-  if (!Number.isFinite(pageSize)) return CATALOG_PAGE_SIZE;
-  return Math.max(1, Math.trunc(pageSize));
 }
