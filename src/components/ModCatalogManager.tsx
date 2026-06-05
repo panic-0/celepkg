@@ -2,6 +2,7 @@ import { Download, ExternalLink, Info, PackageCheck, Search } from "lucide-react
 import { useMemo, useState } from "react";
 import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
+import { buildInstalledCatalogAliasSet, isCatalogEntryInstalled } from "../utils/dependencies";
 import { DialogFacts, DialogShell } from "./common";
 
 type ModCatalogManagerProps = {
@@ -19,10 +20,7 @@ export function ModCatalogManager({ loading, notifier, scan, sources, setLoading
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
-  const installedNames = useMemo(
-    () => new Set([...scan.maps, ...scan.otherMods].map((item) => item.name.toLowerCase())),
-    [scan.maps, scan.otherMods]
-  );
+  const installedAliases = useMemo(() => buildInstalledCatalogAliasSet([...scan.maps, ...scan.otherMods]), [scan.maps, scan.otherMods]);
 
   const sourceList = sources.length ? sources : defaultSources;
 
@@ -76,7 +74,7 @@ export function ModCatalogManager({ loading, notifier, scan, sources, setLoading
             {searchResult.entries.map((entry) => (
               <CatalogEntryRow
                 entry={entry}
-                installed={installedNames.has(entry.name.toLowerCase())}
+                installed={isCatalogEntryInstalled(entry.name, installedAliases)}
                 key={`${entry.source}:${entry.id}`}
                 onInstall={() => onInstall(entry)}
                 onOpenDetail={() => setDetailEntry(entry)}
@@ -89,7 +87,7 @@ export function ModCatalogManager({ loading, notifier, scan, sources, setLoading
       {detailEntry && (
         <CatalogEntryDetailDialog
           entry={detailEntry}
-          installed={installedNames.has(detailEntry.name.toLowerCase())}
+          installed={isCatalogEntryInstalled(detailEntry.name, installedAliases)}
           loading={loading}
           onClose={() => setDetailEntry(null)}
           onInstall={() => onInstall(detailEntry)}

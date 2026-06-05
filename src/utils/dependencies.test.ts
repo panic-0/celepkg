@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModRecord } from "../types";
-import { buildModAliasMap, normalizeDependencyName } from "./dependencies";
+import { buildInstalledCatalogAliasSet, buildModAliasMap, isCatalogEntryInstalled, normalizeDependencyName } from "./dependencies";
 
 describe("normalizeDependencyName", () => {
   it("normalizes zip suffixes, separators, whitespace, and case", () => {
@@ -32,3 +32,61 @@ describe("buildModAliasMap", () => {
     expect(aliases.get("mods/helper one")).toBe("helper-one");
   });
 });
+
+describe("catalog installed aliases", () => {
+  it("matches catalog entries against installed metadata and file aliases", () => {
+    const installedAliases = buildInstalledCatalogAliasSet([
+      modRecord({
+        id: "local-id",
+        name: "Local Display Name",
+        fileName: "Helper_File.zip",
+        metadataName: "Catalog Helper",
+        relativePath: "Mods/Helper_File.zip"
+      })
+    ]);
+
+    expect(isCatalogEntryInstalled("Catalog Helper", installedAliases)).toBe(true);
+    expect(isCatalogEntryInstalled("Helper File", installedAliases)).toBe(true);
+    expect(isCatalogEntryInstalled("Other Helper", installedAliases)).toBe(false);
+  });
+
+  it("does not treat read-only built-in records as catalog installs", () => {
+    const installedAliases = buildInstalledCatalogAliasSet([
+      modRecord({
+        id: "official",
+        name: "Forsaken City",
+        fileName: "1-ForsakenCity.bin",
+        metadataName: "Forsaken City",
+        readOnly: true,
+        relativePath: "Content/Maps/1-ForsakenCity.bin"
+      })
+    ]);
+
+    expect(isCatalogEntryInstalled("Forsaken City", installedAliases)).toBe(false);
+  });
+});
+
+function modRecord({
+  id,
+  name,
+  fileName,
+  metadataName,
+  readOnly = false,
+  relativePath
+}: {
+  id: string;
+  name: string;
+  fileName: string;
+  metadataName: string;
+  readOnly?: boolean;
+  relativePath: string;
+}) {
+  return {
+    id,
+    name,
+    fileName,
+    relativePath,
+    readOnly,
+    metadata: { name: metadataName }
+  } as ModRecord;
+}
