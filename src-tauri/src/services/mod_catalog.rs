@@ -118,7 +118,7 @@ pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatal
     if !normalized_query.is_empty() {
         entries.retain(|entry| entry_matches_query(entry, &normalized_query));
     }
-    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    entries.sort_by_key(|entry| entry.name.to_lowercase());
     entries.truncate(200);
     ModCatalogSearchResult {
         sources: load.sources,
