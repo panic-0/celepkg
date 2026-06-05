@@ -1,6 +1,6 @@
 import type { Dependency, EverestRelease, ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
 import { isEverestDependencyName } from "./everestDependency";
-import { normalizeDependencyName } from "./dependencies";
+import { dependencyAliasesForRecord, normalizeDependencyName } from "./dependencies";
 
 export type DependencyUpdateChoice = "none" | "required" | "all";
 export type DependencyActionLabel = "安装" | "更新";
@@ -28,14 +28,7 @@ export type DependencyUpdatePlan = {
 export function buildInstalledDependencyIndex(records: ModRecord[]) {
   const index = new Map<string, ModRecord>();
   for (const record of records) {
-    for (const alias of [
-      record.id,
-      record.name,
-      record.metadata.name,
-      record.fileName,
-      record.fileName.replace(/\.zip$/i, ""),
-      record.relativePath
-    ]) {
+    for (const alias of dependencyAliasesForRecord(record)) {
       const normalized = normalizeDependencyName(alias);
       if (normalized) index.set(normalized, record);
     }

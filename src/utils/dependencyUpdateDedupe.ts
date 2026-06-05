@@ -1,4 +1,5 @@
 import type { Dependency, EverestRelease, ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
+import { compareNumericVersions, parseNumericVersion } from "./appDependencyResolution";
 import { normalizeDependencyName } from "./dependencies";
 
 export type DependencyIssueForDedupe = {
@@ -63,27 +64,13 @@ function mergeDependencyIssue<T extends DependencyIssueForDedupe>(left: T, right
 function stricterDependency(left: Dependency, right: Dependency) {
   if (!left.version.trim()) return right;
   if (!right.version.trim()) return left;
-  return compareNumericVersions(left.version, right.version) === -1 ? right : left;
+  const leftParts = parseNumericVersion(left.version);
+  const rightParts = parseNumericVersion(right.version);
+  if (!leftParts || !rightParts) return left;
+  return compareNumericVersions(leftParts, rightParts) < 0 ? right : left;
 }
 
 function actionPriority(action: DependencyUpdateActionForDedupe) {
   if (action.kind === "everest") return 0;
   return action.kind === "update" ? 0 : 1;
-}
-
-function compareNumericVersions(left: string, right: string) {
-  const leftParts = numericVersionParts(left);
-  const rightParts = numericVersionParts(right);
-  const length = Math.max(leftParts.length, rightParts.length);
-  for (let index = 0; index < length; index += 1) {
-    const leftValue = leftParts[index] ?? 0;
-    const rightValue = rightParts[index] ?? 0;
-    if (leftValue < rightValue) return -1;
-    if (leftValue > rightValue) return 1;
-  }
-  return 0;
-}
-
-function numericVersionParts(value: string) {
-  return [...value.matchAll(/\d+/g)].map((match) => Number(match[0]));
 }

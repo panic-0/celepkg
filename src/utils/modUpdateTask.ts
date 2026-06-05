@@ -1,4 +1,5 @@
 import type { ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
+import { buildInstalledDependencyIndex } from "./appDependencyResolution";
 import type { DownloadTaskItem } from "./downloadTask";
 import { normalizeDependencyName } from "./dependencies";
 
@@ -114,22 +115,4 @@ function dedupeCandidatesByTarget(candidates: ModUpdateCandidate[]) {
     deduped.push(candidate);
   }
   return deduped;
-}
-
-function buildInstalledDependencyIndex(records: ModRecord[]) {
-  const index = new Map<string, ModRecord>();
-  for (const record of records) {
-    for (const alias of [
-      record.id,
-      record.name,
-      record.metadata.name,
-      record.fileName,
-      record.fileName.replace(/\.zip$/i, ""),
-      record.relativePath
-    ]) {
-      const normalized = normalizeDependencyName(alias);
-      if (normalized) index.set(normalized, record);
-    }
-  }
-  return index;
 }

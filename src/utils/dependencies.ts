@@ -21,7 +21,7 @@ export function normalizeDependencyName(value: string) {
 export function buildModAliasMap(mods: ModRecord[]) {
   const aliases = new Map<string, string>();
   for (const modItem of mods) {
-    for (const alias of dependencyAliasesForMod(modItem)) {
+    for (const alias of dependencyAliasesForRecord(modItem)) {
       const normalized = normalizeDependencyName(alias);
       if (normalized) aliases.set(normalized, modItem.id);
     }
@@ -33,7 +33,7 @@ export function buildInstalledCatalogAliasSet(records: ModRecord[]) {
   const aliases = new Set<string>();
   for (const record of records) {
     if (record.readOnly) continue;
-    for (const alias of catalogAliasesForInstalledRecord(record)) {
+    for (const alias of catalogAliasesForRecord(record)) {
       const normalized = normalizeDependencyName(alias);
       if (normalized) aliases.add(normalized);
     }
@@ -62,11 +62,11 @@ export function findDependencyReferencesByModId(sourceRecords: ModRecord[], targ
   };
 }
 
-function dependencyAliasesForMod(modItem: ModRecord) {
-  return [modItem.id, ...catalogAliasesForInstalledRecord(modItem)];
+export function dependencyAliasesForRecord(record: ModRecord) {
+  return [record.id, ...catalogAliasesForRecord(record)];
 }
 
-function catalogAliasesForInstalledRecord(record: ModRecord) {
+export function catalogAliasesForRecord(record: ModRecord) {
   return [record.name, record.metadata.name, record.fileName, record.fileName.replace(/\.zip$/i, ""), record.relativePath];
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notifyError, notifyWarning, showErrorNotice } from "./notify";
+import { notifyError, notifyWarning } from "./notify";
 
 describe("notify helpers", () => {
   it("normalizes unknown errors before sending error notifications", () => {
@@ -11,14 +11,11 @@ describe("notify helpers", () => {
     expect(messages).toEqual(["失败", "操作失败。"]);
   });
 
-  it("normalizes warning and notice messages", () => {
+  it("normalizes warning messages", () => {
     const warnings: string[] = [];
-    const notices: Array<[string, string]> = [];
 
     notifyWarning({ showWarning: (message) => warnings.push(message) }, "警告");
-    showErrorNotice((tone, message) => notices.push([tone, message]), "错误");
 
     expect(warnings).toEqual(["警告"]);
-    expect(notices).toEqual([["error", "错误"]]);
   });
 });
