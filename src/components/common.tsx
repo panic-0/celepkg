@@ -88,6 +88,8 @@ export function DialogShell({
   }, [closeDisabled, onClose]);
 
   useLayoutEffect(() => {
+    const previousFocus = previousFocusRef.current;
+
     function focusInitialTarget() {
       const dialog = dialogRef.current;
       const initialTarget = autofocusTarget(dialog) ?? firstFocusable(dialog) ?? dialog;
@@ -101,7 +103,7 @@ export function DialogShell({
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timeout);
-      previousFocusRef.current?.focus();
+      previousFocus?.focus();
     };
   }, []);
 
