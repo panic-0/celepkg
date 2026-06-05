@@ -81,6 +81,7 @@ function TaskGroup({ emptyText, items, task, title }: { emptyText: string; items
             <li key={item.id}>
               <span>
                 <strong title={item.name}>{item.name}</strong>
+                {item.detail && <small title={item.detail}>{item.detail}</small>}
                 <small>{formatTaskItemKind(item.kind)}</small>
               </span>
               <em>{formatTaskItemMeta(item, task)}</em>

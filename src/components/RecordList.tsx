@@ -17,6 +17,7 @@ import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, ModUpdateCandidate } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
 import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
+import { formatModUpdateVersionChange } from "../utils/modUpdateTask";
 import { clampPage, paginateItems } from "../utils/pagination";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
 import { Pagination } from "./Pagination";
@@ -455,6 +456,11 @@ function RecordNameCell({
             {record.metadata.version}
           </span>
         )}
+        {updateCandidate && (
+          <span className="update-version-text" title={formatModUpdateVersionChange(updateCandidate)}>
+            {formatModUpdateVersionChange(updateCandidate)}
+          </span>
+        )}
         {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
       </div>
       {children}
@@ -473,7 +479,7 @@ function InlineUpdateButton({ candidate, onUpdate }: { candidate: ModUpdateCandi
         if (!hasDownloadUrl) return;
         onUpdate(candidate);
       }}
-      title={hasDownloadUrl ? `更新到 ${candidate.entry.version || "目录最新版本"}` : "该目录条目没有下载地址"}
+      title={hasDownloadUrl ? `更新 ${formatModUpdateVersionChange(candidate)}` : "该目录条目没有下载地址"}
     >
       <Download size={13} />
       更新

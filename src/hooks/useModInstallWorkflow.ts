@@ -49,7 +49,8 @@ import { readError } from "../utils/format";
 import {
   createCatalogInstallTaskDescriptor,
   createModUpdateTaskDescriptors,
-  createSingleModUpdateTaskDescriptor
+  createSingleModUpdateTaskDescriptor,
+  formatModUpdateVersionChange
 } from "../utils/modUpdateTask";
 import { notifyWarning } from "../utils/notify";
 
@@ -131,8 +132,14 @@ export function useModInstallWorkflow({
         if (latestResultRequest) setModUpdateResult(result);
         if (!startupMode) {
           if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
-          else if (result.updates.length) notifier.showSuccess(`发现 ${result.updates.length} 个可更新 Mod`);
-          else notifier.showSuccess("本地 Mod 已是最新");
+          else if (result.updates.length) {
+            const downloadableCount = result.updates.filter((candidate) => candidate.entry.downloadUrl.trim().length > 0).length;
+            notifier.showSuccess(
+              downloadableCount === result.updates.length
+                ? `发现 ${result.updates.length} 个可更新 Mod`
+                : `发现 ${result.updates.length} 个可更新 Mod，其中 ${downloadableCount} 个可下载`
+            );
+          } else notifier.showSuccess("本地 Mod 已是最新");
         }
       } catch (error) {
         const message = readError(error);
@@ -165,8 +172,7 @@ export function useModInstallWorkflow({
       confirmLabel: "更新",
       facts: [
         { label: "目标", value: candidate.installed.name },
-        { label: "当前版本", value: candidate.installed.version || "未知版本" },
-        { label: "目标版本", value: candidate.entry.version || "目录最新版本" },
+        { label: "版本变化", value: formatModUpdateVersionChange(candidate) },
         { label: "本地文件", value: candidate.installed.relativePath }
       ],
       variant: "danger"
@@ -223,7 +229,7 @@ export function useModInstallWorkflow({
         { label: "可下载更新", value: `${downloadableModUpdates.length} 个` }
       ],
       details: descriptors.map(
-        (descriptor) => `${descriptor.candidate.installed.name} -> ${descriptor.candidate.entry.version || "目录最新版本"}`
+        (descriptor) => `${descriptor.candidate.installed.name}: ${formatModUpdateVersionChange(descriptor.candidate)}`
       ),
       variant: "danger"
     });

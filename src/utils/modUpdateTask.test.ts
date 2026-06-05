@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
-import { createCatalogInstallTaskDescriptor, createModUpdateTaskDescriptors, createSingleModUpdateTaskDescriptor } from "./modUpdateTask";
+import {
+  createCatalogInstallTaskDescriptor,
+  createModUpdateTaskDescriptors,
+  createSingleModUpdateTaskDescriptor,
+  formatModUpdateVersionChange
+} from "./modUpdateTask";
 
 function entry(name: string): ModCatalogEntry {
   return {
@@ -155,8 +160,26 @@ describe("mod update task descriptors", () => {
       name: "Helper",
       kind: "mod",
       status: "queued",
+      detail: "1.0.0 -> 2.0.0",
       dependsOn: []
     });
+  });
+
+  it("formats update version changes with clear fallbacks", () => {
+    const helper = record("helper", "Helper");
+    const normal = candidate(helper);
+    const unknownInstalled = {
+      ...normal,
+      installed: { ...normal.installed, version: "" }
+    };
+    const latestCatalog = {
+      ...normal,
+      entry: { ...normal.entry, version: "" }
+    };
+
+    expect(formatModUpdateVersionChange(normal)).toBe("1.0.0 -> 2.0.0");
+    expect(formatModUpdateVersionChange(unknownInstalled)).toBe("未知 -> 2.0.0");
+    expect(formatModUpdateVersionChange(latestCatalog)).toBe("1.0.0 -> 目录最新版本");
   });
 
   it("creates a catalog install descriptor from the catalog entry", () => {

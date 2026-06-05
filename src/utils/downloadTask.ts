@@ -21,6 +21,7 @@ export type DownloadTaskItem = {
   name: string;
   kind: DownloadTaskItemKind;
   status: DownloadTaskItemStatus;
+  detail?: string;
   operationId?: string;
   dependsOn?: string[];
   progress?: ModDownloadProgress;

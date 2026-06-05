@@ -3,7 +3,7 @@ import { buildInstalledDependencyIndex } from "./appDependencyResolution";
 import type { DownloadTaskItem } from "./downloadTask";
 import { normalizeDependencyName } from "./dependencies";
 
-export type ModUpdateTaskDescriptor = Pick<DownloadTaskItem, "id" | "name" | "kind" | "status" | "dependsOn"> & {
+export type ModUpdateTaskDescriptor = Pick<DownloadTaskItem, "id" | "name" | "kind" | "status" | "detail" | "dependsOn"> & {
   candidate: ModUpdateCandidate;
 };
 
@@ -40,6 +40,7 @@ export function createModUpdateTaskDescriptors(
       name: candidate.installed.name || candidate.entry.name,
       kind: "mod",
       status: "queued",
+      detail: formatModUpdateVersionChange(candidate),
       dependsOn,
       candidate
     };
@@ -52,6 +53,7 @@ export function createSingleModUpdateTaskDescriptor(candidate: ModUpdateCandidat
     name: candidate.installed.name || candidate.entry.name,
     kind: "mod",
     status: "queued",
+    detail: formatModUpdateVersionChange(candidate),
     dependsOn: [],
     candidate
   };
@@ -70,6 +72,14 @@ export function createCatalogInstallTaskDescriptor(entry: ModCatalogEntry): ModI
 
 export function createModUpdateTaskId(candidate: ModUpdateCandidate) {
   return `mod-update:${candidate.installed.absolutePath || candidate.installed.recordId}`;
+}
+
+export function formatModUpdateVersionChange(candidate: ModUpdateCandidate) {
+  return `${formatUpdateVersion(candidate.installed.version, "未知")} -> ${formatUpdateVersion(candidate.entry.version, "目录最新版本")}`;
+}
+
+function formatUpdateVersion(version: string, fallback: string) {
+  return version.trim() || fallback;
 }
 
 function orderCandidatesByInstalledDependencyGraph(candidates: ModUpdateCandidate[], recordsBeforeUpdate: ModRecord[]) {
