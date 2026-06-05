@@ -14,6 +14,7 @@ use zip::ZipArchive;
 
 const EVEREST_RELEASES_URL: &str =
     "https://maddie480.ovh/celeste/everest-versions?supportsNativeBuilds=true";
+const HTTP_USER_AGENT: &str = concat!("celepkg/", env!("CARGO_PKG_VERSION"));
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -191,7 +192,7 @@ fn branch_rank(branch: &str) -> u8 {
 
 fn download_client() -> Result<reqwest::blocking::Client, String> {
     reqwest::blocking::Client::builder()
-        .user_agent("celepkg/0.2")
+        .user_agent(HTTP_USER_AGENT)
         .connect_timeout(DOWNLOAD_CONNECT_TIMEOUT)
         .timeout(DOWNLOAD_REQUEST_TIMEOUT)
         .build()
@@ -546,6 +547,22 @@ fn emit_progress(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn http_user_agent_uses_package_version() {
+        assert_eq!(
+            HTTP_USER_AGENT,
+            format!("celepkg/{}", env!("CARGO_PKG_VERSION"))
+        );
+        assert!(HTTP_USER_AGENT.contains(env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn download_client_keeps_download_timeouts() {
+        assert_eq!(DOWNLOAD_CONNECT_TIMEOUT, Duration::from_secs(10));
+        assert_eq!(DOWNLOAD_REQUEST_TIMEOUT, Duration::from_secs(300));
+        download_client().expect("download client should build");
+    }
 
     fn temp_celeste_root(label: &str) -> PathBuf {
         let stamp = time::OffsetDateTime::now_utc()

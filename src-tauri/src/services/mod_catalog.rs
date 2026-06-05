@@ -20,6 +20,9 @@ const EVEREST_MIRROR_UPDATE_URL: &str =
     "https://everestapi.github.io/updatermirror/everest_update.yaml";
 const EVEREST_UPDATE_POINTER_URL: &str = "https://everestapi.github.io/modupdater.txt";
 const WEGFAN_MOD_LIST_URL: &str = "https://celeste.weg.fan/api/v2/mod/list";
+const HTTP_USER_AGENT: &str = concat!("celepkg/", env!("CARGO_PKG_VERSION"));
+const CATALOG_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const CATALOG_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 const DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(120);
@@ -373,7 +376,7 @@ fn download_entry(
 
 fn download_client() -> Result<reqwest::blocking::Client, String> {
     reqwest::blocking::Client::builder()
-        .user_agent("celepkg/0.2")
+        .user_agent(HTTP_USER_AGENT)
         .connect_timeout(DOWNLOAD_CONNECT_TIMEOUT)
         .timeout(DOWNLOAD_REQUEST_TIMEOUT)
         .build()
@@ -743,9 +746,7 @@ fn load_catalogs_with_cache_mode(
     sources: &[ModCatalogSourceKind],
     allow_valid_cache: bool,
 ) -> CatalogLoad {
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("celepkg/0.2")
-        .build();
+    let client = catalog_client();
     let mut entries = vec![];
     let mut loaded_sources = vec![];
     let mut warnings = vec![];
@@ -776,6 +777,14 @@ fn load_catalogs_with_cache_mode(
         entries,
         warnings,
     }
+}
+
+fn catalog_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
+    reqwest::blocking::Client::builder()
+        .user_agent(HTTP_USER_AGENT)
+        .connect_timeout(CATALOG_CONNECT_TIMEOUT)
+        .timeout(CATALOG_REQUEST_TIMEOUT)
+        .build()
 }
 
 fn load_catalog_cached(
@@ -1130,6 +1139,29 @@ mod tests {
     use std::sync::Mutex;
     use std::thread;
     use zip::write::SimpleFileOptions;
+
+    #[test]
+    fn http_user_agent_uses_package_version() {
+        assert_eq!(
+            HTTP_USER_AGENT,
+            format!("celepkg/{}", env!("CARGO_PKG_VERSION"))
+        );
+        assert!(HTTP_USER_AGENT.contains(env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn catalog_client_builds_with_catalog_timeouts() {
+        assert_eq!(CATALOG_CONNECT_TIMEOUT, Duration::from_secs(10));
+        assert_eq!(CATALOG_REQUEST_TIMEOUT, Duration::from_secs(60));
+        catalog_client().expect("catalog client should build");
+    }
+
+    #[test]
+    fn download_client_keeps_download_timeouts() {
+        assert_eq!(DOWNLOAD_CONNECT_TIMEOUT, Duration::from_secs(10));
+        assert_eq!(DOWNLOAD_REQUEST_TIMEOUT, Duration::from_secs(300));
+        download_client().expect("download client should build");
+    }
 
     #[test]
     fn parses_everest_catalog_entries() {
