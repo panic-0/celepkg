@@ -1,7 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  cancelModDownload,
   checkModUpdates,
   createOperationId,
   downloadEverestToStaging,
@@ -35,6 +34,7 @@ import {
 } from "./components/AppDialogs";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
+import { useDownloadTaskControls } from "./hooks/useDownloadTaskControls";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
 import { useModFilters } from "./hooks/useModFilters";
 import { useProfileDraft } from "./hooks/useProfileDraft";
@@ -45,8 +45,7 @@ import { useWorkspaceView } from "./hooks/useWorkspaceView";
 import type { Dependency, EverestRelease, ModCatalogEntry, ModDownloadProgress, ModUpdateCandidate, ModUpdateCheckResult } from "./types";
 import { normalizeDependencyName } from "./utils/dependencies";
 import { dedupeDependencyActions, dedupeDependencyIssues } from "./utils/dependencyUpdateDedupe";
-import type { DownloadTask } from "./utils/downloadTask";
-import { DownloadTaskRunner, type ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
+import type { ExecutableDownloadTaskItem } from "./utils/downloadTaskRunner";
 import { createEverestInstallTaskDescriptor } from "./utils/everestTask";
 import {
   buildInstalledDependencyIndex,
@@ -116,13 +115,9 @@ export function App() {
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [modUpdateResult, setModUpdateResult] = useState<ModUpdateCheckResult>({ sources: [], updates: [], matched: [], warnings: [] });
   const [modUpdateChecking, setModUpdateChecking] = useState(false);
-  const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
-  const [downloadControls, setDownloadControls] = useState<DownloadControlState>({ downloadPaused: false, installPaused: false });
   const [confirmPrompt, setConfirmPrompt] = useState<AppConfirmPromptState | null>(null);
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
   const [everestDependencyPrompt, setEverestDependencyPrompt] = useState<EverestDependencyPromptState | null>(null);
-  const downloadTaskRunner = useRef<DownloadTaskRunner | null>(null);
-  const downloadControlsRef = useRef<DownloadControlState>(downloadControls);
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
   const modUpdateCheckRequest = useRef(0);
   const manualModUpdateCheckRequest = useRef(0);
@@ -130,6 +125,21 @@ export function App() {
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
   const uiLayout = useUiLayout();
+  const downloadTaskControls = useDownloadTaskControls({ notifier, setLoading });
+  const {
+    applyProgress,
+    cancelTaskDownloads,
+    cancelTaskInstalls,
+    downloadControls,
+    downloadTask,
+    pauseTaskDownloads,
+    pauseTaskInstalls,
+    resumeTaskDownloads,
+    resumeTaskInstalls,
+    retryFailedDownloadTask,
+    runExecutableDownloadTask,
+    startDownloadTask
+  } = downloadTaskControls;
   const itemWarnings = useMemo(
     () => [...scan.maps, ...scan.otherMods].filter((record) => record.warnings.length),
     [scan.maps, scan.otherMods]
@@ -160,7 +170,7 @@ export function App() {
         listen<unknown>("mod-download-progress", (event) => {
           const progress = toModDownloadProgress(event.payload);
           if (!progress) return;
-          downloadTaskRunner.current?.applyProgress(progress.operationId, progress);
+          applyProgress(progress);
         })
       )
       .then((listener) => {
@@ -172,7 +182,7 @@ export function App() {
       disposed = true;
       if (unlisten) unlisten();
     };
-  }, []);
+  }, [applyProgress]);
 
   const backups = useBackups({
     celestePath,
@@ -345,18 +355,9 @@ export function App() {
     if (!confirmed) return;
     completedModUpdatePaths.current.clear();
     const items = descriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
-    const runner = new DownloadTaskRunner(createOperationId("mod-update-task"), items, {
-      concurrencyLimit: 3,
-      initialDownloadPaused: downloadControlsRef.current.downloadPaused,
-      initialInstallPaused: downloadControlsRef.current.installPaused,
-      createOperationId: () => createOperationId("mod-update"),
-      cancelOperation: cancelModDownload,
-      onChange: setDownloadTask
-    });
-    downloadTaskRunner.current = runner;
     try {
       setLoading(true, `正在更新 ${items.length} 个 Mod...`);
-      const result = await runner.start();
+      const result = await startDownloadTask(createOperationId("mod-update-task"), items, "mod-update");
       const installedCount = result.items.filter((item) => item.status === "installed").length;
       const failedCount = result.items.filter(
         (item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped"
@@ -659,38 +660,6 @@ export function App() {
     );
   }
 
-  async function runExecutableDownloadTask(taskId: string, items: ExecutableDownloadTaskItem[], message: string, successMessage: string) {
-    const runner = new DownloadTaskRunner(taskId, items, {
-      concurrencyLimit: 3,
-      initialDownloadPaused: downloadControlsRef.current.downloadPaused,
-      initialInstallPaused: downloadControlsRef.current.installPaused,
-      createOperationId: () => createOperationId("mod-task"),
-      cancelOperation: cancelModDownload,
-      onChange: setDownloadTask
-    });
-    downloadTaskRunner.current = runner;
-    try {
-      setLoading(true, message);
-      const result = await runner.start();
-      if (result.status === "cancelled") {
-        notifier.showInfo("已取消下载任务");
-        return false;
-      }
-      if (result.status !== "done") {
-        const failedItem = result.items.find((item) => item.error);
-        notifier.showError(failedItem?.error ?? "下载或安装失败");
-        return false;
-      }
-      notifier.showSuccess(successMessage);
-      return true;
-    } catch (error) {
-      notifier.showError(readError(error));
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function requestDependencyChoice(targetName: string, actionLabel: DependencyActionLabel, issues: DependencyIssue[]) {
     return new Promise<DependencyUpdateChoice | null>((resolve) => {
       setDependencyPrompt({ actionLabel, issues, resolve, targetName });
@@ -707,85 +676,6 @@ export function App() {
     return new Promise<boolean>((resolve) => {
       setConfirmPrompt({ ...prompt, resolve });
     });
-  }
-
-  function updateDownloadControls(update: (current: DownloadControlState) => DownloadControlState) {
-    setDownloadControls((current) => {
-      const next = update(current);
-      downloadControlsRef.current = next;
-      return next;
-    });
-  }
-
-  async function pauseTaskDownloads() {
-    updateDownloadControls((current) => ({ ...current, downloadPaused: true }));
-    const runner = downloadTaskRunner.current;
-    try {
-      if (runner) await runner.pauseDownloads();
-      notifier.showInfo("已停止下载，新项目会停在待下载列表");
-    } catch (error) {
-      notifier.showError(readError(error));
-    }
-  }
-
-  function resumeTaskDownloads() {
-    updateDownloadControls((current) => ({ ...current, downloadPaused: false }));
-    const runner = downloadTaskRunner.current;
-    if (runner) runner.resumeDownloads();
-    notifier.showInfo("已恢复下载");
-  }
-
-  function pauseTaskInstalls() {
-    updateDownloadControls((current) => ({ ...current, installPaused: true }));
-    const runner = downloadTaskRunner.current;
-    if (runner) runner.pauseInstalls();
-    notifier.showInfo("已停止安装，新下载完成的项目会停在等待安装列表");
-  }
-
-  function resumeTaskInstalls() {
-    updateDownloadControls((current) => ({ ...current, installPaused: false }));
-    const runner = downloadTaskRunner.current;
-    if (runner) runner.resumeInstalls();
-    notifier.showInfo("已恢复安装");
-  }
-
-  async function cancelTaskDownloads() {
-    const runner = downloadTaskRunner.current;
-    if (!runner) return;
-    try {
-      await runner.cancelPendingDownloads();
-      notifier.showInfo("已取消当前待下载项目");
-    } catch (error) {
-      notifier.showError(readError(error));
-    }
-  }
-
-  function cancelTaskInstalls() {
-    const runner = downloadTaskRunner.current;
-    if (!runner) return;
-    runner.cancelPendingInstalls();
-    notifier.showInfo("已取消当前待安装项目");
-  }
-
-  async function retryFailedDownloadTask() {
-    const runner = downloadTaskRunner.current;
-    if (!runner) return;
-    try {
-      setLoading(true, "正在重试失败任务...");
-      const result = await runner.retryFailed();
-      const installedCount = result.items.filter((item) => item.status === "installed").length;
-      const failedCount = result.items.filter(
-        (item) => item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped"
-      ).length;
-      if (result.status === "running") notifier.showInfo("已将失败项目重新加入重试队列");
-      else if (result.status === "cancelled") notifier.showInfo("已取消重试任务");
-      else if (failedCount) notifier.showWarning(`重试完成，成功 ${installedCount} 个，失败 ${failedCount} 个`);
-      else notifier.showSuccess(`重试完成，成功 ${installedCount} 个`);
-    } catch (error) {
-      notifier.showError(readError(error));
-    } finally {
-      setLoading(false);
-    }
   }
 
   function removeUpdatedCandidate(candidate: ModUpdateCandidate) {
@@ -1070,11 +960,6 @@ export function App() {
 function isWorkspaceLoadingMessage(message: string) {
   return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
 }
-
-type DownloadControlState = {
-  downloadPaused: boolean;
-  installPaused: boolean;
-};
 
 const modDownloadPhases = new Set(["downloading", "verifying", "installing", "done", "error"]);
 
