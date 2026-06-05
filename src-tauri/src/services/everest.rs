@@ -6,7 +6,7 @@ use crate::utils::stable_id;
 use serde::Deserialize;
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
@@ -253,11 +253,28 @@ fn staged_id_from_path(path: &Path) -> Result<String, String> {
         .ok_or_else(|| "生成 staging id 失败".to_string())
 }
 
+fn is_staged_download_file_name(staged_id: &str) -> bool {
+    staged_id.strip_suffix(".zip.download").is_some_and(|id| {
+        id.len() == 16
+            && id
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    })
+}
+
 fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<PathBuf, String> {
+    let mut components = Path::new(staged_id).components();
+    let is_single_file_name = matches!(
+        components.next(),
+        Some(Component::Normal(name)) if name == std::ffi::OsStr::new(staged_id)
+    ) && components.next().is_none();
+
     if staged_id.trim().is_empty()
         || staged_id.contains('/')
         || staged_id.contains('\\')
         || staged_id.contains("..")
+        || !is_single_file_name
+        || !is_staged_download_file_name(staged_id)
     {
         return Err("无效的 staging id".to_string());
     }
@@ -265,17 +282,7 @@ fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<
         .join(".celepkg")
         .join("downloads")
         .join("staging");
-    let path = staging_dir.join(staged_id);
-    let canonical_dir = staging_dir
-        .canonicalize()
-        .map_err(|error| format!("读取 staging 目录失败：{error}"))?;
-    let canonical_path = path
-        .canonicalize()
-        .map_err(|error| format!("读取 staging 文件失败：{error}"))?;
-    if !canonical_path.starts_with(&canonical_dir) {
-        return Err("staging 文件不在下载目录中".to_string());
-    }
-    Ok(canonical_path)
+    Ok(staging_dir.join(staged_id))
 }
 
 fn download_url_to_file(
@@ -583,6 +590,47 @@ mod tests {
         fs::write(root.join("Celeste.dll"), b"core").expect("write celeste dll");
 
         ensure_install_targets_available(&root).expect("preflight should pass");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn staged_download_path_accepts_missing_file_inside_staging_dir() {
+        let root = temp_celeste_root("missing-staged");
+        let staged = root
+            .join(".celepkg")
+            .join("downloads")
+            .join("staging")
+            .join("0123456789abcdef.zip.download");
+
+        let resolved =
+            resolve_staged_download_path(&root, staged.file_name().unwrap().to_str().unwrap())
+                .unwrap();
+
+        assert_eq!(resolved, staged);
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn staged_download_path_rejects_path_traversal_ids() {
+        let root = temp_celeste_root("traversal");
+
+        let error =
+            resolve_staged_download_path(&root, "../0123456789abcdef.zip.download").unwrap_err();
+
+        assert_eq!(error, "无效的 staging id");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn staged_download_path_rejects_non_staging_id() {
+        let root = temp_celeste_root("non-staging");
+
+        let error = resolve_staged_download_path(&root, "Everest.zip.download").unwrap_err();
+
+        assert_eq!(error, "无效的 staging id");
 
         let _ = fs::remove_dir_all(root);
     }

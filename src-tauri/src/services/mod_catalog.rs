@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use xxhash_rust::xxh64::Xxh64;
@@ -435,11 +435,28 @@ fn staged_id_from_path(path: &Path) -> Result<String, String> {
         .ok_or_else(|| "生成 staging id 失败".to_string())
 }
 
+fn is_staged_download_file_name(staged_id: &str) -> bool {
+    staged_id.strip_suffix(".zip.download").is_some_and(|id| {
+        id.len() == 16
+            && id
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    })
+}
+
 fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<PathBuf, String> {
+    let mut components = Path::new(staged_id).components();
+    let is_single_file_name = matches!(
+        components.next(),
+        Some(Component::Normal(name)) if name == std::ffi::OsStr::new(staged_id)
+    ) && components.next().is_none();
+
     if staged_id.trim().is_empty()
         || staged_id.contains('/')
         || staged_id.contains('\\')
         || staged_id.contains("..")
+        || !is_single_file_name
+        || !is_staged_download_file_name(staged_id)
     {
         return Err("无效的 staging id".to_string());
     }
@@ -447,17 +464,7 @@ fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<
         .join(".celepkg")
         .join("downloads")
         .join("staging");
-    let path = staging_dir.join(staged_id);
-    let canonical_dir = staging_dir
-        .canonicalize()
-        .map_err(|error| format!("读取 staging 目录失败：{error}"))?;
-    let canonical_path = path
-        .canonicalize()
-        .map_err(|error| format!("读取 staging 文件失败：{error}"))?;
-    if !canonical_path.starts_with(&canonical_dir) {
-        return Err("staging 文件不在下载目录中".to_string());
-    }
-    Ok(canonical_path)
+    Ok(staging_dir.join(staged_id))
 }
 
 fn download_url_to_file(
@@ -1365,43 +1372,36 @@ Helper:
     fn staged_download_path_rejects_path_traversal_ids() {
         let dir = tempfile::tempdir().unwrap();
 
-        let error = resolve_staged_download_path(dir.path(), "../outside.zip").unwrap_err();
+        let error = resolve_staged_download_path(dir.path(), "../0123456789abcdef.zip.download")
+            .unwrap_err();
 
         assert_eq!(error, "无效的 staging id");
     }
 
     #[test]
-    fn staged_download_path_accepts_file_inside_staging_dir() {
+    fn staged_download_path_accepts_missing_file_inside_staging_dir() {
         let dir = tempfile::tempdir().unwrap();
         let staged = dir
             .path()
             .join(".celepkg")
             .join("downloads")
             .join("staging")
-            .join("Helper.zip.download");
-        fs::create_dir_all(staged.parent().unwrap()).unwrap();
-        fs::write(&staged, b"staged").unwrap();
+            .join("0123456789abcdef.zip.download");
 
         let resolved =
             resolve_staged_download_path(dir.path(), staged.file_name().unwrap().to_str().unwrap())
                 .unwrap();
 
-        assert_eq!(resolved, staged.canonicalize().unwrap());
+        assert_eq!(resolved, staged);
     }
 
     #[test]
-    fn staged_download_path_rejects_non_staging_file() {
+    fn staged_download_path_rejects_non_staging_id() {
         let dir = tempfile::tempdir().unwrap();
-        let outside = dir.path().join("Helper.zip.download");
-        fs::write(&outside, b"not staging").unwrap();
 
-        let error = resolve_staged_download_path(
-            dir.path(),
-            outside.file_name().unwrap().to_str().unwrap(),
-        )
-        .unwrap_err();
+        let error = resolve_staged_download_path(dir.path(), "Helper.zip.download").unwrap_err();
 
-        assert!(error.contains("读取 staging"));
+        assert_eq!(error, "无效的 staging id");
     }
 
     #[test]

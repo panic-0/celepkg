@@ -252,19 +252,18 @@ pub async fn download_everest_to_staging(
         let emit_progress = move |progress: ModDownloadProgress| {
             let _ = app_for_progress.emit("mod-download-progress", progress);
         };
-        let cancel_flag = register_mod_download(&operation_id);
+        let download_guard = register_mod_download(&operation_id);
         let result = services::everest::download_to_staging(
             &path,
             &release,
             services::mod_catalog::ModDownloadReporter {
                 operation_id: &operation_id,
                 progress: Some(&emit_progress),
-                cancel_token: Some(&cancel_flag),
+                cancel_token: Some(download_guard.cancel_flag()),
                 task_index: 1,
                 task_total: 1,
             },
         );
-        unregister_mod_download(&operation_id);
         if result.is_err() {
             emit_download_error(&app, operation_id, "Everest".to_string(), 1, 1);
         }
@@ -313,19 +312,18 @@ pub async fn download_mod_to_staging(
         let emit_progress = move |progress: ModDownloadProgress| {
             let _ = app_for_progress.emit("mod-download-progress", progress);
         };
-        let cancel_flag = register_mod_download(&operation_id);
+        let download_guard = register_mod_download(&operation_id);
         let result = services::mod_catalog::download_to_staging(
             &path,
             &entry,
             services::mod_catalog::ModDownloadReporter {
                 operation_id: &operation_id,
                 progress: Some(&emit_progress),
-                cancel_token: Some(&cancel_flag),
+                cancel_token: Some(download_guard.cancel_flag()),
                 task_index,
                 task_total,
             },
         );
-        unregister_mod_download(&operation_id);
         if result.is_err() {
             emit_download_error(&app, operation_id, entry.name, task_index, task_total);
         }
@@ -397,17 +395,82 @@ fn emit_download_error(
     );
 }
 
-fn register_mod_download(operation_id: &str) -> Arc<AtomicBool> {
+struct ModDownloadGuard {
+    operation_id: String,
+    cancel_flag: Arc<AtomicBool>,
+}
+
+impl ModDownloadGuard {
+    fn cancel_flag(&self) -> &Arc<AtomicBool> {
+        &self.cancel_flag
+    }
+}
+
+impl Drop for ModDownloadGuard {
+    fn drop(&mut self) {
+        if let Ok(mut flags) = MOD_DOWNLOAD_CANCEL_FLAGS.lock() {
+            if flags
+                .get(&self.operation_id)
+                .is_some_and(|flag| Arc::ptr_eq(flag, &self.cancel_flag))
+            {
+                flags.remove(&self.operation_id);
+            }
+        }
+    }
+}
+
+fn register_mod_download(operation_id: &str) -> ModDownloadGuard {
     let flag = Arc::new(AtomicBool::new(false));
     if let Ok(mut flags) = MOD_DOWNLOAD_CANCEL_FLAGS.lock() {
         flags.insert(operation_id.to_string(), Arc::clone(&flag));
     }
-    flag
+    ModDownloadGuard {
+        operation_id: operation_id.to_string(),
+        cancel_flag: flag,
+    }
 }
 
-fn unregister_mod_download(operation_id: &str) {
-    if let Ok(mut flags) = MOD_DOWNLOAD_CANCEL_FLAGS.lock() {
-        flags.remove(operation_id);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_operation_id(label: &str) -> String {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after epoch")
+            .as_nanos();
+        format!("download-{label}-{}-{stamp}", std::process::id())
+    }
+
+    fn fail_after_download_registration(operation_id: &str) -> Result<(), String> {
+        let download_guard = register_mod_download(operation_id);
+        assert!(cancel_mod_download(operation_id.to_string()).unwrap());
+        assert!(download_guard.cancel_flag().load(Ordering::Relaxed));
+        Err("提前失败".to_string())
+    }
+
+    #[test]
+    fn mod_download_registration_cleans_flag_when_scope_ends() {
+        let operation_id = unique_operation_id("scope");
+
+        {
+            let download_guard = register_mod_download(&operation_id);
+            assert!(cancel_mod_download(operation_id.clone()).unwrap());
+            assert!(download_guard.cancel_flag().load(Ordering::Relaxed));
+        }
+
+        assert!(!cancel_mod_download(operation_id).unwrap());
+    }
+
+    #[test]
+    fn mod_download_registration_cleans_flag_after_early_error() {
+        let operation_id = unique_operation_id("error");
+
+        let error = fail_after_download_registration(&operation_id).unwrap_err();
+
+        assert_eq!(error, "提前失败");
+        assert!(!cancel_mod_download(operation_id).unwrap());
     }
 }
 
