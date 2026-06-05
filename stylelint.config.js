@@ -1,0 +1,19 @@
+export default {
+  extends: ["stylelint-config-standard"],
+  rules: {
+    "alpha-value-notation": null,
+    "color-function-alias-notation": null,
+    "color-function-notation": null,
+    "color-hex-length": null,
+    "custom-property-empty-line-before": null,
+    "declaration-empty-line-before": null,
+    "declaration-block-no-redundant-longhand-properties": null,
+    "declaration-property-value-keyword-no-deprecated": null,
+    "import-notation": null,
+    "media-feature-range-notation": null,
+    "no-descending-specificity": null,
+    "selector-class-pattern": null,
+    "selector-not-notation": null,
+    "value-keyword-case": null
+  }
+};
