@@ -1,96 +1,100 @@
 use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult};
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
-use crate::storage::{load_state, resolve_required_celeste_path_from_state, write_state};
+use crate::storage::{
+    load_state, load_state_from_path, resolve_required_celeste_path_from_state, state_path,
+    update_state, update_state_at,
+};
 use crate::utils::{normalize_dependency_name, now_string, stable_id};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
-    let mut state = load_state()?;
-    let mut data = state.profiles_state();
     let now = now_string();
     let profile_type = profile.profile_type;
     let id = profile
         .id
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| stable_id(&format!("{}-{}-{now}", profile.name, profile_type.as_str())));
-    let normalized = Profile {
-        id: id.clone(),
-        name: if profile.name.trim().is_empty() {
-            if profile_type == ProfileType::Maps {
-                "未命名地图 Profile".to_string()
+    update_state(|state| {
+        let mut data = state.profiles_state();
+        let normalized = Profile {
+            id: id.clone(),
+            name: if profile.name.trim().is_empty() {
+                if profile_type == ProfileType::Maps {
+                    "未命名地图 Profile".to_string()
+                } else {
+                    "未命名 Mod Profile".to_string()
+                }
             } else {
-                "未命名 Mod Profile".to_string()
-            }
+                profile.name.trim().to_string()
+            },
+            profile_type,
+            enabled_map_ids: if profile_type == ProfileType::Maps {
+                profile.enabled_map_ids
+            } else {
+                None
+            },
+            enabled_mod_ids: profile.enabled_mod_ids,
+            launch_args: if profile_type == ProfileType::Maps {
+                profile.launch_args.unwrap_or_default()
+            } else {
+                String::new()
+            },
+            created_at: profile.created_at.unwrap_or_else(|| now.clone()),
+            updated_at: now,
+        };
+        if let Some(index) = data.profiles.iter().position(|item| item.id == id) {
+            data.profiles[index] = normalized;
         } else {
-            profile.name.trim().to_string()
-        },
-        profile_type,
-        enabled_map_ids: if profile_type == ProfileType::Maps {
-            profile.enabled_map_ids
+            data.profiles.push(normalized);
+        }
+        if profile_type == ProfileType::Maps {
+            data.active_map_profile_id = id;
         } else {
-            None
-        },
-        enabled_mod_ids: profile.enabled_mod_ids,
-        launch_args: if profile_type == ProfileType::Maps {
-            profile.launch_args.unwrap_or_default()
-        } else {
-            String::new()
-        },
-        created_at: profile.created_at.unwrap_or_else(|| now.clone()),
-        updated_at: now,
-    };
-    if let Some(index) = data.profiles.iter().position(|item| item.id == id) {
-        data.profiles[index] = normalized;
-    } else {
-        data.profiles.push(normalized);
-    }
-    if profile_type == ProfileType::Maps {
-        data.active_map_profile_id = id;
-    } else {
-        data.active_mod_profile_id = id;
-    }
-    state.set_profiles_state(data.clone());
-    write_state(&state)?;
-    Ok(data)
+            data.active_mod_profile_id = id;
+        }
+        state.set_profiles_state(data.clone());
+        Ok(data)
+    })
 }
 
 pub fn delete_profile(profile_id: String) -> Result<ProfilesState, String> {
     if profile_id == "default-maps" || profile_id == "default-mods" {
         return Err("默认 Profile 不能删除".to_string());
     }
-    let mut state = load_state()?;
-    let mut data = state.profiles_state();
-    let Some(profile) = data
-        .profiles
-        .iter()
-        .find(|item| item.id == profile_id)
-        .cloned()
-    else {
-        return Err("Profile 不存在".to_string());
-    };
-    data.profiles.retain(|item| item.id != profile_id);
-    if profile.profile_type == ProfileType::Maps && data.active_map_profile_id == profile_id {
-        data.active_map_profile_id = data
+    update_state(|state| {
+        let mut data = state.profiles_state();
+        let Some(profile) = data
             .profiles
             .iter()
-            .find(|item| item.profile_type == ProfileType::Maps)
-            .map(|item| item.id.clone())
-            .unwrap_or_else(|| "default-maps".to_string());
-    } else if profile.profile_type == ProfileType::Mods && data.active_mod_profile_id == profile_id
-    {
-        data.active_mod_profile_id = data
-            .profiles
-            .iter()
-            .find(|item| item.profile_type == ProfileType::Mods)
-            .map(|item| item.id.clone())
-            .unwrap_or_else(|| "default-mods".to_string());
-    }
-    state.set_profiles_state(data.clone());
-    write_state(&state)?;
-    Ok(data)
+            .find(|item| item.id == profile_id)
+            .cloned()
+        else {
+            return Err("Profile 不存在".to_string());
+        };
+        data.profiles.retain(|item| item.id != profile_id);
+        if profile.profile_type == ProfileType::Maps && data.active_map_profile_id == profile_id {
+            data.active_map_profile_id = data
+                .profiles
+                .iter()
+                .find(|item| item.profile_type == ProfileType::Maps)
+                .map(|item| item.id.clone())
+                .unwrap_or_else(|| "default-maps".to_string());
+        } else if profile.profile_type == ProfileType::Mods
+            && data.active_mod_profile_id == profile_id
+        {
+            data.active_mod_profile_id = data
+                .profiles
+                .iter()
+                .find(|item| item.profile_type == ProfileType::Mods)
+                .map(|item| item.id.clone())
+                .unwrap_or_else(|| "default-mods".to_string());
+        }
+        state.set_profiles_state(data.clone());
+        Ok(data)
+    })
 }
 
 pub fn apply_profile(
@@ -99,13 +103,7 @@ pub fn apply_profile(
     mod_profile_id: String,
 ) -> Result<ScanResult, String> {
     let applied = apply_profile_to_blacklist(celeste_path, map_profile_id, mod_profile_id)?;
-    let state = load_state()?;
-    Ok(full_scan_cached(
-        &applied.path,
-        applied.profiles,
-        &state.protected_record_ids,
-        &state.selected_save_files,
-    ))
+    Ok(scan_applied_profile(&applied))
 }
 
 pub fn launch_profile(
@@ -157,6 +155,8 @@ struct AppliedProfile {
     map_profile: Profile,
     mod_profile: Profile,
     profiles: ProfilesState,
+    protected_record_ids: Vec<String>,
+    selected_save_files: Vec<String>,
 }
 
 fn apply_profile_to_blacklist(
@@ -164,7 +164,16 @@ fn apply_profile_to_blacklist(
     map_profile_id: String,
     mod_profile_id: String,
 ) -> Result<AppliedProfile, String> {
-    let mut state = load_state()?;
+    apply_profile_to_blacklist_at(&state_path(), celeste_path, map_profile_id, mod_profile_id)
+}
+
+fn apply_profile_to_blacklist_at(
+    state_file: &Path,
+    celeste_path: String,
+    map_profile_id: String,
+    mod_profile_id: String,
+) -> Result<AppliedProfile, String> {
+    let state = load_state_from_path(state_file)?;
     let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
     let mut profiles = state.profiles_state();
     let map_profile = profiles
@@ -211,14 +220,28 @@ fn apply_profile_to_blacklist(
     write_profile_blacklist(&path, &enabled_map_ids, &enabled_mod_ids, &scan)?;
     profiles.active_map_profile_id = map_profile.id.clone();
     profiles.active_mod_profile_id = mod_profile.id.clone();
-    state.set_profiles_state(profiles.clone());
-    write_state(&state)?;
+    update_state_at(state_file, |state| {
+        state.active_map_profile_id = map_profile.id.clone();
+        state.active_mod_profile_id = mod_profile.id.clone();
+        Ok(())
+    })?;
     Ok(AppliedProfile {
         path,
         map_profile,
         mod_profile,
         profiles,
+        protected_record_ids: state.protected_record_ids,
+        selected_save_files: state.selected_save_files,
     })
+}
+
+fn scan_applied_profile(applied: &AppliedProfile) -> ScanResult {
+    full_scan_cached(
+        &applied.path,
+        applied.profiles.clone(),
+        &applied.protected_record_ids,
+        &applied.selected_save_files,
+    )
 }
 
 fn resolve_required_mod_ids(
@@ -316,6 +339,7 @@ impl ProfileType {
 mod tests {
     use super::*;
     use crate::domain::{CompletionStatus, Dependency, ModKind, ModMetadata, ModRecord};
+    use std::fs;
 
     #[test]
     fn resolves_required_mods_from_maps_and_mods_recursively() {
@@ -444,6 +468,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn applied_profile_scan_uses_returned_state_snapshot() {
+        let root = temp_celeste_root("snapshot");
+        let state_root = temp_celeste_root("snapshot-state");
+        fs::create_dir_all(root.join("Mods")).expect("mods dir");
+        fs::create_dir_all(root.join("Saves")).expect("saves dir");
+        fs::write(root.join("Saves").join("0.celeste"), "<Save />").expect("save 0");
+        fs::write(root.join("Saves").join("2.celeste"), "<Save />").expect("save 2");
+        fs::create_dir_all(&state_root).expect("state dir");
+        let state_file = state_root.join("state.json");
+        write_profile_state(
+            &state_file,
+            &root,
+            vec!["2.celeste".to_string()],
+            vec!["snapshot-protected".to_string()],
+        );
+
+        let applied = apply_profile_to_blacklist_at(
+            &state_file,
+            String::new(),
+            "map-profile".to_string(),
+            "mod-profile".to_string(),
+        )
+        .expect("apply profile");
+        write_profile_state(
+            &state_file,
+            &root,
+            vec!["0.celeste".to_string()],
+            Vec::new(),
+        );
+        let scan = scan_applied_profile(&applied);
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(state_root);
+
+        assert_eq!(applied.selected_save_files, vec!["2.celeste".to_string()]);
+        assert_eq!(
+            applied.protected_record_ids,
+            vec!["snapshot-protected".to_string()]
+        );
+        assert_eq!(scan.selected_save_files, vec!["2.celeste".to_string()]);
+    }
+
     fn dependency(name: &str) -> Dependency {
         Dependency {
             name: name.to_string(),
@@ -486,5 +553,52 @@ mod tests {
             stats: None,
             warnings: vec![],
         }
+    }
+
+    fn temp_celeste_root(label: &str) -> PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("celepkg-profile-{label}-{stamp}"))
+    }
+
+    fn write_profile_state(
+        state_file: &Path,
+        root: &Path,
+        selected_save_files: Vec<String>,
+        protected_record_ids: Vec<String>,
+    ) {
+        let state = serde_json::json!({
+            "celestePath": root.to_string_lossy(),
+            "activeMapProfileId": "map-profile",
+            "activeModProfileId": "mod-profile",
+            "autoBackupEnabled": false,
+            "selectedSaveFiles": selected_save_files,
+            "protectedRecordIds": protected_record_ids,
+            "profiles": [
+                {
+                    "id": "map-profile",
+                    "name": "Map Profile",
+                    "profileType": "maps",
+                    "enabledMapIds": [],
+                    "enabledModIds": [],
+                    "launchArgs": "",
+                    "createdAt": "1",
+                    "updatedAt": "1"
+                },
+                {
+                    "id": "mod-profile",
+                    "name": "Mod Profile",
+                    "profileType": "mods",
+                    "enabledMapIds": null,
+                    "enabledModIds": [],
+                    "launchArgs": "",
+                    "createdAt": "1",
+                    "updatedAt": "1"
+                }
+            ]
+        });
+        crate::storage::write_json(state_file, &state).expect("write profile state");
     }
 }

@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
+
+static STATE_UPDATE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,7 +59,7 @@ pub fn load_state() -> Result<AppState, String> {
     load_state_from_path(&state_path())
 }
 
-fn load_state_from_path(file: &Path) -> Result<AppState, String> {
+pub(crate) fn load_state_from_path(file: &Path) -> Result<AppState, String> {
     if file.exists() {
         let mut state = read_state_json(file)?;
         normalize_profiles(&mut state);
@@ -68,8 +71,23 @@ fn load_state_from_path(file: &Path) -> Result<AppState, String> {
     Ok(state)
 }
 
-pub fn write_state(state: &AppState) -> Result<(), String> {
-    write_json(&state_path(), state)
+pub fn update_state<T>(
+    mutate: impl FnOnce(&mut AppState) -> Result<T, String>,
+) -> Result<T, String> {
+    update_state_at(&state_path(), mutate)
+}
+
+pub(crate) fn update_state_at<T>(
+    file: &Path,
+    mutate: impl FnOnce(&mut AppState) -> Result<T, String>,
+) -> Result<T, String> {
+    let _guard = STATE_UPDATE_LOCK
+        .lock()
+        .map_err(|_| "配置状态不可用".to_string())?;
+    let mut state = load_state_from_path(file)?;
+    let result = mutate(&mut state)?;
+    write_json(file, &state)?;
+    Ok(result)
 }
 
 pub fn normalize_configured_celeste_path(state: &mut AppState) -> Result<Vec<String>, String> {
@@ -697,6 +715,44 @@ mod tests {
 
         assert!(warnings.is_empty());
         assert_eq!(state.celeste_path, root.to_string_lossy());
+    }
+
+    #[test]
+    fn concurrent_state_updates_keep_changes_to_different_fields() {
+        let root = temp_dir("concurrent-state");
+        let file = root.join("state.json");
+        write_json(&file, &default_state()).expect("write state");
+        let first_file = file.clone();
+        let second_file = file.clone();
+        let start = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let first_start = std::sync::Arc::clone(&start);
+        let second_start = std::sync::Arc::clone(&start);
+
+        let first = std::thread::spawn(move || {
+            first_start.wait();
+            update_state_at(&first_file, |state| {
+                state.auto_backup_enabled = false;
+                Ok(())
+            })
+        });
+        let second = std::thread::spawn(move || {
+            second_start.wait();
+            update_state_at(&second_file, |state| {
+                state.selected_save_files = vec!["2.celeste".to_string()];
+                Ok(())
+            })
+        });
+
+        first.join().expect("first thread").expect("first update");
+        second
+            .join()
+            .expect("second thread")
+            .expect("second update");
+        let state = load_state_from_path(&file).expect("load state");
+        let _ = fs::remove_dir_all(root);
+
+        assert!(!state.auto_backup_enabled);
+        assert_eq!(state.selected_save_files, vec!["2.celeste".to_string()]);
     }
 
     fn temp_dir(label: &str) -> PathBuf {

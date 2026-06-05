@@ -8,7 +8,7 @@ use crate::services;
 use crate::storage::{
     load_state, normalize_configured_celeste_path, normalize_mod_catalog_source_settings,
     resolve_input_path_from_state, resolve_required_celeste_path,
-    resolve_required_celeste_path_from_state, write_state,
+    resolve_required_celeste_path_from_state, update_state,
 };
 use std::collections::HashMap;
 use std::path::Path;
@@ -24,38 +24,39 @@ static MOD_DOWNLOAD_CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>
 
 #[tauri::command]
 pub fn get_config() -> Result<ConfigResponse, String> {
-    let mut state = load_state()?;
-    let warnings = normalize_configured_celeste_path(&mut state)?;
-    Ok(config_response(&state, warnings))
+    update_state(|state| {
+        let warnings = normalize_configured_celeste_path(state)?;
+        Ok(config_response(state, warnings))
+    })
 }
 
 #[tauri::command]
 pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
-    let mut state = load_state()?;
-    let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-    state.celeste_path = path.to_string_lossy().to_string();
-    write_state(&state)?;
-    Ok(AppConfig {
-        celeste_path: state.celeste_path,
+    update_state(|state| {
+        let path = resolve_required_celeste_path_from_state(&celeste_path, state)?;
+        state.celeste_path = path.to_string_lossy().to_string();
+        Ok(AppConfig {
+            celeste_path: state.celeste_path.clone(),
+        })
     })
 }
 
 #[tauri::command]
 pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigResponse, String> {
-    let mut state = load_state()?;
-    state.auto_backup_enabled = auto_backup_enabled;
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.auto_backup_enabled = auto_backup_enabled;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
 pub fn set_auto_backup_cleanup_enabled(
     auto_backup_cleanup_enabled: bool,
 ) -> Result<ConfigResponse, String> {
-    let mut state = load_state()?;
-    state.auto_backup_cleanup_enabled = auto_backup_cleanup_enabled;
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.auto_backup_cleanup_enabled = auto_backup_cleanup_enabled;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
@@ -65,10 +66,10 @@ pub fn set_auto_backup_retention_count(
     if !(1..=100).contains(&auto_backup_retention_count) {
         return Err("自动备份保留数量必须在 1 到 100 之间".to_string());
     }
-    let mut state = load_state()?;
-    state.auto_backup_retention_count = auto_backup_retention_count;
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.auto_backup_retention_count = auto_backup_retention_count;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
@@ -79,46 +80,48 @@ pub fn set_mod_catalog_sources(
     if mod_catalog_source_order.is_empty() {
         return Err("至少保留一个 Mod 数据源".to_string());
     }
-    let mut state = load_state()?;
     let (order, enabled_count) = normalize_mod_catalog_source_settings(
         mod_catalog_source_order,
         mod_catalog_source_enabled_count,
     );
-    state.mod_catalog_source_order = order;
-    state.mod_catalog_source_enabled_count = enabled_count;
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.mod_catalog_source_order = order;
+        state.mod_catalog_source_enabled_count = enabled_count;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
 pub fn set_auto_check_mod_updates_on_startup(
     auto_check_mod_updates_on_startup: bool,
 ) -> Result<ConfigResponse, String> {
-    let mut state = load_state()?;
-    state.auto_check_mod_updates_on_startup = auto_check_mod_updates_on_startup;
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.auto_check_mod_updates_on_startup = auto_check_mod_updates_on_startup;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
 pub fn set_auto_refresh_mod_catalog_cache_on_startup(
     auto_refresh_mod_catalog_cache_on_startup: bool,
 ) -> Result<ConfigResponse, String> {
-    let mut state = load_state()?;
-    state.auto_refresh_mod_catalog_cache_on_startup = auto_refresh_mod_catalog_cache_on_startup;
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.auto_refresh_mod_catalog_cache_on_startup = auto_refresh_mod_catalog_cache_on_startup;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
 pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
-    let mut state = load_state()?;
-    let path = resolve_input_path_from_state("", &state);
+    let snapshot = load_state()?;
+    let path = resolve_input_path_from_state("", &snapshot);
     let available = services::scan::list_available_save_files(&path);
-    state.selected_save_files =
+    let selected_save_files =
         crate::parsers::save_stats::normalize_selected_save_files(&available, &save_files);
-    write_state(&state)?;
-    Ok(config_response(&state, vec![]))
+    update_state(|state| {
+        state.selected_save_files = selected_save_files;
+        Ok(config_response(state, vec![]))
+    })
 }
 
 #[tauri::command]
@@ -511,7 +514,7 @@ pub async fn set_record_protected(
     protected: bool,
 ) -> Result<ScanResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut state = load_state()?;
+        let state = load_state()?;
         let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
         let mut scan = services::scan::full_scan_cached(
             &path,
@@ -520,16 +523,18 @@ pub async fn set_record_protected(
             &state.selected_save_files,
         );
         services::scan::set_scan_protected_state(&mut scan, &record_id, protected)?;
-        if protected {
-            if !state.protected_record_ids.contains(&record_id) {
-                state.protected_record_ids.push(record_id);
+        update_state(|state| {
+            if protected {
+                if !state.protected_record_ids.contains(&record_id) {
+                    state.protected_record_ids.push(record_id.clone());
+                }
+            } else {
+                state.protected_record_ids.retain(|id| id != &record_id);
             }
-        } else {
-            state.protected_record_ids.retain(|id| id != &record_id);
-        }
-        state.protected_record_ids.sort();
-        state.protected_record_ids.dedup();
-        write_state(&state)?;
+            state.protected_record_ids.sort();
+            state.protected_record_ids.dedup();
+            Ok(())
+        })?;
         services::scan::write_scan_cache(&path, &scan);
         Ok(scan)
     })
