@@ -618,18 +618,35 @@ h1 {
 
 .search-box {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
   border: 1px solid #c8d1dc;
   border-radius: 6px;
   padding-left: 9px;
+  padding-right: 4px;
 }
 
 .search-box input {
+  min-width: 0;
   border: 0;
   box-shadow: none;
+}
+
+.search-clear-button {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: #7b8794;
+}
+
+.search-clear-button:hover:not(:disabled) {
+  border-color: #d8e0e8;
+  background: #f5f8fb;
+  color: #263849;
 }
 
 .field {
@@ -1343,7 +1360,7 @@ button.profile {
 
 .catalog-actions {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) auto auto;
+  grid-template-columns: minmax(280px, 1fr);
   gap: 7px;
   align-items: center;
   min-width: 0;

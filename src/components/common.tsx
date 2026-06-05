@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 
 export function Select({
@@ -18,6 +18,40 @@ export function Select({
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         {children}
       </select>
+    </label>
+  );
+}
+
+export function SearchBox({
+  className = "",
+  disabled,
+  placeholder,
+  value,
+  onChange
+}: {
+  className?: string;
+  disabled?: boolean;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className={className ? `search-box ${className}` : "search-box"}>
+      <Search size={17} />
+      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} disabled={disabled} />
+      {value && (
+        <button
+          aria-label="清空搜索"
+          className="search-clear-button"
+          disabled={disabled}
+          onClick={() => onChange("")}
+          onMouseDown={(event) => event.preventDefault()}
+          title="清空搜索"
+          type="button"
+        >
+          <X size={15} />
+        </button>
+      )}
     </label>
   );
 }

@@ -6,7 +6,6 @@ import {
   Gamepad2,
   Mountain,
   PackageSearch,
-  Search,
   Settings2,
   SlidersHorizontal,
   ToggleLeft,
@@ -17,7 +16,7 @@ import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import type { SubMapSortKey } from "../utils/subMapSorting";
 import type { ActiveView, EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
-import { Select } from "./common";
+import { SearchBox, Select } from "./common";
 
 type WorkspaceNavProps = {
   activeView: ActiveView;
@@ -155,14 +154,7 @@ export function WorkspaceNav({
             <SubMapFilters controls={mapDetailControls} />
           ) : (
             <div className="filter-content">
-              <label className="search-box">
-                <Search size={17} />
-                <input
-                  value={query}
-                  onChange={(event) => onQueryChange(event.target.value)}
-                  placeholder={activeView === "maps" ? "搜索地图、SID" : "搜索 Mod、依赖"}
-                />
-              </label>
+              <SearchBox value={query} onChange={onQueryChange} placeholder={activeView === "maps" ? "搜索地图、SID" : "搜索 Mod、依赖"} />
               <EnabledFilterControl value={enabledFilter} onChange={onEnabledFilterChange} />
               {activeView === "maps" ? (
                 <>
@@ -263,14 +255,7 @@ function ReferenceFilterControl({ value, onChange }: { value: ReferenceFilter; o
 function SubMapFilters({ controls }: { controls: MapDetailControls }) {
   return (
     <div className="filter-content">
-      <label className="search-box">
-        <Search size={17} />
-        <input
-          value={controls.subMapQuery}
-          onChange={(event) => controls.updateSubMapQuery(event.target.value)}
-          placeholder="搜索小图名称、SID"
-        />
-      </label>
+      <SearchBox value={controls.subMapQuery} onChange={controls.updateSubMapQuery} placeholder="搜索小图名称、SID" />
       <Select label="排序" value={controls.subMapSortKey} onChange={(value) => controls.updateSubMapSortKey(value as SubMapSortKey)}>
         <option value="file">文件顺序</option>
         <option value="name">名称</option>

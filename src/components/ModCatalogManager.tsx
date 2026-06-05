@@ -1,5 +1,5 @@
-import { Download, ExternalLink, Info, PackageCheck, RotateCcw, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Download, ExternalLink, Info, PackageCheck, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { searchModCatalog } from "../api";
 import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
 import type { DownloadTask } from "../utils/downloadTask";
@@ -12,7 +12,7 @@ import {
   type CatalogFilters,
   type CatalogSortKey
 } from "../utils/catalogView";
-import { DialogFacts, DialogShell, Select } from "./common";
+import { DialogFacts, DialogShell, SearchBox, Select } from "./common";
 
 type ModCatalogManagerProps = {
   downloadTask?: DownloadTask | null;
@@ -49,8 +49,9 @@ export function ModCatalogManager({
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
   const [filters, setFilters] = useState<CatalogFilters>(defaultFilters);
   const [sortKey, setSortKey] = useState<CatalogSortKey>("relevance");
+  const searchRequestRef = useRef(0);
 
-  const sourceList = sources.length ? sources : defaultSources;
+  const sourceList = useMemo(() => (sources.length ? sources : defaultSources), [sources]);
   const allViews = useMemo(
     () => buildCatalogEntryViews(searchResult.entries, [...scan.maps, ...scan.otherMods], downloadTask ?? null, query),
     [downloadTask, query, scan.maps, scan.otherMods, searchResult.entries]
@@ -60,24 +61,34 @@ export function ModCatalogManager({
   const detailView = detailEntry ? allViews.find((view) => view.entry.source === detailEntry.source && view.entry.id === detailEntry.id) ?? null : null;
   const activeSourceLabels = sourceList.map(sourceLabel).join("、");
 
-  async function runSearch() {
-    try {
+  useEffect(() => {
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+    let disposed = false;
+    const timer = window.setTimeout(() => {
       setLoading(true, "搜索 Mod 目录...");
-      const result = await searchModCatalog(query, sourceList);
-      setSearchResult(result);
-      notifier.showSuccess(`找到 ${result.entries.length} 个目录条目`);
-    } catch (error) {
-      notifier.showError(error instanceof Error ? error.message : "搜索 Mod 目录失败。");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function clearSearch() {
-    setQuery("");
-    setSearchResult({ sources: [], entries: [], warnings: [] });
-    setDetailEntry(null);
-  }
+      searchModCatalog(query, sourceList)
+        .then((result) => {
+          if (disposed || searchRequestRef.current !== requestId) return;
+          setSearchResult(result);
+          setDetailEntry((current) =>
+            current && result.entries.some((entry) => entry.source === current.source && entry.id === current.id) ? current : null
+          );
+          if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+        })
+        .catch((error) => {
+          if (disposed || searchRequestRef.current !== requestId) return;
+          notifier.showError(error instanceof Error ? error.message : "搜索 Mod 目录失败。");
+        })
+        .finally(() => {
+          if (!disposed && searchRequestRef.current === requestId) setLoading(false);
+        });
+    }, 300);
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [notifier, query, setLoading, sourceList]);
 
   function updateFilters(update: Partial<CatalogFilters>) {
     setFilters((current) => ({ ...current, ...update }));
@@ -99,25 +110,7 @@ export function ModCatalogManager({
             <h3>目录结果</h3>
           </div>
           <div className="catalog-actions">
-            <label className="search-box catalog-search">
-              <Search size={17} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void runSearch();
-                }}
-                placeholder="搜索 Mod、地图、Helper"
-              />
-            </label>
-            <button onClick={clearSearch} disabled={loading || (!query && !searchResult.entries.length)} title="清空">
-              <X size={16} />
-              清空
-            </button>
-            <button onClick={runSearch} disabled={loading}>
-              <Search size={16} />
-              搜索
-            </button>
+            <SearchBox className="catalog-search" value={query} onChange={setQuery} placeholder="搜索 Mod、地图、Helper" />
           </div>
           <CatalogFilterBar
             filters={filters}
