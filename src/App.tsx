@@ -226,29 +226,16 @@ export function App() {
         <WorkspaceNav
           activeView={workspaceView.activeView}
           dependencyModCount={profileDraft.dependencyModDraft.size}
-          enabledFilter={showingModRecords ? filters.modEnabledFilter : filters.mapEnabledFilter}
           enabledMapCount={workspaceView.enabledMapCount}
           enabledModCount={workspaceView.enabledModCount}
-          helperMapCount={filters.helperMapMods.length}
           mapProfileName={workspaceView.mapProfileName}
           modProfileName={workspaceView.modProfileName}
-          progressFilter={showingModRecords ? filters.modProgressFilter : filters.mapProgressFilter}
-          query={showingModRecords ? filters.modQuery : filters.mapQuery}
-          referenceFilter={filters.modReferenceFilter}
-          showHelperMaps={filters.showHelperMaps}
-          sortKey={filters.mapSortKey}
           mainMode={workspaceView.mainMode}
           mapDetailTab={uiLayout.mapDetailTab}
           mapDetailControls={mapDetailControls}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
           onActiveViewChange={workspaceView.changeActiveView}
-          onEnabledFilterChange={showingModRecords ? filters.setModEnabledFilter : filters.setMapEnabledFilter}
-          onProgressFilterChange={showingModRecords ? filters.setModProgressFilter : filters.setMapProgressFilter}
-          onQueryChange={showingModRecords ? filters.setModQuery : filters.setMapQuery}
-          onReferenceFilterChange={filters.setModReferenceFilter}
-          onShowHelperMapsChange={filters.setShowHelperMaps}
-          onSortKeyChange={filters.setMapSortKey}
         />
 
         {workspaceView.activeView === "profiles" ? (
@@ -397,11 +384,18 @@ export function App() {
         ) : (
           <RecordList
             activeView={workspaceView.activeView}
+            enabledFilter={showingModRecords ? filters.modEnabledFilter : filters.mapEnabledFilter}
             filteredMaps={filters.filteredMaps}
             filteredMods={filters.filteredMods}
+            helperMapCount={filters.helperMapMods.length}
+            progressFilter={showingModRecords ? filters.modProgressFilter : filters.mapProgressFilter}
+            query={filters.query}
+            referenceFilter={filters.modReferenceFilter}
             selectedMap={workspaceView.selectedMap}
             selectedMod={workspaceView.selectedMod}
+            showHelperMaps={filters.showHelperMaps}
             showWarningColumn={uiLayout.showWarningColumn}
+            sortKey={filters.mapSortKey}
             strawberryDenominator={uiLayout.strawberryDenominator}
             visibleMapCount={filters.visibleMapRecords.length}
             modCount={scan.otherMods.length}
@@ -415,12 +409,18 @@ export function App() {
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}
+            onEnabledFilterChange={showingModRecords ? filters.setModEnabledFilter : filters.setMapEnabledFilter}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={workspaceView.selectMod}
             onModToggle={recordActions.toggleModRecord}
             onModUpdate={updateSingleMod}
+            onProgressFilterChange={showingModRecords ? filters.setModProgressFilter : filters.setMapProgressFilter}
+            onQueryChange={filters.setQuery}
             onRecordViewChange={workspaceView.changeActiveView}
+            onReferenceFilterChange={filters.setModReferenceFilter}
+            onShowHelperMapsChange={filters.setShowHelperMaps}
+            onSortKeyChange={filters.setMapSortKey}
             onUpdateAllMods={updateAllMods}
             onFavoriteToggle={recordActions.updateRecordFavorite}
             onProtectedToggle={recordActions.updateRecordProtected}

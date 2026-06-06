@@ -104,7 +104,7 @@ test("record table columns remain ordered without cell overlap", async ({ page }
 test("detail dependency panel shows mock dependency tree states", async ({ page }) => {
   await openMock(page);
   await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
-  await page.getByPlaceholder("搜索 Mod、依赖").fill("Dependency Tree");
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Dependency Tree");
   const rootRow = page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" });
   await expect(rootRow).toHaveCount(1);
   await rootRow.click();

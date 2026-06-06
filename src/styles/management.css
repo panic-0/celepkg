@@ -2,7 +2,7 @@
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .record-panel > .pagination-bar {
@@ -142,6 +142,28 @@
   border-color: #9bc7d8;
   background: #eaf6fb;
   color: var(--color-info);
+}
+
+.record-filter-stack {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid #e2e8ef;
+  background: #f8fafc;
+}
+
+.record-filter-bar.map-filters {
+  grid-template-columns: repeat(3, minmax(118px, 1fr)) minmax(146px, max-content);
+}
+
+.record-filter-bar.mod-filters {
+  grid-template-columns: repeat(3, minmax(118px, 1fr));
+}
+
+.record-helper-toggle small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .update-all-button {

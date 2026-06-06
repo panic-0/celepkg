@@ -15,78 +15,44 @@ import {
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import type { SubMapSortKey } from "../utils/subMapSorting";
-import type { ActiveView, EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
+import type { ActiveView } from "../viewTypes";
 import { SearchBox, Select } from "./common";
 
 type WorkspaceNavProps = {
   activeView: ActiveView;
   dependencyModCount: number;
-  enabledFilter: EnabledFilter;
   enabledMapCount: number;
   enabledModCount: number;
-  helperMapCount: number;
   mapProfileName: string;
   modProfileName: string;
-  progressFilter: ProgressFilter;
-  query: string;
-  referenceFilter: ReferenceFilter;
-  showHelperMaps: boolean;
-  sortKey: SortKey;
   mainMode: "list" | "detail";
   mapDetailControls: MapDetailControls;
   mapDetailTab: MapDetailTab;
   totalMapCount: number;
   totalModCount: number;
   onActiveViewChange: (view: ActiveView) => void;
-  onEnabledFilterChange: (value: EnabledFilter) => void;
-  onProgressFilterChange: (value: ProgressFilter) => void;
-  onQueryChange: (value: string) => void;
-  onReferenceFilterChange: (value: ReferenceFilter) => void;
-  onShowHelperMapsChange: (value: boolean) => void;
-  onSortKeyChange: (value: SortKey) => void;
 };
 
 export function WorkspaceNav({
   activeView,
   dependencyModCount,
-  enabledFilter,
   enabledMapCount,
   enabledModCount,
-  helperMapCount,
   mapProfileName,
   modProfileName,
-  progressFilter,
-  query,
-  referenceFilter,
-  showHelperMaps,
-  sortKey,
   mainMode,
   mapDetailControls,
   mapDetailTab,
   totalMapCount,
   totalModCount,
-  onActiveViewChange,
-  onEnabledFilterChange,
-  onProgressFilterChange,
-  onQueryChange,
-  onReferenceFilterChange,
-  onShowHelperMapsChange,
-  onSortKeyChange
+  onActiveViewChange
 }: WorkspaceNavProps) {
-  const showsRecordFilters = activeView === "maps" || activeView === "mods";
   const showsSubMapFilters = activeView === "maps" && mainMode === "detail" && mapDetailTab === "submaps";
-  const filterTitle = showsSubMapFilters ? "小图筛选" : activeView === "maps" ? "地图筛选" : "Mod 筛选";
-  const filterCount = showsSubMapFilters
-    ? Number(mapDetailControls.subMapQuery.trim().length > 0) +
-      Number(mapDetailControls.subMapSortKey !== "file") +
-      Number(mapDetailControls.subMapSortDescending) +
-      Number(!mapDetailControls.groupSubMapsByDifficulty)
-    : Number(query.trim().length > 0) +
-      Number(enabledFilter !== "all") +
-      Number(activeView === "maps" ? progressFilter !== "all" : progressFilter === "warnings") +
-      Number(activeView === "maps" && sortKey !== "name") +
-      Number(activeView === "maps" && showHelperMaps) +
-      Number(activeView === "mods" && referenceFilter !== "all");
+  const filterCount =
+    Number(mapDetailControls.subMapQuery.trim().length > 0) +
+    Number(mapDetailControls.subMapSortKey !== "file") +
+    Number(mapDetailControls.subMapSortDescending) +
+    Number(!mapDetailControls.groupSubMapsByDifficulty);
 
   return (
     <aside className="workspace-nav">
@@ -153,112 +119,17 @@ export function WorkspaceNav({
         </button>
       </section>
 
-      {showsRecordFilters && (
+      {showsSubMapFilters && (
         <section className="nav-section filter-dock">
           <div className="filter-heading">
             <SlidersHorizontal size={17} />
-            <span>{filterTitle}</span>
+            <span>小图筛选</span>
             {filterCount > 0 && <small>{filterCount}</small>}
           </div>
-          {showsSubMapFilters ? (
-            <SubMapFilters controls={mapDetailControls} />
-          ) : (
-            <div className="filter-content">
-              <SearchBox value={query} onChange={onQueryChange} placeholder={activeView === "maps" ? "搜索地图、SID" : "搜索 Mod、依赖"} />
-              <EnabledFilterControl value={enabledFilter} onChange={onEnabledFilterChange} />
-              {activeView === "maps" ? (
-                <>
-                  <Select label="进度" value={progressFilter} onChange={(value) => onProgressFilterChange(value as ProgressFilter)}>
-                    <option value="all">全部进度</option>
-                    <option value="completed">已完成</option>
-                    <option value="unfinished">未完成</option>
-                    <option value="withStats">有存档统计</option>
-                    <option value="warnings">有依赖警告</option>
-                  </Select>
-                  <Select label="排序" value={sortKey} onChange={(value) => onSortKeyChange(value as SortKey)}>
-                    <option value="name">名称</option>
-                    <option value="deaths">死亡数</option>
-                    <option value="time">用时</option>
-                    <option value="strawberries">草莓</option>
-                  </Select>
-                  <button
-                    className={showHelperMaps ? "inline-toggle active" : "inline-toggle"}
-                    onClick={() => onShowHelperMapsChange(!showHelperMaps)}
-                    title="显示 Helper 或代码 Mod 附带的测试地图"
-                  >
-                    {showHelperMaps ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-                    Helper 测试图
-                    <small>{helperMapCount}</small>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <ReferenceFilterControl value={referenceFilter} onChange={onReferenceFilterChange} />
-                  <Select
-                    label="警告"
-                    value={progressFilter === "warnings" ? "warnings" : "all"}
-                    onChange={(value) => onProgressFilterChange(value as ProgressFilter)}
-                  >
-                    <option value="all">全部 Mod</option>
-                    <option value="warnings">有警告</option>
-                  </Select>
-                </>
-              )}
-            </div>
-          )}
+          <SubMapFilters controls={mapDetailControls} />
         </section>
       )}
     </aside>
-  );
-}
-
-function EnabledFilterControl({ value, onChange }: { value: EnabledFilter; onChange: (value: EnabledFilter) => void }) {
-  return (
-    <div className="filter-segmented-field">
-      <span className="filter-segmented-label">启用状态</span>
-      <div className="filter-segmented" aria-label="启用状态">
-        <button className={value === "all" ? "active" : ""} onClick={() => onChange("all")} title="显示全部条目">
-          全部
-        </button>
-        <button className={value === "enabled" ? "active" : ""} onClick={() => onChange("enabled")} title="只显示当前 Profile 中启用的条目">
-          仅启用
-        </button>
-        <button
-          className={value === "disabled" ? "active" : ""}
-          onClick={() => onChange("disabled")}
-          title="只显示当前 Profile 中禁用的条目"
-        >
-          仅禁用
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ReferenceFilterControl({ value, onChange }: { value: ReferenceFilter; onChange: (value: ReferenceFilter) => void }) {
-  return (
-    <div className="filter-segmented-field">
-      <span className="filter-segmented-label">依赖关系</span>
-      <div className="filter-segmented" aria-label="依赖关系">
-        <button className={value === "all" ? "active" : ""} onClick={() => onChange("all")} title="显示全部 Mod">
-          全部
-        </button>
-        <button
-          className={value === "unreferenced" ? "active" : ""}
-          onClick={() => onChange("unreferenced")}
-          title="只显示没有被地图或其他 Mod 声明为必需依赖的 Mod"
-        >
-          不被依赖
-        </button>
-        <button
-          className={value === "unreferencedAndOptional" ? "active" : ""}
-          onClick={() => onChange("unreferencedAndOptional")}
-          title="只显示没有被声明为必需依赖或可选依赖的 Mod"
-        >
-          不被依赖与可选依赖
-        </button>
-      </div>
-    </div>
   );
 }
 

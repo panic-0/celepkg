@@ -19,8 +19,9 @@ import type { DependencyReference } from "../utils/dependencies";
 import { formatCompletionStatus, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
 import { formatModUpdateVersionChange } from "../utils/modUpdateTask";
 import { clampPage, paginateItems } from "../utils/pagination";
-import type { ActiveView, StrawberryDenominator } from "../viewTypes";
+import type { ActiveView, EnabledFilter, ProgressFilter, ReferenceFilter, SortKey, StrawberryDenominator } from "../viewTypes";
 import { Pagination } from "./Pagination";
+import { SearchBox, Select } from "./common";
 
 type RecordView = Extract<ActiveView, "maps" | "mods">;
 
@@ -28,9 +29,16 @@ type RecordListProps = {
   activeView: RecordView;
   filteredMaps: ModRecord[];
   filteredMods: ModRecord[];
+  enabledFilter: EnabledFilter;
+  helperMapCount: number;
+  progressFilter: ProgressFilter;
+  query: string;
+  referenceFilter: ReferenceFilter;
   selectedMap?: ModRecord;
   selectedMod?: ModRecord;
+  showHelperMaps: boolean;
   showWarningColumn: boolean;
+  sortKey: SortKey;
   strawberryDenominator: StrawberryDenominator;
   scrollMemory: ScrollMemory;
   loading: boolean;
@@ -44,12 +52,18 @@ type RecordListProps = {
   onDisableAll: () => void;
   onEnableAll: () => void;
   onCheckModUpdates: () => void;
+  onEnabledFilterChange: (value: EnabledFilter) => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
   onModToggle: (record: ModRecord) => void;
   onModUpdate: (candidate: ModUpdateCandidate) => void;
+  onProgressFilterChange: (value: ProgressFilter) => void;
+  onQueryChange: (value: string) => void;
   onRecordViewChange: (view: RecordView) => void;
+  onReferenceFilterChange: (value: ReferenceFilter) => void;
+  onShowHelperMapsChange: (value: boolean) => void;
+  onSortKeyChange: (value: SortKey) => void;
   onUpdateAllMods: () => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
@@ -61,9 +75,16 @@ export function RecordList({
   activeView,
   filteredMaps,
   filteredMods,
+  enabledFilter,
+  helperMapCount,
+  progressFilter,
+  query,
+  referenceFilter,
   selectedMap,
   selectedMod,
+  showHelperMaps,
   showWarningColumn,
+  sortKey,
   strawberryDenominator,
   scrollMemory,
   loading,
@@ -77,12 +98,18 @@ export function RecordList({
   onDisableAll,
   onEnableAll,
   onCheckModUpdates,
+  onEnabledFilterChange,
   onMapSelect,
   onMapToggle,
   onModSelect,
   onModToggle,
   onModUpdate,
+  onProgressFilterChange,
+  onQueryChange,
   onRecordViewChange,
+  onReferenceFilterChange,
+  onShowHelperMapsChange,
+  onSortKeyChange,
   onUpdateAllMods,
   onFavoriteToggle,
   onProtectedToggle,
@@ -145,6 +172,30 @@ export function RecordList({
           <span>{formatUpdateAllLabel(modUpdateCount)}</span>
         </button>
       </div>
+      <div className="record-filter-stack">
+        <div className="catalog-actions record-search-actions">
+          <SearchBox
+            className="catalog-search record-search"
+            value={query}
+            onChange={onQueryChange}
+            placeholder="搜索地图、SID、Mod、依赖"
+          />
+        </div>
+        <RecordFilterBar
+          activeView={activeView}
+          enabledFilter={enabledFilter}
+          helperMapCount={helperMapCount}
+          progressFilter={progressFilter}
+          referenceFilter={referenceFilter}
+          showHelperMaps={showHelperMaps}
+          sortKey={sortKey}
+          onEnabledFilterChange={onEnabledFilterChange}
+          onProgressFilterChange={onProgressFilterChange}
+          onReferenceFilterChange={onReferenceFilterChange}
+          onShowHelperMapsChange={onShowHelperMapsChange}
+          onSortKeyChange={onSortKeyChange}
+        />
+      </div>
       <div className="record-table-scroll" ref={tableScrollRef}>
         {activeView === "maps" ? (
           <MapTable
@@ -184,6 +235,103 @@ export function RecordList({
         onPageChange={setPage}
       />
     </section>
+  );
+}
+
+function RecordFilterBar({
+  activeView,
+  enabledFilter,
+  helperMapCount,
+  progressFilter,
+  referenceFilter,
+  showHelperMaps,
+  sortKey,
+  onEnabledFilterChange,
+  onProgressFilterChange,
+  onReferenceFilterChange,
+  onShowHelperMapsChange,
+  onSortKeyChange
+}: {
+  activeView: RecordView;
+  enabledFilter: EnabledFilter;
+  helperMapCount: number;
+  progressFilter: ProgressFilter;
+  referenceFilter: ReferenceFilter;
+  showHelperMaps: boolean;
+  sortKey: SortKey;
+  onEnabledFilterChange: (value: EnabledFilter) => void;
+  onProgressFilterChange: (value: ProgressFilter) => void;
+  onReferenceFilterChange: (value: ReferenceFilter) => void;
+  onShowHelperMapsChange: (value: boolean) => void;
+  onSortKeyChange: (value: SortKey) => void;
+}) {
+  return (
+    <div
+      className={
+        activeView === "maps" ? "catalog-filter-bar record-filter-bar map-filters" : "catalog-filter-bar record-filter-bar mod-filters"
+      }
+    >
+      <EnabledFilterControl value={enabledFilter} onChange={onEnabledFilterChange} />
+      {activeView === "maps" ? (
+        <>
+          <Select label="进度" value={progressFilter} onChange={(value) => onProgressFilterChange(value as ProgressFilter)}>
+            <option value="all">全部进度</option>
+            <option value="completed">已完成</option>
+            <option value="unfinished">未完成</option>
+            <option value="withStats">有存档统计</option>
+            <option value="warnings">有依赖警告</option>
+          </Select>
+          <Select label="排序" value={sortKey} onChange={(value) => onSortKeyChange(value as SortKey)}>
+            <option value="name">名称</option>
+            <option value="deaths">死亡数</option>
+            <option value="time">用时</option>
+            <option value="strawberries">草莓</option>
+          </Select>
+          <label className={`catalog-downloadable-toggle record-helper-toggle ${showHelperMaps ? "active" : ""}`}>
+            <input
+              type="checkbox"
+              checked={showHelperMaps}
+              onChange={(event) => onShowHelperMapsChange(event.target.checked)}
+              title="显示 Helper 或代码 Mod 附带的测试地图"
+            />
+            <span>Helper 测试图</span>
+            <small>{helperMapCount}</small>
+          </label>
+        </>
+      ) : (
+        <>
+          <ReferenceFilterControl value={referenceFilter} onChange={onReferenceFilterChange} />
+          <Select
+            label="警告"
+            value={progressFilter === "warnings" ? "warnings" : "all"}
+            onChange={(value) => onProgressFilterChange(value as ProgressFilter)}
+          >
+            <option value="all">全部 Mod</option>
+            <option value="warnings">有警告</option>
+          </Select>
+        </>
+      )}
+    </div>
+  );
+}
+
+function EnabledFilterControl({ value, onChange }: { value: EnabledFilter; onChange: (value: EnabledFilter) => void }) {
+  return (
+    <Select label="启用状态" value={value} onChange={(nextValue) => onChange(nextValue as EnabledFilter)}>
+      <option value="all">全部</option>
+      <option value="enabled">仅启用</option>
+      <option value="disabled">仅禁用</option>
+    </Select>
+  );
+}
+
+function ReferenceFilterControl({ value, onChange }: { value: ReferenceFilter; onChange: (value: ReferenceFilter) => void }) {
+  return (
+    <Select label="依赖关系" value={value} onChange={(nextValue) => onChange(nextValue as ReferenceFilter)}>
+      <option value="all">全部</option>
+      <option value="unreferenced">不被依赖</option>
+      <option value="unreferencedAndOptional">不被依赖与可选依赖</option>
+    </Select>
   );
 }
 

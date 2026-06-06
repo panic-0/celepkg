@@ -67,7 +67,7 @@ test("catalog install flow previews dependencies and queues the mock task", asyn
 test("mock dependency tree update opens the tree preview", async ({ page }) => {
   await openMock(page);
   await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
-  await page.getByPlaceholder("搜索 Mod、依赖").fill("Dependency Tree");
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Dependency Tree");
   await page.getByRole("button", { name: "检查更新" }).click();
   await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
 

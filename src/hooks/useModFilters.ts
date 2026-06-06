@@ -11,12 +11,11 @@ type ModFiltersOptions = {
 };
 
 export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFiltersOptions) {
-  const [mapQuery, setMapQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [mapEnabledFilter, setMapEnabledFilter] = useState<EnabledFilter>("all");
   const [mapProgressFilter, setMapProgressFilter] = useState<ProgressFilter>("all");
   const [mapSortKey, setMapSortKey] = useState<SortKey>("name");
   const [showHelperMaps, setShowHelperMaps] = useState(false);
-  const [modQuery, setModQuery] = useState("");
   const [modEnabledFilter, setModEnabledFilter] = useState<EnabledFilter>("all");
   const [modProgressFilter, setModProgressFilter] = useState<ProgressFilter>("all");
   const [modReferenceFilter, setModReferenceFilter] = useState<ReferenceFilter>("all");
@@ -29,7 +28,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
   const { optionalReferencedModIds, referencedModIds } = useMemo(() => findReferencedModIds(scan), [scan]);
 
   const filteredMaps = useMemo(() => {
-    const normalizedQuery = mapQuery.trim().toLowerCase();
+    const normalizedQuery = query.trim().toLowerCase();
     const maps = visibleMapRecords.filter((map) => {
       const draftEnabled = isDraftEnabled(map, enabledMapDraft, enabledModDraft);
       if (mapEnabledFilter === "enabled" && !draftEnabled) return false;
@@ -47,10 +46,10 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
       if (mapSortKey === "strawberries") return strawberrySortValue(b) - strawberrySortValue(a);
       return a.name.localeCompare(b.name, "zh-Hans-CN");
     });
-  }, [enabledMapDraft, enabledModDraft, mapEnabledFilter, mapProgressFilter, mapQuery, mapSortKey, visibleMapRecords]);
+  }, [enabledMapDraft, enabledModDraft, mapEnabledFilter, mapProgressFilter, mapSortKey, query, visibleMapRecords]);
 
   const filteredMods = useMemo(() => {
-    const normalizedQuery = modQuery.trim().toLowerCase();
+    const normalizedQuery = query.trim().toLowerCase();
     const mods = scan.otherMods.filter((modItem) => {
       const draftEnabled = modItem.readOnly || enabledModDraft.has(modItem.id);
       if (modEnabledFilter === "enabled" && !draftEnabled) return false;
@@ -77,9 +76,9 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
     enabledModDraft,
     modEnabledFilter,
     modProgressFilter,
-    modQuery,
     modReferenceFilter,
     optionalReferencedModIds,
+    query,
     referencedModIds,
     scan.otherMods
   ]);
@@ -90,21 +89,19 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
     helperMapMods,
     mapEnabledFilter,
     mapProgressFilter,
-    mapQuery,
     mapSortKey,
     modEnabledFilter,
     modProgressFilter,
-    modQuery,
     modReferenceFilter,
+    query,
     referencedModIds,
     setMapEnabledFilter,
     setMapProgressFilter,
-    setMapQuery,
     setMapSortKey,
     setModEnabledFilter,
     setModProgressFilter,
-    setModQuery,
     setModReferenceFilter,
+    setQuery,
     setShowHelperMaps,
     showHelperMaps,
     visibleMapRecords

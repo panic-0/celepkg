@@ -51,6 +51,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .record-filter-bar.map-filters,
+  .record-filter-bar.mod-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .everest-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -124,7 +129,16 @@
     grid-template-columns: 1fr;
   }
 
+  .record-filter-bar.map-filters,
+  .record-filter-bar.mod-filters {
+    grid-template-columns: 1fr;
+  }
+
   .catalog-downloadable-toggle {
+    width: 100%;
+  }
+
+  .record-helper-toggle {
     width: 100%;
   }
 
