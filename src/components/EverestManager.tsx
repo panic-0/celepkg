@@ -84,7 +84,7 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
 
         <section className="everest-channel-panel">
           <div className="everest-channel-heading">
-            <div className="segmented three" aria-label="Everest 通道">
+            <div className="segmented three">
               {channels.map((channel) => (
                 <button
                   className={activeChannel === channel.key ? "active" : ""}

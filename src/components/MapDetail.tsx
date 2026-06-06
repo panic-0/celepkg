@@ -140,7 +140,7 @@ export function MapDetail({
         <p title={map.metadata.description || map.fileName}>{map.metadata.description || map.fileName}</p>
       </div>
 
-      <div className="detail-tabs" role="tablist">
+      <div className="detail-tabs">
         <TabButton active={activeTab === "overview"} onClick={() => onTabChange("overview")}>
           概览
         </TabButton>
@@ -195,7 +195,7 @@ export function MapDetail({
         <div className="detail-tab-panel sub-map-tab-panel" ref={detailPanelRef}>
           {map.subMaps.length ? (
             <>
-              <nav className="sub-map-breadcrumbs" aria-label="小图目录">
+              <nav className="sub-map-breadcrumbs">
                 {subMapBreadcrumbs.map((crumb, index) => (
                   <span key={`${crumb.path}-${index}`} className="breadcrumb-part">
                     {index > 0 && <span className="breadcrumb-separator">/</span>}

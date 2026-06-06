@@ -68,7 +68,7 @@ export function ModDetail({
         <p title={modItem.metadata.description || modItem.fileName}>{modItem.metadata.description || modItem.fileName}</p>
       </div>
 
-      <div className="detail-tabs" role="tablist">
+      <div className="detail-tabs">
         <TabButton active={activeTab === "overview"} onClick={() => onTabChange("overview")}>
           概览
         </TabButton>

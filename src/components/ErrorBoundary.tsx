@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.error) {
       return (
         <main className="app-shell fatal-shell">
-          <section className="fatal-error" role="alert">
+          <section className="fatal-error">
             <AlertTriangle size={30} />
             <h1>界面渲染失败</h1>
             <p>{readError(this.state.error)}</p>

@@ -17,7 +17,7 @@ export function ToastHost({ notice, onClose }: ToastHostProps) {
   if (!notice) return null;
 
   return (
-    <div className="toast-host" role={notice.tone === "error" || notice.tone === "warning" ? "alert" : "status"} aria-live="polite">
+    <div className="toast-host">
       <div className={`toast-card ${notice.tone}`}>
         {toneIcons[notice.tone]}
         <span>{notice.text}</span>

@@ -50,12 +50,7 @@ function DependencyTreeNodeRow({
     <div className={`dependency-tree-node ${node.status}`}>
       <div className="dependency-tree-row">
         {node.selectable && onOptionalToggle ? (
-          <input
-            aria-label={`选择可选依赖 ${node.name}`}
-            checked={checked}
-            onChange={(event) => onOptionalToggle(node.id, event.currentTarget.checked)}
-            type="checkbox"
-          />
+          <input checked={checked} onChange={(event) => onOptionalToggle(node.id, event.currentTarget.checked)} type="checkbox" />
         ) : (
           <span className="dependency-tree-spacer" />
         )}
@@ -110,7 +105,7 @@ export function LongValue({ label, value }: { label: string; value: string }) {
 
 export function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
   return (
-    <button className={active ? "tab-button active" : "tab-button"} onClick={onClick} role="tab" aria-selected={active}>
+    <button className={active ? "tab-button active" : "tab-button"} onClick={onClick}>
       {children}
     </button>
   );

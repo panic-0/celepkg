@@ -339,7 +339,7 @@ export function SettingsManager({
                 {autoBackupEnabled ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
                 修改前自动备份
               </button>
-              <div className="backup-retention-segments" aria-label="自动清理策略">
+              <div className="backup-retention-segments">
                 <label
                   className={autoBackupCleanupEnabled ? "backup-retention-option active" : "backup-retention-option"}
                   onClick={() => {

@@ -15,7 +15,6 @@ async function forceLongToolbarStatus(page: Page) {
     const beforeHeight = toolbar?.getBoundingClientRect().height ?? 0;
     status.textContent = text;
     status.setAttribute("title", text);
-    status.setAttribute("aria-label", text);
     const style = getComputedStyle(status);
     const lineHeight = Number.parseFloat(style.lineHeight);
     const rect = status.getBoundingClientRect();
@@ -31,7 +30,6 @@ async function forceLongToolbarStatus(page: Page) {
       scrollWidth: status.scrollWidth,
       textOverflow: style.textOverflow,
       title: status.getAttribute("title"),
-      ariaLabel: status.getAttribute("aria-label"),
       whiteSpace: style.whiteSpace
     };
   }, LONG_STATUS_TEXT);
@@ -48,20 +46,17 @@ test("toolbar status stays on one line and keeps full text metadata", async ({ p
       lineHeight: Number.parseFloat(style.lineHeight),
       text: status.textContent?.trim(),
       title: status.getAttribute("title"),
-      ariaLabel: status.getAttribute("aria-label"),
       whiteSpace: style.whiteSpace
     };
   });
 
   expect(connectedStatus.text).toBe("已连接 Celeste");
   expect(connectedStatus.title).toBe("已连接 Celeste");
-  expect(connectedStatus.ariaLabel).toBe("已连接 Celeste");
   expect(connectedStatus.whiteSpace).toBe("nowrap");
   expect(connectedStatus.height).toBeLessThanOrEqual(connectedStatus.lineHeight + 2);
 
   const longStatus = await forceLongToolbarStatus(page);
   expect(longStatus.title).toBe(LONG_STATUS_TEXT);
-  expect(longStatus.ariaLabel).toBe(LONG_STATUS_TEXT);
   expect(longStatus.whiteSpace).toBe("nowrap");
   expect(longStatus.overflow).toBe("hidden");
   expect(longStatus.textOverflow).toBe("ellipsis");
@@ -108,7 +103,7 @@ test("detail dependency panel shows mock dependency tree states", async ({ page 
   const rootRow = page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" });
   await expect(rootRow).toHaveCount(1);
   await rootRow.click();
-  await page.getByRole("tab", { name: "依赖" }).click();
+  await page.locator(".detail-tabs button", { hasText: "依赖" }).click();
 
   await expect(page.locator(".detail-tab-panel")).toContainText("依赖树");
   await expect(page.locator(".detail-tab-panel")).toContainText("必需 已满足");

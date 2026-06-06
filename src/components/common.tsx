@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { highlightTextParts, type HighlightRange } from "../utils/search";
 
 export function Select({
@@ -42,7 +42,6 @@ export function SearchBox({
       <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} disabled={disabled} />
       {value && (
         <button
-          aria-label="清空搜索"
           className="search-clear-button"
           disabled={disabled}
           onClick={() => onChange("")}
@@ -129,7 +128,6 @@ export function DialogShell({
   showCloseButton?: boolean;
   title: string;
 }) {
-  const titleId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const closeDisabledRef = useRef(closeDisabled);
   const onCloseRef = useRef(onClose);
@@ -198,22 +196,14 @@ export function DialogShell({
   return (
     <div
       className="confirm-dialog-backdrop"
-      role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && closeOnBackdrop && !closeDisabled) onClose();
       }}
     >
-      <section
-        className={className ? `confirm-dialog ${className}` : "confirm-dialog"}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-      >
+      <section className={className ? `confirm-dialog ${className}` : "confirm-dialog"} ref={dialogRef} tabIndex={-1}>
         <div className="confirm-dialog-heading">
           {icon}
-          <h3 id={titleId}>{title}</h3>
+          <h3>{title}</h3>
           {showCloseButton && (
             <button
               autoFocus
@@ -221,7 +211,6 @@ export function DialogShell({
               onClick={onClose}
               disabled={closeDisabled}
               title="关闭"
-              aria-label="关闭"
             >
               <X size={16} />
             </button>

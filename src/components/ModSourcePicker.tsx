@@ -148,7 +148,7 @@ export function ModSourcePicker({
   }, [dragState]);
 
   return (
-    <div className="catalog-source-picker" aria-label="Mod 数据源">
+    <div className="catalog-source-picker">
       <SourceLaneView
         disabled={disabled}
         dragState={dragState}
@@ -161,7 +161,7 @@ export function ModSourcePicker({
         onResetDrag={resetDrag}
         onStartDrag={startDrag}
       />
-      <div className="catalog-source-divider" aria-hidden="true" />
+      <div className="catalog-source-divider" />
       <SourceLaneView
         disabled={disabled}
         dragState={dragState}
@@ -205,7 +205,6 @@ function SourceLaneView({
     <div
       className={`catalog-source-lane ${lane}${sources.length ? "" : " empty"}`}
       data-source-lane={lane}
-      aria-label={`${label}数据源`}
       onPointerMove={(event) => {
         if (!disabled && dragState) {
           event.preventDefault();
@@ -287,8 +286,6 @@ function SourceChip({
         }
         onCommitDrag(lane);
       }}
-      role="button"
-      tabIndex={disabled ? -1 : 0}
       title={`拖动调整 ${option.label}`}
     >
       <GripVertical size={13} />

@@ -165,10 +165,10 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
   );
 }
 
-function CatalogPagination(props: Omit<ComponentProps<typeof Pagination>, "ariaLabel">) {
+function CatalogPagination(props: ComponentProps<typeof Pagination>) {
   return (
     <div className="catalog-pagination">
-      <Pagination {...props} ariaLabel="目录结果分页" />
+      <Pagination {...props} />
     </div>
   );
 }
@@ -359,7 +359,7 @@ function CatalogDownloadSummary({ task }: { task: DownloadTask | null }) {
   const failed = modItems.filter((item) => ["downloadFailed", "installFailed", "cancelled", "skipped"].includes(item.status)).length;
   const done = modItems.filter((item) => item.status === "installed").length;
   return (
-    <div className="catalog-download-summary" aria-live="polite">
+    <div className="catalog-download-summary">
       <span>队列 {active}</span>
       <span>完成 {done}</span>
       <span>失败 {failed}</span>

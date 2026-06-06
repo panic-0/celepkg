@@ -137,14 +137,14 @@ export function RecordList({
   }, [records.length]);
 
   return (
-    <section className="ui-panel record-panel" aria-label={activeView === "maps" ? "地图列表" : "其他 Mod 列表"}>
+    <section className="ui-panel record-panel">
       <div className="list-header">
         <div className="record-list-heading">
           <div className="record-list-title">
             <h2>{title}</h2>
             <p>{`${records.length} / ${total} 个结果`}</p>
           </div>
-          <div className="record-view-switch" aria-label="本地内容类型">
+          <div className="record-view-switch">
             <button className={activeView === "maps" ? "active" : ""} onClick={() => onRecordViewChange("maps")}>
               地图
             </button>
@@ -233,12 +233,7 @@ export function RecordList({
         )}
         {!hasRecords && <RecordListEmpty activeView={activeView} loading={loading} loadingMessage={loadingMessage} />}
       </div>
-      <Pagination
-        ariaLabel={activeView === "maps" ? "地图列表分页" : "Mod 列表分页"}
-        page={pagedRecords.page}
-        pageCount={pagedRecords.pageCount}
-        onPageChange={setPage}
-      />
+      <Pagination page={pagedRecords.page} pageCount={pagedRecords.pageCount} onPageChange={setPage} />
     </section>
   );
 }
@@ -424,7 +419,6 @@ function MapTable({
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <RecordActionCell
                 enabled={enabled}
-                flagLabel="地图标记"
                 record={map}
                 toggleLabel="地图"
                 onFavoriteToggle={onFavoriteToggle}
@@ -517,7 +511,6 @@ function ModTable({
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <RecordActionCell
                 enabled={enabled}
-                flagLabel="Mod 标记"
                 record={modItem}
                 toggleLabel="Mod"
                 onFavoriteToggle={onFavoriteToggle}
@@ -549,7 +542,6 @@ function formatDependencyReferenceTitle(references: DependencyReference[]) {
 
 function RecordActionCell({
   enabled,
-  flagLabel,
   record,
   toggleLabel,
   onFavoriteToggle,
@@ -557,7 +549,6 @@ function RecordActionCell({
   onToggle
 }: {
   enabled: boolean;
-  flagLabel: string;
   record: ModRecord;
   toggleLabel: string;
   onFavoriteToggle: (record: ModRecord) => void;
@@ -573,7 +564,7 @@ function RecordActionCell({
           label={toggleLabel}
           onClick={() => onToggle(record)}
         />
-        <div className="record-flag-actions" aria-label={flagLabel}>
+        <div className="record-flag-actions">
           <FlagButton
             active={record.favorite}
             icon={<Star size={16} />}
@@ -695,7 +686,6 @@ function ToggleButton({
   const blocked = Boolean(blockedReason);
   return (
     <button
-      aria-disabled={blocked}
       className={`${enabled ? "record-toggle enabled" : "record-toggle disabled"}${blocked ? " blocked" : ""}`}
       onClick={(event) => {
         event.stopPropagation();

@@ -53,7 +53,7 @@ test("catalog install flow previews dependencies and queues the mock task", asyn
   await expect(entry).toBeVisible();
   await entry.getByRole("button", { name: "安装" }).click();
 
-  const previewDialog = page.getByRole("dialog", { name: "安装前依赖预览" });
+  const previewDialog = page.locator(".confirm-dialog", { hasText: "安装前依赖预览" });
   await expect(previewDialog).toBeVisible();
   await expect(previewDialog.locator(".dependency-tree")).toContainText("EverestCore");
   await expect(previewDialog.locator(".dependency-tree")).toContainText("CommunalHelper");
@@ -75,7 +75,7 @@ test("mock dependency tree update opens the tree preview", async ({ page }) => {
   await expect(rootRow).toHaveCount(1);
   await rootRow.getByRole("button", { name: "更新" }).click();
 
-  const previewDialog = page.getByRole("dialog", { name: "更新前依赖预览" });
+  const previewDialog = page.locator(".confirm-dialog", { hasText: "更新前依赖预览" });
   await expect(previewDialog).toBeVisible();
   await expect(previewDialog.locator(".dependency-tree")).toContainText("Mock Dependency Tree Outdated");
   await expect(previewDialog.locator(".dependency-tree")).toContainText("Mock Dependency Tree Missing");
@@ -110,13 +110,13 @@ test("backup manager creates, restores, and deletes mock backups", async ({ page
 
   const newestBackup = page.locator(".backup-item").first();
   await newestBackup.getByRole("button", { name: "还原启用状态" }).click();
-  const restoreDialog = page.getByRole("dialog", { name: "还原启用状态" });
+  const restoreDialog = page.locator(".confirm-dialog", { hasText: "还原启用状态" });
   await expect(restoreDialog).toBeVisible();
   await restoreDialog.getByRole("button", { name: "确认还原启用状态" }).click();
   await expect(page.getByText("已还原游戏文件。")).toBeVisible();
 
   await newestBackup.getByRole("button", { name: "删除" }).click();
-  const deleteDialog = page.getByRole("dialog", { name: "删除备份" });
+  const deleteDialog = page.locator(".confirm-dialog", { hasText: "删除备份" });
   await expect(deleteDialog).toBeVisible();
   await deleteDialog.getByRole("button", { name: "删除" }).click();
   await expect(page.getByText("已删除备份。")).toBeVisible();
@@ -131,7 +131,7 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
 
   await page.getByRole("button", { name: /更新全部/ }).click();
-  const updateDialog = page.getByRole("dialog", { name: "批量更新 Mod" });
+  const updateDialog = page.locator(".confirm-dialog", { hasText: "批量更新 Mod" });
   await expect(updateDialog).toBeVisible();
   await updateDialog.getByRole("button", { name: "更新全部" }).click();
 

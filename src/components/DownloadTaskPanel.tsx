@@ -34,7 +34,7 @@ export function DownloadTaskPanel({
   const canRetry = canRetryFailedTask(task);
 
   return (
-    <section className="download-task-panel" aria-label="下载任务" aria-live="polite">
+    <section className="download-task-panel">
       <div className="download-task-header">
         <strong>{`下载中 ${summary.downloading} · 等待安装 ${summary.waitingInstall} · 成功 ${summary.installed} · 失败 ${failureCount}`}</strong>
         <div className="download-task-actions">

@@ -14,11 +14,11 @@ export function IssueDrawer({ configWarnings, itemWarnings, open, scanWarnings, 
   const hasIssues = configWarnings.length > 0 || scanWarnings.length > 0 || itemWarnings.length > 0;
 
   return (
-    <div className="issue-drawer-backdrop" role="presentation">
-      <aside className="issue-drawer" role="dialog" aria-modal="true" aria-labelledby="issue-drawer-title">
+    <div className="issue-drawer-backdrop">
+      <aside className="issue-drawer">
         <header className="issue-drawer-header">
           <div>
-            <h2 id="issue-drawer-title">问题</h2>
+            <h2>问题</h2>
             <p>{hasIssues ? "这些信息需要处理或确认，重新加载配置/扫描后会刷新。" : "当前没有需要处理的问题。"}</p>
           </div>
           <button className="ui-icon-button icon-button" onClick={onClose} title="关闭问题面板">

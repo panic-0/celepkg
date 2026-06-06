@@ -39,9 +39,7 @@ export function AppToolbar({
     <header className="app-toolbar">
       <div className="brand-block">
         <strong>CelePkg</strong>
-        <span title={statusText} aria-label={statusText}>
-          {statusText}
-        </span>
+        <span title={statusText}>{statusText}</span>
       </div>
 
       <div className="toolbar-path">
@@ -55,7 +53,7 @@ export function AppToolbar({
         />
       </div>
 
-      <div className="toolbar-metrics" aria-label="当前扫描状态">
+      <div className="toolbar-metrics">
         <MetricPill icon={<CheckCircle2 size={14} />} label="完成" value={completedCount} />
         <MetricPill
           icon={<AlertTriangle size={14} />}

@@ -4,21 +4,20 @@ import { buildPageItems } from "../utils/pagination";
 type PaginationProps = {
   page: number;
   pageCount: number;
-  ariaLabel: string;
   onPageChange: (page: number) => void;
 };
 
-export function Pagination({ page, pageCount, ariaLabel, onPageChange }: PaginationProps) {
+export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
   const pageItems = buildPageItems(page, pageCount, 3);
   return (
-    <div className="pagination-bar" aria-label={ariaLabel}>
+    <div className="pagination-bar">
       <button className="ui-icon-button icon-button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} title="上一页">
         <ChevronLeft size={16} />
       </button>
       <div className="pagination-numbers">
         {pageItems.map((item, index) =>
           item === "ellipsis" ? (
-            <span className="pagination-ellipsis" key={`ellipsis-${index}`} aria-hidden="true">
+            <span className="pagination-ellipsis" key={`ellipsis-${index}`}>
               ...
             </span>
           ) : (
