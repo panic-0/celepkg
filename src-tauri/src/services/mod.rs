@@ -5,3 +5,4 @@ pub mod mod_catalog;
 mod mod_catalog_cache;
 pub mod profile;
 pub mod scan;
+mod scan_cache;
