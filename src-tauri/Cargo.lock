@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "celepkg"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "dirs",
  "quick-xml 0.37.5",
