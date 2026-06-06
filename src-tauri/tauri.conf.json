@@ -33,7 +33,7 @@
   "plugins": {
     "updater": {
       "endpoints": ["https://github.com/panic-0/celepkg/releases/latest/download/latest.json"],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU4QjIxMDBBQjE0Rjg0NDQKUldSRWhFK3hDaEN5NkUrNmpjYlNtczNnSDNSVjVnNTBSOTJMS0RGZnNZOVFIRDF6YnZPa0NrdjIK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5QTM3MTdFOTZFQzY1REEKUldUYVpleVdmbkdqS2NpenpsUzlmY2FVS3p3N1ZKelpscndqTy9yN0RXZ2VGL29UeXE1Q1JmSWIK"
     }
   }
 }
