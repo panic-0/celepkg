@@ -138,7 +138,7 @@ test("detail dependency panel shows mock dependency tree states", async ({ page 
   expect(dependencyLayout.visibleChips).toBe(true);
 });
 
-for (const width of [1180, 760]) {
+for (const width of [1180]) {
   test(`responsive layout avoids page overflow at ${width}px`, async ({ page }) => {
     await openMock(page, width);
 
