@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
+import { highlightTextParts, type HighlightRange } from "../utils/search";
 
 export function Select({
   label,
@@ -53,6 +54,22 @@ export function SearchBox({
         </button>
       )}
     </label>
+  );
+}
+
+export function HighlightedText({ ranges, text }: { ranges?: HighlightRange[]; text: string }) {
+  return (
+    <>
+      {highlightTextParts(text, ranges).map((part, index) =>
+        part.highlighted ? (
+          <mark className="search-highlight" key={`${part.text}-${index}`}>
+            {part.text}
+          </mark>
+        ) : (
+          <span key={`${part.text}-${index}`}>{part.text}</span>
+        )
+      )}
+    </>
   );
 }
 

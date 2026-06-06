@@ -2,6 +2,7 @@ import type { ModCatalogEntry, ModRecord } from "../types";
 import type { DownloadTask, DownloadTaskItem } from "./downloadTask";
 import { buildInstalledCatalogAliasSet, isCatalogEntryInstalled, normalizeDependencyName } from "./dependencies";
 import { DEFAULT_PAGE_SIZE, clampPage, paginateItems, type Page } from "./pagination";
+import { createSearchMatcher, matchSearchFields, type SearchField, type SearchMatch } from "./search";
 
 export type CatalogTypeFilter = "all" | string;
 export type CatalogSourceFilter = "all" | ModCatalogEntry["source"];
@@ -29,6 +30,7 @@ export type CatalogEntryView = {
   taskItem: DownloadTaskItem | null;
   type: string;
   typeLabel: string;
+  searchMatch: SearchMatch;
   relevance: number;
   originalIndex: number;
 };
@@ -42,9 +44,11 @@ export function buildCatalogEntryViews(
   query: string
 ): CatalogEntryView[] {
   const installedAliases = buildInstalledCatalogAliasSet(records);
+  const searchMatcher = createSearchMatcher(query);
   return entries.map((entry, originalIndex) => {
     const taskItem = findTaskItemForEntry(entry, task);
     const state = catalogEntryState(entry, installedAliases, taskItem);
+    const searchMatch = matchSearchFields(searchFieldsForCatalogEntry(entry), searchMatcher);
     return {
       entry,
       state,
@@ -55,7 +59,8 @@ export function buildCatalogEntryViews(
       taskItem,
       type: catalogEntryTypeKey(entry),
       typeLabel: catalogEntryTypeLabel(entry),
-      relevance: catalogEntryRelevance(entry, query),
+      searchMatch,
+      relevance: searchMatch.score,
       originalIndex
     };
   });
@@ -108,25 +113,7 @@ export function normalizeCatalogType(value: string) {
 }
 
 export function catalogEntryRelevance(entry: ModCatalogEntry, query: string) {
-  const normalizedQuery = normalizeDependencyName(query);
-  if (!normalizedQuery) return 0;
-  const normalizedName = normalizeDependencyName(entry.name);
-  if (normalizedName === normalizedQuery) return 400;
-  if (normalizedName.startsWith(normalizedQuery)) return 300;
-  if (normalizedName.includes(normalizedQuery)) return 200;
-  const haystack = normalizeDependencyName(
-    [
-      entry.version,
-      entry.gameBananaType,
-      entry.categoryName,
-      entry.subCategoryName,
-      entry.pageUrl,
-      entry.downloadUrl,
-      entry.gameBananaId?.toString() ?? "",
-      entry.gameBananaFileId?.toString() ?? ""
-    ].join(" ")
-  );
-  return haystack.includes(normalizedQuery) ? 100 : 0;
+  return matchSearchFields(searchFieldsForCatalogEntry(entry), createSearchMatcher(query)).score;
 }
 
 function catalogEntryState(entry: ModCatalogEntry, installedAliases: Set<string>, taskItem: DownloadTaskItem | null): CatalogEntryState {
@@ -161,4 +148,18 @@ function findTaskItemForEntry(entry: ModCatalogEntry, task: DownloadTask | null)
 
 function compareByOriginalIndex(left: CatalogEntryView, right: CatalogEntryView) {
   return left.originalIndex - right.originalIndex;
+}
+
+function searchFieldsForCatalogEntry(entry: ModCatalogEntry): SearchField[] {
+  return [
+    { key: "name", text: entry.name, weight: 12 },
+    { key: "version", text: entry.version, weight: 6 },
+    { key: "type", text: entry.gameBananaType, weight: 5 },
+    { key: "type", text: entry.categoryName, weight: 6 },
+    { key: "type", text: entry.subCategoryName, weight: 5 },
+    { key: "pageUrl", text: entry.pageUrl, weight: 2 },
+    { key: "downloadUrl", text: entry.downloadUrl, weight: 2 },
+    { key: "gameBananaId", text: entry.gameBananaId?.toString() ?? "", weight: 4 },
+    { key: "gameBananaFileId", text: entry.gameBananaFileId?.toString() ?? "", weight: 4 }
+  ];
 }

@@ -15,7 +15,8 @@ import {
   type CatalogPage,
   type CatalogSortKey
 } from "../utils/catalogView";
-import { DialogFacts, DialogShell, SearchBox, Select } from "./common";
+import { rangesForField } from "../utils/search";
+import { DialogFacts, DialogShell, HighlightedText, SearchBox, Select } from "./common";
 import { Pagination } from "./Pagination";
 
 type ModCatalogManagerProps = {
@@ -146,7 +147,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
                 onRetryFailed={onRetryFailed}
               />
             ))}
-            {!visibleViews.length && <EmptyCatalog text={searchResult.entries.length ? "没有符合筛选的目录结果。" : "暂无目录结果。"} />}
+            {!visibleViews.length && <EmptyCatalog text={emptyCatalogText(query, searchResult.entries.length)} />}
           </div>
           <CatalogPagination page={pagedViews.page} pageCount={pagedViews.pageCount} onPageChange={setPage} />
         </section>
@@ -245,12 +246,16 @@ function CatalogEntryRow({
       onClick={onOpenDetail}
     >
       <div className="catalog-row-main">
-        <strong title={entry.name}>{entry.name}</strong>
+        <strong title={entry.name}>
+          <HighlightedText ranges={rangesForField(view.searchMatch, "name")} text={entry.name} />
+        </strong>
         <span className="ui-chip">{sourceLabel(entry.source)}</span>
         <span className={`ui-chip catalog-state-chip ${view.state}`}>{catalogStateLabel(view)}</span>
       </div>
       <div className="catalog-row-meta">
-        <small>{entry.version || "无版本号"}</small>
+        <small>
+          <HighlightedText ranges={rangesForField(view.searchMatch, "version")} text={entry.version || "无版本号"} />
+        </small>
         <small>{catalogTypeLabel(view)}</small>
         <small>{formatSize(entry.size)}</small>
         <small>{formatCatalogTime(entry.lastUpdate)}</small>
@@ -386,6 +391,11 @@ function EmptyCatalog({ text }: { text: string }) {
       <p>{text}</p>
     </div>
   );
+}
+
+function emptyCatalogText(query: string, entryCount: number) {
+  if (!entryCount) return query.trim() ? "没有找到匹配的目录结果。" : "暂无目录结果。";
+  return "当前筛选条件下没有目录结果。";
 }
 
 function catalogStateLabel(view: CatalogEntryView) {

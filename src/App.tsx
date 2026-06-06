@@ -159,7 +159,9 @@ export function App() {
   const filters = useModFilters({
     enabledMapDraft: profileDraft.enabledMapDraft,
     enabledModDraft: profileDraft.enabledModDraft,
+    optionalReferencesByModId: dependencyReferences.optionalReferencesByModId,
     optionalReferencedModIds,
+    requiredReferencesByModId: dependencyReferences.requiredReferencesByModId,
     referencedModIds,
     scan
   });
@@ -410,6 +412,7 @@ export function App() {
             modUpdateChecking={modUpdateChecking}
             modUpdateCount={downloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
+            recordSearchMatches={filters.recordSearchMatches}
             requiredReferencesByModId={dependencyReferences.requiredReferencesByModId}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}

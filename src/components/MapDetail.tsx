@@ -5,6 +5,7 @@ import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
 import { buildLocalDependencyTree } from "../utils/dependencyTree";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
+import { createSearchMatcher, matchSearchFields, rangesForField, type SearchField, type SearchMatch } from "../utils/search";
 import { sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
 import {
@@ -15,7 +16,7 @@ import {
   subMapMatchesFolder
 } from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
-import { DetailStat, Info } from "./common";
+import { DetailStat, HighlightedText, Info } from "./common";
 import { DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
 import type { DependencyReference } from "../utils/dependencies";
 
@@ -71,14 +72,15 @@ export function MapDetail({
     () => (map ? collectSubMapFolderOptions(map.subMaps, effectiveSubMapPath) : []),
     [effectiveSubMapPath, map]
   );
+  const subMapSearchMatcher = useMemo(() => createSearchMatcher(subMapQuery), [subMapQuery]);
   const filteredSubMaps = useMemo(() => {
     if (!map) return [];
-    const needle = subMapQuery.trim().toLowerCase();
     const matchingSubMaps = map.subMaps.filter((subMap) => {
       if (!subMapMatchesFolder(subMap, effectiveSubMapPath)) return false;
-      if (!needle && subMapFolderOptions.length > 0 && !subMapIsDirectChildOfFolder(subMap, effectiveSubMapPath)) return false;
-      if (!needle) return true;
-      return [subMap.displayName, subMap.sid, subMap.chapter, subMap.filePath, subMap.difficulty].join(" ").toLowerCase().includes(needle);
+      if (!subMapSearchMatcher.active && subMapFolderOptions.length > 0 && !subMapIsDirectChildOfFolder(subMap, effectiveSubMapPath)) {
+        return false;
+      }
+      return matchSearchFields(searchFieldsForSubMap(subMap), subMapSearchMatcher).matched;
     });
     return sortSubMaps(matchingSubMaps, {
       descending: subMapSortDescending,
@@ -90,12 +92,20 @@ export function MapDetail({
     effectiveSubMapPath,
     groupSubMapsByDifficulty,
     map,
+    subMapSearchMatcher,
     strawberryDenominator,
     subMapFolderOptions.length,
-    subMapQuery,
     subMapSortDescending,
     subMapSortKey
   ]);
+  const subMapSearchMatches = useMemo(() => {
+    const matches = new Map<string, SearchMatch>();
+    if (!map) return matches;
+    for (const subMap of map.subMaps) {
+      matches.set(subMap.id, matchSearchFields(searchFieldsForSubMap(subMap), subMapSearchMatcher));
+    }
+    return matches;
+  }, [map, subMapSearchMatcher]);
   const selectedSubMap = useMemo(() => {
     if (!map) return undefined;
     return filteredSubMaps.find((subMap) => subMap.id === selectedSubMapId);
@@ -220,32 +230,43 @@ export function MapDetail({
                     </tr>
                   </thead>
                   <tbody>
-                    {subMapFolderOptions.map((folder) => {
-                      const summary = summarizeSubMapFolder(map.subMaps, folder.path, strawberryDenominator);
-                      return (
-                        <tr className="folder-row" key={folder.path} onClick={() => updateSubMapPath(folder.path)}>
-                          <td title={folder.path}>
-                            <span className="folder-row-content">
-                              <Folder size={16} />
-                              <strong>{folder.label}</strong>
-                              <small>{folder.count} 张</small>
-                            </span>
-                          </td>
-                          <td>{summary.completion}</td>
-                          <td className="num">{summary.deaths}</td>
-                          <td className="num">{summary.time}</td>
-                          <td className="num">{summary.strawberries}</td>
-                          <td>{summary.heartCassette}</td>
-                        </tr>
-                      );
-                    })}
+                    {!subMapSearchMatcher.active &&
+                      subMapFolderOptions.map((folder) => {
+                        const summary = summarizeSubMapFolder(map.subMaps, folder.path, strawberryDenominator);
+                        return (
+                          <tr className="folder-row" key={folder.path} onClick={() => updateSubMapPath(folder.path)}>
+                            <td title={folder.path}>
+                              <span className="folder-row-content">
+                                <Folder size={16} />
+                                <strong>{folder.label}</strong>
+                                <small>{folder.count} 张</small>
+                              </span>
+                            </td>
+                            <td>{summary.completion}</td>
+                            <td className="num">{summary.deaths}</td>
+                            <td className="num">{summary.time}</td>
+                            <td className="num">{summary.strawberries}</td>
+                            <td>{summary.heartCassette}</td>
+                          </tr>
+                        );
+                      })}
                     {filteredSubMaps.map((subMap) => (
                       <Fragment key={subMap.id}>
                         <tr className={selectedSubMap?.id === subMap.id ? "active" : ""} onClick={() => selectSubMap(subMap.id)}>
                           <td title={subMap.sid}>
                             <span className="sub-map-name-cell">
-                              <strong>{subMap.displayName || "未知"}</strong>
-                              <small>{subMapSidName(subMap.sid)}</small>
+                              <strong>
+                                <HighlightedText
+                                  ranges={rangesForField(subMapSearchMatches.get(subMap.id), "name")}
+                                  text={subMap.displayName || "未知"}
+                                />
+                              </strong>
+                              <small>
+                                <HighlightedText
+                                  ranges={rangesForField(subMapSearchMatches.get(subMap.id), "sidName")}
+                                  text={subMapSidName(subMap.sid)}
+                                />
+                              </small>
                             </span>
                           </td>
                           <td>{formatCompletionStatus(subMap.completionStatus)}</td>
@@ -427,6 +448,17 @@ function buildSubMapBreadcrumbs(activePath: string, rootPath: string) {
 
 function subMapSidName(sid: string) {
   return sid.split("/").filter(Boolean).at(-1) ?? sid;
+}
+
+function searchFieldsForSubMap(subMap: SubMapInfo): SearchField[] {
+  return [
+    { key: "name", text: subMap.displayName, weight: 10 },
+    { key: "sid", text: subMap.sid, weight: 8 },
+    { key: "sidName", text: subMapSidName(subMap.sid), weight: 8 },
+    { key: "chapter", text: subMap.chapter, weight: 6 },
+    { key: "filePath", text: subMap.filePath, weight: 6 },
+    { key: "difficulty", text: subMap.difficulty, weight: 4 }
+  ];
 }
 
 function LongList({ label, values, emptyText }: { label?: string; values: string[]; emptyText: string }) {

@@ -1,17 +1,29 @@
 import { useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
+import type { DependencyReference } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
+import { createSearchMatcher, matchSearchFields, type SearchField, type SearchMatch } from "../utils/search";
 
 type ModFiltersOptions = {
   enabledMapDraft: Set<string>;
   enabledModDraft: Set<string>;
+  optionalReferencesByModId: Map<string, DependencyReference[]>;
   optionalReferencedModIds: Set<string>;
+  requiredReferencesByModId: Map<string, DependencyReference[]>;
   referencedModIds: Set<string>;
   scan: ScanResult;
 };
 
-export function useModFilters({ enabledMapDraft, enabledModDraft, optionalReferencedModIds, referencedModIds, scan }: ModFiltersOptions) {
+export function useModFilters({
+  enabledMapDraft,
+  enabledModDraft,
+  optionalReferencesByModId,
+  optionalReferencedModIds,
+  requiredReferencesByModId,
+  referencedModIds,
+  scan
+}: ModFiltersOptions) {
   const [query, setQuery] = useState("");
   const [mapEnabledFilter, setMapEnabledFilter] = useState<EnabledFilter>("all");
   const [mapProgressFilter, setMapProgressFilter] = useState<ProgressFilter>("all");
@@ -26,62 +38,84 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, optionalRefere
     () => (showHelperMaps ? [...scan.maps, ...helperMapMods] : scan.maps),
     [helperMapMods, scan.maps, showHelperMaps]
   );
+  const searchMatcher = useMemo(() => createSearchMatcher(query), [query]);
 
   const filteredMaps = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const maps = visibleMapRecords.filter((map) => {
-      const draftEnabled = isDraftEnabled(map, enabledMapDraft, enabledModDraft);
-      if (mapEnabledFilter === "enabled" && !draftEnabled) return false;
-      if (mapEnabledFilter === "disabled" && draftEnabled) return false;
-      if (mapProgressFilter === "completed" && map.completionStatus !== "completed") return false;
-      if (mapProgressFilter === "unfinished" && map.completionStatus !== "unfinished") return false;
-      if (mapProgressFilter === "withStats" && !map.stats) return false;
-      if (mapProgressFilter === "warnings" && !map.warnings.length) return false;
-      if (!normalizedQuery) return true;
-      return mapSearchText(map).includes(normalizedQuery);
-    });
-    return [...maps].sort((a, b) => {
-      if (mapSortKey === "deaths") return (b.stats?.deaths ?? -1) - (a.stats?.deaths ?? -1);
-      if (mapSortKey === "time") return (b.stats?.timePlayed ?? -1) - (a.stats?.timePlayed ?? -1);
-      if (mapSortKey === "strawberries") return strawberrySortValue(b) - strawberrySortValue(a);
-      return a.name.localeCompare(b.name, "zh-Hans-CN");
-    });
-  }, [enabledMapDraft, enabledModDraft, mapEnabledFilter, mapProgressFilter, mapSortKey, query, visibleMapRecords]);
+    const maps = visibleMapRecords
+      .map((map) => ({ match: matchSearchFields(searchFieldsForMap(map), searchMatcher), record: map }))
+      .filter(({ match, record: map }) => {
+        const draftEnabled = isDraftEnabled(map, enabledMapDraft, enabledModDraft);
+        if (mapEnabledFilter === "enabled" && !draftEnabled) return false;
+        if (mapEnabledFilter === "disabled" && draftEnabled) return false;
+        if (mapProgressFilter === "completed" && map.completionStatus !== "completed") return false;
+        if (mapProgressFilter === "unfinished" && map.completionStatus !== "unfinished") return false;
+        if (mapProgressFilter === "withStats" && !map.stats) return false;
+        if (mapProgressFilter === "warnings" && !map.warnings.length) return false;
+        return match.matched;
+      });
+    return [...maps]
+      .sort((a, b) => {
+        if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
+        return compareMaps(a.record, b.record, mapSortKey);
+      })
+      .map((item) => item.record);
+  }, [enabledMapDraft, enabledModDraft, mapEnabledFilter, mapProgressFilter, mapSortKey, searchMatcher, visibleMapRecords]);
 
   const filteredMods = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const mods = scan.otherMods.filter((modItem) => {
-      const draftEnabled = modItem.readOnly || enabledModDraft.has(modItem.id);
-      if (modEnabledFilter === "enabled" && !draftEnabled) return false;
-      if (modEnabledFilter === "disabled" && draftEnabled) return false;
-      if (modProgressFilter === "warnings" && !modItem.warnings.length) return false;
-      const isReferenced = referencedModIds.has(modItem.id);
-      const isOptionalReferenced = optionalReferencedModIds.has(modItem.id);
-      if (modReferenceFilter === "unreferenced" && isReferenced && !modItem.favorite) return false;
-      if (modReferenceFilter === "unreferencedAndOptional" && (isReferenced || isOptionalReferenced) && !modItem.favorite) return false;
-      if (!normalizedQuery) return true;
-      return [
-        modItem.name,
-        modItem.fileName,
-        modItem.metadata.author,
-        modItem.metadata.description,
-        ...modItem.dependencies.map((dependency) => dependency.name)
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedQuery);
-    });
-    return [...mods].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+    const mods = scan.otherMods
+      .map((modItem) => ({
+        match: matchSearchFields(
+          searchFieldsForMod(modItem, requiredReferencesByModId.get(modItem.id) ?? [], optionalReferencesByModId.get(modItem.id) ?? []),
+          searchMatcher
+        ),
+        record: modItem
+      }))
+      .filter(({ match, record: modItem }) => {
+        const draftEnabled = modItem.readOnly || enabledModDraft.has(modItem.id);
+        if (modEnabledFilter === "enabled" && !draftEnabled) return false;
+        if (modEnabledFilter === "disabled" && draftEnabled) return false;
+        if (modProgressFilter === "warnings" && !modItem.warnings.length) return false;
+        const isReferenced = referencedModIds.has(modItem.id);
+        const isOptionalReferenced = optionalReferencedModIds.has(modItem.id);
+        if (modReferenceFilter === "unreferenced" && isReferenced && !modItem.favorite) return false;
+        if (modReferenceFilter === "unreferencedAndOptional" && (isReferenced || isOptionalReferenced) && !modItem.favorite) return false;
+        return match.matched;
+      });
+    return [...mods]
+      .sort((a, b) => {
+        if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
+        return a.record.name.localeCompare(b.record.name, "zh-Hans-CN");
+      })
+      .map((item) => item.record);
   }, [
     enabledModDraft,
     modEnabledFilter,
     modProgressFilter,
     modReferenceFilter,
+    optionalReferencesByModId,
     optionalReferencedModIds,
-    query,
     referencedModIds,
+    requiredReferencesByModId,
+    searchMatcher,
     scan.otherMods
   ]);
+
+  const recordSearchMatches = useMemo(() => {
+    const matches = new Map<string, SearchMatch>();
+    for (const map of visibleMapRecords) {
+      matches.set(map.id, matchSearchFields(searchFieldsForMap(map), searchMatcher));
+    }
+    for (const modItem of scan.otherMods) {
+      matches.set(
+        modItem.id,
+        matchSearchFields(
+          searchFieldsForMod(modItem, requiredReferencesByModId.get(modItem.id) ?? [], optionalReferencesByModId.get(modItem.id) ?? []),
+          searchMatcher
+        )
+      );
+    }
+    return matches;
+  }, [optionalReferencesByModId, requiredReferencesByModId, scan.otherMods, searchMatcher, visibleMapRecords]);
 
   return {
     filteredMaps,
@@ -94,6 +128,7 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, optionalRefere
     modProgressFilter,
     modReferenceFilter,
     query,
+    recordSearchMatches,
     referencedModIds,
     setMapEnabledFilter,
     setMapProgressFilter,
@@ -112,15 +147,53 @@ function strawberrySortValue(record: { stats: { strawberries: number; strawberri
   return record.stats?.strawberriesKnown ? record.stats.strawberries : -1;
 }
 
-function mapSearchText(map: ModRecord) {
+function compareMaps(left: ModRecord, right: ModRecord, sortKey: SortKey) {
+  if (sortKey === "deaths") return (right.stats?.deaths ?? -1) - (left.stats?.deaths ?? -1);
+  if (sortKey === "time") return (right.stats?.timePlayed ?? -1) - (left.stats?.timePlayed ?? -1);
+  if (sortKey === "strawberries") return strawberrySortValue(right) - strawberrySortValue(left);
+  return left.name.localeCompare(right.name, "zh-Hans-CN");
+}
+
+function searchFieldsForMap(map: ModRecord): SearchField[] {
   return [
-    map.name,
-    map.fileName,
-    map.metadata.author,
-    map.metadata.description,
-    ...map.mapIds,
-    ...map.subMaps.map((subMap) => `${subMap.displayName} ${subMap.chapter} ${subMap.filePath} ${subMap.difficulty}`)
-  ]
-    .join(" ")
-    .toLowerCase();
+    { key: "name", text: map.name, weight: 12 },
+    { key: "metadataName", text: map.metadata.name, weight: 10 },
+    { key: "version", text: map.metadata.version, weight: 4 },
+    { key: "fileName", text: map.fileName, weight: 8 },
+    { key: "relativePath", text: map.relativePath, weight: 8 },
+    { key: "author", text: map.metadata.author, weight: 5 },
+    { key: "description", text: map.metadata.description, weight: 2 },
+    ...map.mapIds.map((sid) => ({ key: "sid", text: sid, weight: 8 })),
+    ...map.subMaps.flatMap((subMap) => [
+      { key: "subMapName", text: subMap.displayName, weight: 7 },
+      { key: "subMapSid", text: subMap.sid, weight: 7 },
+      { key: "subMapChapter", text: subMap.chapter, weight: 5 },
+      { key: "subMapPath", text: subMap.filePath, weight: 5 },
+      { key: "subMapDifficulty", text: subMap.difficulty, weight: 4 }
+    ]),
+    ...map.dependencies.map((dependency) => ({ key: "dependency", text: dependency.name, weight: 6 })),
+    ...map.optionalDependencies.map((dependency) => ({ key: "optionalDependency", text: dependency.name, weight: 4 })),
+    ...map.warnings.map((warning) => ({ key: "warning", text: warning, weight: 2 }))
+  ];
+}
+
+function searchFieldsForMod(
+  modItem: ModRecord,
+  requiredReferences: DependencyReference[],
+  optionalReferences: DependencyReference[]
+): SearchField[] {
+  return [
+    { key: "name", text: modItem.name, weight: 12 },
+    { key: "metadataName", text: modItem.metadata.name, weight: 10 },
+    { key: "version", text: modItem.metadata.version, weight: 4 },
+    { key: "fileName", text: modItem.fileName, weight: 8 },
+    { key: "relativePath", text: modItem.relativePath, weight: 8 },
+    { key: "author", text: modItem.metadata.author, weight: 5 },
+    { key: "description", text: modItem.metadata.description, weight: 2 },
+    ...modItem.dependencies.map((dependency) => ({ key: "dependency", text: dependency.name, weight: 6 })),
+    ...modItem.optionalDependencies.map((dependency) => ({ key: "optionalDependency", text: dependency.name, weight: 4 })),
+    ...requiredReferences.map((reference) => ({ key: "reference", text: reference.name, weight: 4 })),
+    ...optionalReferences.map((reference) => ({ key: "optionalReference", text: reference.name, weight: 3 })),
+    ...modItem.warnings.map((warning) => ({ key: "warning", text: warning, weight: 2 }))
+  ];
 }

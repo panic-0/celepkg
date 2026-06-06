@@ -279,6 +279,13 @@ h1 {
   word-break: break-word;
 }
 
+.search-highlight {
+  border-radius: 3px;
+  background: #fff0a8;
+  color: inherit;
+  padding: 0 1px;
+}
+
 .cache-rescan-button {
   min-width: 106px;
   gap: var(--space-sm);

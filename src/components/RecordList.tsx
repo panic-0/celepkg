@@ -19,9 +19,10 @@ import type { DependencyReference } from "../utils/dependencies";
 import { formatCompletionStatus, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
 import { formatModUpdateVersionChange } from "../utils/modUpdateTask";
 import { clampPage, paginateItems } from "../utils/pagination";
+import { rangesForField, type SearchMatch } from "../utils/search";
 import type { ActiveView, EnabledFilter, ProgressFilter, ReferenceFilter, SortKey, StrawberryDenominator } from "../viewTypes";
 import { Pagination } from "./Pagination";
-import { SearchBox, Select } from "./common";
+import { HighlightedText, SearchBox, Select } from "./common";
 
 type RecordView = Extract<ActiveView, "maps" | "mods">;
 
@@ -46,6 +47,7 @@ type RecordListProps = {
   modUpdateChecking: boolean;
   modUpdateCount: number;
   modUpdatesByRecordId: Map<string, ModUpdateCandidate>;
+  recordSearchMatches: Map<string, SearchMatch>;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
   visibleMapCount: number;
   modCount: number;
@@ -92,6 +94,7 @@ export function RecordList({
   modUpdateChecking,
   modUpdateCount,
   modUpdatesByRecordId,
+  recordSearchMatches,
   requiredReferencesByModId,
   visibleMapCount,
   modCount,
@@ -208,6 +211,7 @@ export function RecordList({
             showWarningColumn={showWarningColumn}
             strawberryDenominator={strawberryDenominator}
             isEnabled={isMapEnabled}
+            searchMatches={recordSearchMatches}
             updatesByRecordId={modUpdatesByRecordId}
             onUpdate={onModUpdate}
           />
@@ -223,6 +227,7 @@ export function RecordList({
             isEnabled={isModEnabled}
             updatesByRecordId={modUpdatesByRecordId}
             requiredReferencesByModId={requiredReferencesByModId}
+            searchMatches={recordSearchMatches}
             onUpdate={onModUpdate}
           />
         )}
@@ -361,6 +366,7 @@ function MapTable({
   strawberryDenominator,
   isEnabled,
   updatesByRecordId,
+  searchMatches,
   onUpdate
 }: {
   maps: ModRecord[];
@@ -372,6 +378,7 @@ function MapTable({
   showWarningColumn: boolean;
   strawberryDenominator: StrawberryDenominator;
   isEnabled: (record: ModRecord) => boolean;
+  searchMatches: Map<string, SearchMatch>;
   updatesByRecordId: Map<string, ModUpdateCandidate>;
   onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
@@ -411,6 +418,7 @@ function MapTable({
       <tbody>
         {maps.map((map) => {
           const enabled = isEnabled(map);
+          const searchMatch = searchMatches.get(map.id);
           const updateCandidate = updatesByRecordId.get(map.id);
           return (
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
@@ -423,7 +431,7 @@ function MapTable({
                 onProtectedToggle={onProtectedToggle}
                 onToggle={onToggle}
               />
-              <RecordNameCell record={map} updateCandidate={updateCandidate} onUpdate={onUpdate}>
+              <RecordNameCell record={map} searchMatch={searchMatch} updateCandidate={updateCandidate} onUpdate={onUpdate}>
                 <div className="inline-pills">
                   {map.readOnly && <span>官图</span>}
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
@@ -461,6 +469,7 @@ function ModTable({
   isEnabled,
   updatesByRecordId,
   requiredReferencesByModId,
+  searchMatches,
   onUpdate
 }: {
   mods: ModRecord[];
@@ -473,6 +482,7 @@ function ModTable({
   isEnabled: (id: string) => boolean;
   updatesByRecordId: Map<string, ModUpdateCandidate>;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
+  searchMatches: Map<string, SearchMatch>;
   onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
@@ -500,6 +510,7 @@ function ModTable({
       <tbody>
         {mods.map((modItem) => {
           const enabled = isEnabled(modItem.id);
+          const searchMatch = searchMatches.get(modItem.id);
           const updateCandidate = updatesByRecordId.get(modItem.id);
           const requiredReferences = requiredReferencesByModId.get(modItem.id) ?? [];
           return (
@@ -513,7 +524,7 @@ function ModTable({
                 onProtectedToggle={onProtectedToggle}
                 onToggle={onToggle}
               />
-              <RecordNameCell record={modItem} updateCandidate={updateCandidate} onUpdate={onUpdate} />
+              <RecordNameCell record={modItem} searchMatch={searchMatch} updateCandidate={updateCandidate} onUpdate={onUpdate} />
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
               <td className="num" title={formatDependencyReferenceTitle(requiredReferences)}>
@@ -587,21 +598,25 @@ function RecordActionCell({
 function RecordNameCell({
   children,
   record,
+  searchMatch,
   updateCandidate,
   onUpdate
 }: {
   children?: React.ReactNode;
   record: ModRecord;
+  searchMatch?: SearchMatch;
   updateCandidate?: ModUpdateCandidate;
   onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
     <td className="name-cell">
       <div className="name-title-row">
-        <strong title={record.name}>{record.name}</strong>
+        <strong title={record.name}>
+          <HighlightedText ranges={rangesForField(searchMatch, "name")} text={record.name} />
+        </strong>
         {record.metadata.version && (
           <span className="version-text" title={record.metadata.version}>
-            {record.metadata.version}
+            <HighlightedText ranges={rangesForField(searchMatch, "version")} text={record.metadata.version} />
           </span>
         )}
         {updateCandidate && (

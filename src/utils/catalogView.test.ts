@@ -128,6 +128,21 @@ describe("catalog view model", () => {
     ]);
   });
 
+  it("scores catalog relevance from categories and GameBanana ids", () => {
+    const views = buildCatalogEntryViews(
+      [
+        entry("Plain Helper", { categoryName: "Helpers", gameBananaId: 100 }),
+        entry("Map Pack", { categoryName: "Maps", gameBananaId: 4242 })
+      ],
+      [],
+      null,
+      "maps 4242"
+    );
+
+    expect(sortCatalogEntryViews(views, "relevance").map((view) => view.entry.name)).toEqual(["Map Pack", "Plain Helper"]);
+    expect(views.find((view) => view.entry.name === "Map Pack")?.searchMatch.matched).toBe(true);
+  });
+
   it("sorts by update time, name, and size", () => {
     const views = buildCatalogEntryViews(
       [entry("B", { lastUpdate: 1, size: 10 }), entry("A", { lastUpdate: 3, size: 30 }), entry("C", { lastUpdate: 2, size: 20 })],
