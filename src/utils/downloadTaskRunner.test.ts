@@ -256,6 +256,43 @@ describe("download task runner", () => {
     expect(started).toEqual(["mod-1", "mod-1", "mod-2"]);
   });
 
+  it("cleans staged files when a paused download returns successfully", async () => {
+    const first = deferred<ReturnType<typeof staged>>();
+    const cleaned: string[] = [];
+    let attempts = 0;
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          download: async () => {
+            attempts += 1;
+            if (attempts > 1) return staged("mod-1-retry");
+            return await first.promise;
+          },
+          cleanupStaged: async (item) => {
+            cleaned.push(item.stagedId);
+          }
+        })
+      ],
+      { concurrencyLimit: 1, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const done = runner.start();
+    await Promise.resolve();
+    await runner.pauseDownloads();
+    first.resolve(staged("mod-1-first"));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+
+    expect(cleaned).toEqual(["mod-1-first.download"]);
+    expect(runner.snapshot().items[0].status).toBe("queued");
+
+    runner.resumeDownloads();
+    const result = await done;
+
+    expect(result.status).toBe("done");
+    expect(attempts).toBe(2);
+  });
+
   it("honors initial paused downloads before starting a new task", async () => {
     const started: string[] = [];
     const runner = new DownloadTaskRunner(
@@ -427,6 +464,33 @@ describe("download task runner", () => {
       ["mod-1", "cancelled", "已取消下载"],
       ["mod-2", "cancelled", "已取消下载"]
     ]);
+  });
+
+  it("cleans staged files when a cancelled download returns successfully", async () => {
+    const first = deferred<ReturnType<typeof staged>>();
+    const cleaned: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("mod-1", {
+          download: async () => await first.promise,
+          cleanupStaged: async (item) => {
+            cleaned.push(item.stagedId);
+          }
+        })
+      ],
+      { concurrencyLimit: 1, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const done = runner.start();
+    await Promise.resolve();
+    await runner.cancelPendingDownloads();
+    first.resolve(staged("mod-1-cancelled"));
+    const result = await done;
+
+    expect(cleaned).toEqual(["mod-1-cancelled.download"]);
+    expect(result.status).toBe("cancelled");
+    expect(result.items[0]).toMatchObject({ id: "mod-1", status: "cancelled", error: "已取消下载" });
   });
 
   it("cancels current install queue without pausing future installs", async () => {

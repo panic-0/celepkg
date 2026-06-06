@@ -15,6 +15,7 @@ import {
 export type ExecutableDownloadTaskItem = DownloadTaskItem & {
   download: (operationId: string, taskIndex: number, taskTotal: number) => Promise<StagedDownload>;
   prepareInstall?: (staged: StagedDownload) => Promise<ExecutableDownloadTaskItem[]>;
+  cleanupStaged?: (staged: StagedDownload) => Promise<unknown>;
   install: (staged: StagedDownload) => Promise<void>;
 };
 
@@ -46,7 +47,8 @@ export class DownloadTaskRunner {
     this.options = options;
     this.task = createDownloadTask(
       id,
-      items.map(({ download, prepareInstall, install, ...item }) => {
+      items.map(({ cleanupStaged, download, prepareInstall, install, ...item }) => {
+        void cleanupStaged;
         void download;
         void prepareInstall;
         void install;
@@ -174,6 +176,7 @@ export class DownloadTaskRunner {
     try {
       const staged = await executable.download(operationId, taskIndex, taskTotal);
       if (this.cancelledDownloadItemIds.has(itemId)) {
+        await this.cleanupStagedDownload(executable, staged);
         this.updateItem(itemId, (item) => ({
           ...item,
           status: "cancelled",
@@ -182,6 +185,7 @@ export class DownloadTaskRunner {
           error: "已取消下载"
         }));
       } else if (this.pausedDownloadItemIds.has(itemId)) {
+        await this.cleanupStagedDownload(executable, staged);
         this.pausedDownloadItemIds.delete(itemId);
         this.updateItem(itemId, (item) => ({ ...item, status: "queued", operationId: undefined, progress: undefined }));
       } else {
@@ -299,7 +303,8 @@ export class DownloadTaskRunner {
       ...this.task,
       items: [
         ...this.task.items,
-        ...newItems.map(({ download, prepareInstall, install, ...item }) => {
+        ...newItems.map(({ cleanupStaged, download, prepareInstall, install, ...item }) => {
+          void cleanupStaged;
           void download;
           void prepareInstall;
           void install;
@@ -325,6 +330,14 @@ export class DownloadTaskRunner {
         };
       })
     });
+  }
+
+  private async cleanupStagedDownload(executable: ExecutableDownloadTaskItem, staged: StagedDownload) {
+    try {
+      await executable.cleanupStaged?.(staged);
+    } catch {
+      // Best-effort cleanup keeps cancellation and pause semantics stable.
+    }
   }
 
   private updateItemByOperation(operationId: string, update: (item: DownloadTaskItem) => DownloadTaskItem) {

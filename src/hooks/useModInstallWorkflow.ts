@@ -234,6 +234,7 @@ export function useModInstallWorkflow({
         {
           ...descriptor,
           download: (operationId) => downloadEverestToStaging(celestePath, release, operationId),
+          cleanupStaged: cleanupStagedDownload,
           install: async (staged) => {
             const result = await installStagedEverest(celestePath, staged.stagedId, release);
             setScan(result.scan);
@@ -324,6 +325,7 @@ export function useModInstallWorkflow({
       download: prepared
         ? async () => prepared.staged
         : (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
+      cleanupStaged: cleanupStagedDownload,
       prepareInstall: prepared
         ? async () => prepared.dependencies
         : async (staged) => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新", staged),
@@ -347,6 +349,7 @@ export function useModInstallWorkflow({
       download: prepared
         ? async () => prepared.staged
         : (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
+      cleanupStaged: cleanupStagedDownload,
       prepareInstall: prepared
         ? async () => prepared.dependencies
         : async (staged) => await prepareDependencyItems(entry, entry.name, "安装", staged),
@@ -362,6 +365,7 @@ export function useModInstallWorkflow({
     return {
       ...descriptor,
       download: (operationId) => downloadEverestToStaging(celestePath, release, operationId),
+      cleanupStaged: cleanupStagedDownload,
       install: async (staged) => {
         const result = await installStagedEverest(celestePath, staged.stagedId, release);
         setScan(result.scan);
@@ -724,6 +728,10 @@ export function useModInstallWorkflow({
 
   async function cleanupStagedDownloads(staged: StagedDownload[]) {
     await Promise.allSettled(staged.map((item) => deleteStagedDownload(celestePath, item.stagedId)));
+  }
+
+  async function cleanupStagedDownload(staged: StagedDownload) {
+    await deleteStagedDownload(celestePath, staged.stagedId);
   }
 
   async function prepareDependencyItems(
