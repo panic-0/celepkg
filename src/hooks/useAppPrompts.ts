@@ -1,10 +1,17 @@
 import { useState } from "react";
-import type { AppConfirmPromptState, DependencyPromptState, EverestDependencyPromptState } from "../components/AppDialogs";
+import type {
+  AppConfirmPromptState,
+  DependencyPromptState,
+  DependencyTreePromptState,
+  EverestDependencyPromptState
+} from "../components/AppDialogs";
 import type { DependencyUpdateChoice, EverestDependencyChoice } from "../utils/appDependencyResolution";
+import type { DependencyTreePreviewChoice } from "../utils/dependencyTree";
 
 export function useAppPrompts() {
   const [confirmPrompt, setConfirmPrompt] = useState<AppConfirmPromptState | null>(null);
   const [dependencyPrompt, setDependencyPrompt] = useState<DependencyPromptState | null>(null);
+  const [dependencyTreePrompt, setDependencyTreePrompt] = useState<DependencyTreePromptState | null>(null);
   const [everestDependencyPrompt, setEverestDependencyPrompt] = useState<EverestDependencyPromptState | null>(null);
 
   function requestDependencyChoice(
@@ -23,6 +30,12 @@ export function useAppPrompts() {
     });
   }
 
+  function requestDependencyTreeChoice(prompt: Omit<DependencyTreePromptState, "resolve">) {
+    return new Promise<DependencyTreePreviewChoice | null>((resolve) => {
+      setDependencyTreePrompt({ ...prompt, resolve });
+    });
+  }
+
   function requestAppConfirm(prompt: Omit<AppConfirmPromptState, "resolve">) {
     return new Promise<boolean>((resolve) => {
       setConfirmPrompt({ ...prompt, resolve });
@@ -32,6 +45,11 @@ export function useAppPrompts() {
   function closeDependencyPrompt(choice: DependencyUpdateChoice | null) {
     dependencyPrompt?.resolve(choice);
     setDependencyPrompt(null);
+  }
+
+  function closeDependencyTreePrompt(choice: DependencyTreePreviewChoice | null) {
+    dependencyTreePrompt?.resolve(choice);
+    setDependencyTreePrompt(null);
   }
 
   function closeEverestDependencyPrompt(choice: EverestDependencyChoice | null) {
@@ -47,12 +65,15 @@ export function useAppPrompts() {
   return {
     closeConfirmPrompt,
     closeDependencyPrompt,
+    closeDependencyTreePrompt,
     closeEverestDependencyPrompt,
     confirmPrompt,
     dependencyPrompt,
+    dependencyTreePrompt,
     everestDependencyPrompt,
     requestAppConfirm,
     requestDependencyChoice,
+    requestDependencyTreeChoice,
     requestEverestDependencyChoice
   };
 }

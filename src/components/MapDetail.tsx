@@ -3,6 +3,7 @@ import { Fragment, useMemo } from "react";
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
+import { buildLocalDependencyTree } from "../utils/dependencyTree";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
 import { sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
@@ -15,11 +16,12 @@ import {
 } from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, Info } from "./common";
-import { DependencyReferenceList, LongValue, TabButton } from "./detailCommon";
+import { DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
 import type { DependencyReference } from "../utils/dependencies";
 
 type MapDetailProps = {
   activeTab: MapDetailTab;
+  allRecords: ModRecord[];
   draftEnabled: boolean;
   map?: ModRecord;
   mapDetailControls: MapDetailControls;
@@ -34,6 +36,7 @@ type MapDetailProps = {
 
 export function MapDetail({
   activeTab,
+  allRecords,
   draftEnabled,
   map,
   mapDetailControls,
@@ -47,6 +50,7 @@ export function MapDetail({
 }: MapDetailProps) {
   const mapId = map?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:${activeTab}:panel`, scrollMemory);
+  const dependencyTree = map ? buildLocalDependencyTree(map, allRecords) : null;
   const subMapTableRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:submaps:table`, scrollMemory);
   const {
     effectiveSubMapPath,
@@ -308,7 +312,15 @@ export function MapDetail({
             <LongList label="SID" values={map.mapIds} emptyText="无" />
           </section>
           <section className="detail-section">
-            <h3>依赖</h3>
+            <h3>依赖树</h3>
+            {dependencyTree && dependencyTree.children.length ? (
+              <DependencyTreeView nodes={dependencyTree.children} />
+            ) : (
+              <p className="muted">没有声明依赖。</p>
+            )}
+          </section>
+          <section className="detail-section">
+            <h3>直接依赖</h3>
             {map.dependencies.length ? (
               <div className="dependency-list">
                 {map.dependencies.map((dependency) => (

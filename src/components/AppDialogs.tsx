@@ -1,5 +1,7 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
+import { useState } from "react";
 import { DialogFacts, DialogShell, type DialogFact } from "./common";
+import { DependencyTreeView } from "./detailCommon";
 import {
   formatDependencyIssue,
   type DependencyActionLabel,
@@ -9,6 +11,7 @@ import {
 } from "../utils/appDependencyResolution";
 import { formatEverestBuildVersion } from "../utils/everestDependency";
 import type { EverestRelease } from "../types";
+import type { DependencyTreeNode, DependencyTreePreviewChoice } from "../utils/dependencyTree";
 
 export type AppConfirmPromptState = {
   cancelLabel?: string;
@@ -26,6 +29,16 @@ export type DependencyPromptState = {
   issues: DependencyIssue[];
   resolve: (choice: DependencyUpdateChoice | null) => void;
   targetName: string;
+};
+
+export type DependencyTreePromptState = {
+  actionLabel: DependencyActionLabel;
+  plannedCount: number;
+  resolve: (choice: DependencyTreePreviewChoice | null) => void;
+  stagedCount: number;
+  targetName: string;
+  tree: DependencyTreeNode;
+  unavailableCount: number;
 };
 
 export type EverestDependencyPromptState = {
@@ -122,4 +135,59 @@ export function DependencyUpdateDialog({
       </div>
     </DialogShell>
   );
+}
+
+export function DependencyTreePreviewDialog({
+  prompt,
+  onClose
+}: {
+  prompt: DependencyTreePromptState;
+  onClose: (choice: DependencyTreePreviewChoice | null) => void;
+}) {
+  const defaultSelected = collectSelectedOptionalIds(prompt.tree);
+  const [selectedOptionalIds, setSelectedOptionalIds] = useState(defaultSelected);
+  const continueVariant = prompt.unavailableCount ? "danger" : "primary";
+
+  function toggleOptional(nodeId: string, selected: boolean) {
+    setSelectedOptionalIds((current) => {
+      const next = new Set(current);
+      if (selected) next.add(nodeId);
+      else next.delete(nodeId);
+      return next;
+    });
+  }
+
+  return (
+    <DialogShell
+      actions={[
+        { label: "取消", onClick: () => onClose(null) },
+        {
+          label: prompt.actionLabel === "安装" ? "继续安装" : "继续更新",
+          onClick: () => onClose({ selectedOptionalIds }),
+          variant: continueVariant
+        }
+      ]}
+      className="dependency-tree-dialog"
+      icon={<LoaderCircle size={18} />}
+      onClose={() => onClose(null)}
+      title={`${prompt.actionLabel}前依赖预览`}
+    >
+      <p>{`${prompt.targetName} 将复用已下载的预览包；计划处理 ${prompt.plannedCount} 个依赖，已暂存 ${prompt.stagedCount} 个安装包。`}</p>
+      {prompt.unavailableCount > 0 && (
+        <p className="warning-text">{`有 ${prompt.unavailableCount} 个依赖无法自动安装或更新，继续后目标 Mod 可能无法正常运行。`}</p>
+      )}
+      <DependencyTreeView nodes={[prompt.tree]} selectedOptionalIds={selectedOptionalIds} onOptionalToggle={toggleOptional} />
+    </DialogShell>
+  );
+}
+
+function collectSelectedOptionalIds(node: DependencyTreeNode) {
+  const selected = new Set<string>();
+  visit(node);
+  return selected;
+
+  function visit(current: DependencyTreeNode) {
+    if (current.kind === "optional" && current.selected) selected.add(current.id);
+    for (const child of current.children) visit(child);
+  }
 }

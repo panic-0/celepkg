@@ -257,6 +257,36 @@ pub fn download_to_staging(
     })
 }
 
+pub fn stage_preview(
+    celeste_path: &Path,
+    entry: &ModCatalogEntry,
+    reporter: ModDownloadReporter<'_>,
+) -> Result<crate::domain::ModPreviewStaging, String> {
+    let staged = download_to_staging(celeste_path, entry, reporter)?;
+    let metadata = match read_staged_metadata(celeste_path, &staged.staged_id) {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            let _ = delete_staged_download(celeste_path, &staged.staged_id);
+            return Err(error);
+        }
+    };
+    Ok(crate::domain::ModPreviewStaging { staged, metadata })
+}
+
+pub fn read_staged_metadata(celeste_path: &Path, staged_id: &str) -> Result<ModMetadata, String> {
+    let path = resolve_staged_download_path(celeste_path, staged_id)?;
+    read_zip_metadata(&path)
+}
+
+pub fn delete_staged_download(celeste_path: &Path, staged_id: &str) -> Result<bool, String> {
+    let path = resolve_staged_download_path(celeste_path, staged_id)?;
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!("清理 staged 下载失败：{error}")),
+    }
+}
+
 pub fn install_staged(
     celeste_path: &Path,
     staged_id: &str,
@@ -1628,6 +1658,25 @@ Helper:
         let error = resolve_staged_download_path(dir.path(), "Helper.zip.download").unwrap_err();
 
         assert_eq!(error, "无效的 staging id");
+    }
+
+    #[test]
+    fn delete_staged_download_removes_only_valid_staging_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let staged_id = "0123456789abcdef.zip.download";
+        let staged = dir
+            .path()
+            .join(".celepkg")
+            .join("downloads")
+            .join("staging")
+            .join(staged_id);
+        fs::create_dir_all(staged.parent().unwrap()).unwrap();
+        fs::write(&staged, b"staged").unwrap();
+
+        assert!(delete_staged_download(dir.path(), staged_id).unwrap());
+        assert!(!staged.exists());
+        assert!(!delete_staged_download(dir.path(), staged_id).unwrap());
+        assert!(delete_staged_download(dir.path(), "../0123456789abcdef.zip.download").is_err());
     }
 
     #[test]

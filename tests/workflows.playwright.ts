@@ -44,7 +44,7 @@ test("profile manager creates, copies, renames, and applies mock profiles", asyn
   await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
 });
 
-test("catalog install flow asks for dependency choices and queues the mock task", async ({ page }) => {
+test("catalog install flow previews dependencies and queues the mock task", async ({ page }) => {
   await openMock(page);
   await openNav(page, "下载 Mod");
 
@@ -53,19 +53,34 @@ test("catalog install flow asks for dependency choices and queues the mock task"
   await expect(entry).toBeVisible();
   await entry.getByRole("button", { name: "安装" }).click();
 
-  const confirmDialog = page.getByRole("dialog", { name: "安装 Mod" });
-  await expect(confirmDialog).toBeVisible();
-  await confirmDialog.getByRole("button", { name: "安装", exact: true }).click();
-
-  await expect(page.getByRole("dialog", { name: "需要更新 Everest" })).toBeVisible();
-  await page.getByRole("button", { name: "更新 Everest 后继续" }).click();
-
-  await expect(page.getByRole("dialog", { name: "安装前依赖检查" })).toBeVisible();
-  await page.getByRole("button", { name: "更新必须" }).click();
+  const previewDialog = page.getByRole("dialog", { name: "安装前依赖预览" });
+  await expect(previewDialog).toBeVisible();
+  await expect(previewDialog.locator(".dependency-tree")).toContainText("EverestCore");
+  await expect(previewDialog.locator(".dependency-tree")).toContainText("CommunalHelper");
+  await previewDialog.getByRole("button", { name: "继续安装" }).click();
 
   await expect(page.locator(".catalog-download-summary")).toContainText("队列");
   await openNav(page, "下载管理");
-  await expect(page.getByText("Everest Gate")).toBeVisible();
+  await expect(page.locator(".download-task-panel")).toContainText("Everest Gate");
+});
+
+test("mock dependency tree update opens the tree preview", async ({ page }) => {
+  await openMock(page);
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByPlaceholder("搜索 Mod、依赖").fill("Dependency Tree");
+  await page.getByRole("button", { name: "检查更新" }).click();
+  await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
+
+  const rootRow = page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" });
+  await expect(rootRow).toHaveCount(1);
+  await rootRow.getByRole("button", { name: "更新" }).click();
+
+  const previewDialog = page.getByRole("dialog", { name: "更新前依赖预览" });
+  await expect(previewDialog).toBeVisible();
+  await expect(previewDialog.locator(".dependency-tree")).toContainText("Mock Dependency Tree Outdated");
+  await expect(previewDialog.locator(".dependency-tree")).toContainText("Mock Dependency Tree Missing");
+  await expect(previewDialog.locator(".dependency-tree")).toContainText("Mock Dependency Tree Cycle A");
+  await previewDialog.getByRole("button", { name: "取消" }).click();
 });
 
 test("settings save-file and catalog-cache actions show persistent feedback", async ({ page }) => {

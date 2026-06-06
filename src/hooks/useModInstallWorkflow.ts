@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import {
   checkModUpdates,
   createOperationId,
+  deleteStagedDownload,
   downloadEverestToStaging,
   downloadModToStaging,
   installStagedEverest,
   installStagedMod,
   listEverestReleases,
   previewModUpdateMetadata,
-  searchModCatalog
+  searchModCatalog,
+  stageModPreview
 } from "../api";
 import { useAppPrompts } from "./useAppPrompts";
 import type {
@@ -17,6 +19,9 @@ import type {
   EverestRelease,
   ModCatalogEntry,
   ModCatalogSourceKind,
+  ModMetadata,
+  ModPreviewStaging,
+  StagedDownload,
   ModUpdateCandidate,
   ModUpdateCheckResult,
   ScanResult
@@ -33,7 +38,8 @@ import {
   type DependencyUpdateAction,
   type DependencyUpdatePlan
 } from "../utils/appDependencyResolution";
-import { dedupeDependencyActions, dedupeDependencyIssues } from "../utils/dependencyUpdateDedupe";
+import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "../utils/dependencyUpdateDedupe";
+import type { DependencyTreeNode, DependencyTreeNodeKind } from "../utils/dependencyTree";
 import type { DownloadTask } from "../utils/downloadTask";
 import type { ExecutableDownloadTaskItem } from "../utils/downloadTaskRunner";
 import { normalizeDependencyName } from "../utils/dependencies";
@@ -49,6 +55,7 @@ import { readError } from "../utils/format";
 import {
   createCatalogInstallTaskDescriptor,
   createModUpdateTaskDescriptors,
+  createModUpdateTaskId,
   createSingleModUpdateTaskDescriptor,
   formatModUpdateVersionChange
 } from "../utils/modUpdateTask";
@@ -72,6 +79,23 @@ type ModInstallWorkflowOptions = {
   startDownloadTask: (taskId: string, items: ExecutableDownloadTaskItem[], operationIdPrefix?: string) => Promise<DownloadTask>;
 };
 
+type PreviewDependencyAction = DependencyUpdateAction & {
+  dependsOn: string[];
+  optionalAncestorIds: string[];
+  staged?: StagedDownload;
+};
+
+type PreviewDependencyResolution = {
+  actionIds: string[];
+  actions: PreviewDependencyAction[];
+  staged: StagedDownload[];
+  unavailableCount: number;
+};
+
+type DependencyPreviewPlan = PreviewDependencyResolution & {
+  tree: DependencyTreeNode;
+};
+
 export function useModInstallWorkflow({
   autoCheckModUpdatesOnStartup,
   celestePath,
@@ -89,12 +113,15 @@ export function useModInstallWorkflow({
   const {
     closeConfirmPrompt,
     closeDependencyPrompt,
+    closeDependencyTreePrompt,
     closeEverestDependencyPrompt,
     confirmPrompt,
     dependencyPrompt,
+    dependencyTreePrompt,
     everestDependencyPrompt,
     requestAppConfirm,
     requestDependencyChoice,
+    requestDependencyTreeChoice,
     requestEverestDependencyChoice
   } = useAppPrompts();
   const completedModUpdatePaths = useRef<Set<string>>(new Set());
@@ -166,18 +193,6 @@ export function useModInstallWorkflow({
   }, [autoCheckModUpdatesOnStartup, celestePath, checkUpdatesForMods, scan.modsPath, startupAutoCheckModUpdatesOnStartup]);
 
   async function updateSingleMod(candidate: ModUpdateCandidate) {
-    const confirmed = await requestAppConfirm({
-      title: "更新 Mod",
-      description: "确认后会下载目录中的版本，并覆盖这个本地 Mod 文件。",
-      confirmLabel: "更新",
-      facts: [
-        { label: "目标", value: candidate.installed.name },
-        { label: "版本变化", value: formatModUpdateVersionChange(candidate) },
-        { label: "本地文件", value: candidate.installed.relativePath }
-      ],
-      variant: "danger"
-    });
-    if (!confirmed) return;
     await updateModCandidate(candidate);
   }
 
@@ -263,39 +278,41 @@ export function useModInstallWorkflow({
   }
 
   async function installCatalogEntry(entry: ModCatalogEntry) {
-    const confirmed = await requestAppConfirm({
-      title: "安装 Mod",
-      description: "确认后会下载并安装此 Mod。若安装过程中发现依赖问题，会继续进入依赖检查流程。",
-      confirmLabel: "安装",
-      facts: [
-        { label: "目标", value: entry.name },
-        { label: "版本", value: entry.version || "无版本号" },
-        { label: "来源", value: entry.source },
-        { label: "下载地址", value: entry.downloadUrl || "无下载地址" }
-      ]
-    });
-    if (!confirmed) return;
     return await performCatalogInstall(entry, `正在安装 ${entry.name}...`, `已安装 ${entry.name}`);
   }
 
   async function performModUpdate(candidate: ModUpdateCandidate, batchLabel = "", message = `正在更新 ${candidate.installed.name}...`) {
     void batchLabel;
+    const preview = await prepareTargetDependencyPreview(candidate.entry, candidate.installed.name, "更新");
+    if (!preview) return false;
     return await runExecutableDownloadTask(
       createOperationId("mod-update-task"),
-      [createModUpdateExecutableItem(candidate)],
+      [
+        createModUpdateExecutableItem(candidate, [], {
+          dependencies: preview.dependencyItems,
+          staged: preview.targetStaged
+        })
+      ],
       message,
       `已更新 ${candidate.installed.name}`
     );
   }
 
-  function createModUpdateExecutableItem(candidate: ModUpdateCandidate, dependsOn: string[] = []): ExecutableDownloadTaskItem {
+  function createModUpdateExecutableItem(
+    candidate: ModUpdateCandidate,
+    dependsOn: string[] = [],
+    prepared?: { dependencies: ExecutableDownloadTaskItem[]; staged: StagedDownload }
+  ): ExecutableDownloadTaskItem {
     const descriptor = createSingleModUpdateTaskDescriptor(candidate);
     return {
       ...descriptor,
       dependsOn,
-      download: (operationId, taskIndex, taskTotal) =>
-        downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
-      prepareInstall: async () => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新"),
+      download: prepared
+        ? async () => prepared.staged
+        : (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
+      prepareInstall: prepared
+        ? async () => prepared.dependencies
+        : async () => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新"),
       install: async (staged) => {
         const result = await installStagedMod(celestePath, staged.stagedId, candidate.entry, candidate.installed.absolutePath);
         setScan(result.scan);
@@ -304,13 +321,19 @@ export function useModInstallWorkflow({
     };
   }
 
-  function createCatalogInstallExecutableItem(entry: ModCatalogEntry, dependsOn: string[] = []): ExecutableDownloadTaskItem {
+  function createCatalogInstallExecutableItem(
+    entry: ModCatalogEntry,
+    dependsOn: string[] = [],
+    prepared?: { dependencies: ExecutableDownloadTaskItem[]; staged: StagedDownload }
+  ): ExecutableDownloadTaskItem {
     const descriptor = createCatalogInstallTaskDescriptor(entry);
     return {
       ...descriptor,
       dependsOn,
-      download: (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
-      prepareInstall: async () => await prepareDependencyItems(entry, entry.name, "安装"),
+      download: prepared
+        ? async () => prepared.staged
+        : (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
+      prepareInstall: prepared ? async () => prepared.dependencies : async () => await prepareDependencyItems(entry, entry.name, "安装"),
       install: async (staged) => {
         const result = await installStagedMod(celestePath, staged.stagedId, entry);
         setScan(result.scan);
@@ -328,6 +351,358 @@ export function useModInstallWorkflow({
         setScan(result.scan);
       }
     };
+  }
+
+  async function prepareTargetDependencyPreview(
+    entry: ModCatalogEntry,
+    targetName: string,
+    actionLabel: DependencyActionLabel
+  ): Promise<{ dependencyItems: ExecutableDownloadTaskItem[]; targetStaged: StagedDownload } | null> {
+    const stagedToCleanup: StagedDownload[] = [];
+    let targetPreview: ModPreviewStaging;
+    let plan: DependencyPreviewPlan;
+    try {
+      setLoading(true, `正在下载并预览 ${targetName} 的依赖...`);
+      targetPreview = await stageModPreview(celestePath, entry, createOperationId("mod-preview"));
+      stagedToCleanup.push(targetPreview.staged);
+      plan = await buildDependencyPreviewPlan(targetName, targetPreview.metadata);
+      stagedToCleanup.push(...plan.staged);
+    } catch (error) {
+      const message = readError(error);
+      notifier.showError(message);
+      await cleanupStagedDownloads(stagedToCleanup);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+
+    const choice = await requestDependencyTreeChoice({
+      actionLabel,
+      plannedCount: plan.actions.length,
+      stagedCount: stagedToCleanup.length,
+      targetName,
+      tree: plan.tree,
+      unavailableCount: plan.unavailableCount
+    });
+    if (!choice) {
+      await cleanupStagedDownloads(stagedToCleanup);
+      return null;
+    }
+
+    const selectedActions = filterSelectedPreviewActions(plan.actions, choice.selectedOptionalIds);
+    const selectedActionIds = new Set(selectedActions.map(previewActionId));
+    const unusedStaged = plan.actions
+      .filter((action) => !selectedActionIds.has(previewActionId(action)))
+      .map((action) => action.staged)
+      .filter((staged): staged is StagedDownload => Boolean(staged));
+    await cleanupStagedDownloads(unusedStaged);
+
+    return {
+      dependencyItems: createPreviewDependencyExecutableItems(selectedActions),
+      targetStaged: targetPreview.staged
+    };
+  }
+
+  async function buildDependencyPreviewPlan(targetName: string, metadata: ModMetadata): Promise<DependencyPreviewPlan> {
+    const context = { plannedKeys: new Set<string>() };
+    const root: DependencyTreeNode = {
+      id: `target:${normalizeDependencyName(targetName)}`,
+      name: targetName,
+      kind: "target",
+      status: "target",
+      detail: metadata.version || "预览版本",
+      selected: true,
+      selectable: false,
+      children: []
+    };
+    const resolution = await resolvePreviewDependencies(
+      metadata.dependencies,
+      "required",
+      [],
+      new Set([normalizeDependencyName(targetName)]),
+      context
+    );
+    const optionalResolution = await resolvePreviewDependencies(
+      metadata.optionalDependencies,
+      "optional",
+      [],
+      new Set([normalizeDependencyName(targetName)]),
+      context
+    );
+    root.children = [...resolution.nodes, ...optionalResolution.nodes];
+    return {
+      tree: root,
+      actionIds: [...resolution.actionIds, ...optionalResolution.actionIds],
+      actions: [...resolution.actions, ...optionalResolution.actions],
+      staged: [...resolution.staged, ...optionalResolution.staged],
+      unavailableCount: resolution.unavailableCount + optionalResolution.unavailableCount
+    };
+  }
+
+  async function resolvePreviewDependencies(
+    dependencies: Dependency[],
+    kind: Exclude<DependencyTreeNodeKind, "target">,
+    optionalAncestorIds: string[],
+    path: Set<string>,
+    context: { plannedKeys: Set<string> }
+  ): Promise<PreviewDependencyResolution & { nodes: DependencyTreeNode[] }> {
+    const nodes: DependencyTreeNode[] = [];
+    const actionIds: string[] = [];
+    const actions: PreviewDependencyAction[] = [];
+    const staged: StagedDownload[] = [];
+    let unavailableCount = 0;
+
+    for (const dependency of dependencies) {
+      const resolved = await resolvePreviewDependency(dependency, kind, optionalAncestorIds, path, context);
+      nodes.push(resolved.node);
+      actionIds.push(...resolved.actionIds);
+      actions.push(...resolved.actions);
+      staged.push(...resolved.staged);
+      unavailableCount += resolved.unavailableCount;
+    }
+
+    return { actionIds, actions, nodes, staged, unavailableCount };
+  }
+
+  async function resolvePreviewDependency(
+    dependency: Dependency,
+    kind: Exclude<DependencyTreeNodeKind, "target">,
+    optionalAncestorIds: string[],
+    path: Set<string>,
+    context: { plannedKeys: Set<string> }
+  ): Promise<PreviewDependencyResolution & { node: DependencyTreeNode }> {
+    const normalized = normalizeDependencyName(dependency.name);
+    const nodeId = `${kind}:${normalized}:${dependency.version}:${path.size}`;
+    const nextOptionalAncestorIds = kind === "optional" ? [...optionalAncestorIds, nodeId] : optionalAncestorIds;
+
+    if (isEverestDependencyName(dependency.name)) {
+      return await resolveEverestPreviewDependency(dependency, kind, nodeId, nextOptionalAncestorIds);
+    }
+    if (isBuiltinDependencyName(dependency.name)) {
+      return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "builtin", "内置依赖"));
+    }
+    if (path.has(normalized)) {
+      return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "cycle", "循环依赖"));
+    }
+
+    const installedIndex = buildInstalledDependencyIndex([...scan.maps, ...scan.otherMods]);
+    const installed = installedIndex.get(normalized);
+    if (installed && !versionTooLow(installed.metadata.version, dependency.version)) {
+      const nextPath = new Set(path);
+      nextPath.add(normalized);
+      const required = await resolvePreviewDependencies(installed.dependencies, "required", nextOptionalAncestorIds, nextPath, context);
+      const optional = await resolvePreviewDependencies(
+        installed.optionalDependencies,
+        "optional",
+        nextOptionalAncestorIds,
+        nextPath,
+        context
+      );
+      return {
+        node: {
+          ...basePreviewNode(dependency, kind, nodeId, "installed", installed.metadata.version || installed.fileName),
+          name: installed.name || dependency.name,
+          children: [...required.nodes, ...optional.nodes]
+        },
+        actionIds: [...required.actionIds, ...optional.actionIds],
+        actions: [...required.actions, ...optional.actions],
+        staged: [...required.staged, ...optional.staged],
+        unavailableCount: required.unavailableCount + optional.unavailableCount
+      };
+    }
+
+    const issue: DependencyIssue = {
+      dependency,
+      installed,
+      optional: kind === "optional",
+      reason: installed ? "tooLow" : "missing"
+    };
+    const action = await resolveDependencyAction(issue);
+    if (!action) {
+      return {
+        ...emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "unavailable", formatDependencyIssue(issue))),
+        unavailableCount: 1
+      };
+    }
+
+    const actionKey = dependencyActionKey(action);
+    if (context.plannedKeys.has(actionKey)) {
+      return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "duplicate", "已在预览中处理"));
+    }
+    context.plannedKeys.add(actionKey);
+
+    const entry = action.kind === "install" ? action.entry : action.kind === "update" ? action.candidate.entry : null;
+    if (!entry) return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "duplicate", "已在预览中处理"));
+
+    let preview: ModPreviewStaging;
+    try {
+      preview = await stageModPreview(celestePath, entry, createOperationId("mod-preview"));
+    } catch (error) {
+      notifyWarning(notifier, error);
+      return {
+        ...emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "unavailable", formatDependencyIssue(issue))),
+        unavailableCount: 1
+      };
+    }
+
+    const nextPath = new Set(path);
+    nextPath.add(normalized);
+    const required = await resolvePreviewDependencies(
+      preview.metadata.dependencies,
+      "required",
+      nextOptionalAncestorIds,
+      nextPath,
+      context
+    );
+    const optional = await resolvePreviewDependencies(
+      preview.metadata.optionalDependencies,
+      "optional",
+      nextOptionalAncestorIds,
+      nextPath,
+      context
+    );
+    const previewAction: PreviewDependencyAction = {
+      ...action,
+      dependsOn: [...required.actionIds, ...optional.actionIds],
+      optionalAncestorIds: nextOptionalAncestorIds,
+      staged: preview.staged
+    };
+    const currentActionId = previewActionId(previewAction);
+
+    return {
+      node: {
+        ...basePreviewNode(
+          dependency,
+          kind,
+          nodeId,
+          action.kind === "install" ? "plannedInstall" : "plannedUpdate",
+          action.kind === "install" ? `将安装 ${entry.version || "目录版本"}` : `将更新到 ${entry.version || "目录版本"}`
+        ),
+        children: [...required.nodes, ...optional.nodes]
+      },
+      actionIds: [currentActionId],
+      actions: [...required.actions, ...optional.actions, previewAction],
+      staged: [...required.staged, ...optional.staged, preview.staged],
+      unavailableCount: required.unavailableCount + optional.unavailableCount
+    };
+  }
+
+  async function resolveEverestPreviewDependency(
+    dependency: Dependency,
+    kind: Exclude<DependencyTreeNodeKind, "target">,
+    nodeId: string,
+    optionalAncestorIds: string[]
+  ): Promise<PreviewDependencyResolution & { node: DependencyTreeNode }> {
+    const requiredBuild = requiredEverestBuild([dependency]);
+    if (requiredBuild === null) {
+      return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "everest", "Everest 运行环境依赖"));
+    }
+    const installedBuild = installedEverestBuild(scan.otherMods);
+    if (installedBuild !== null && installedBuild >= requiredBuild) {
+      return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "installed", `当前 ${formatEverestBuildVersion(installedBuild)}`));
+    }
+    try {
+      const result = await listEverestReleases();
+      if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+      const release = selectEverestReleaseForBuild(result.releases, requiredBuild);
+      if (!release) {
+        return {
+          ...emptyPreviewNode(
+            basePreviewNode(dependency, kind, nodeId, "unavailable", `需要 ${formatEverestBuildVersion(requiredBuild)} 或更高版本`)
+          ),
+          unavailableCount: 1
+        };
+      }
+      const action: PreviewDependencyAction = {
+        kind: "everest",
+        name: "Everest",
+        release,
+        dependsOn: [],
+        optionalAncestorIds
+      };
+      return {
+        node: basePreviewNode(dependency, kind, nodeId, "plannedUpdate", `将更新到 ${formatEverestBuildVersion(release.version)}`),
+        actionIds: [previewActionId(action)],
+        actions: [action],
+        staged: [],
+        unavailableCount: 0
+      };
+    } catch (error) {
+      notifyWarning(notifier, error);
+      return {
+        ...emptyPreviewNode(
+          basePreviewNode(dependency, kind, nodeId, "unavailable", `需要 ${formatEverestBuildVersion(requiredBuild)} 或更高版本`)
+        ),
+        unavailableCount: 1
+      };
+    }
+  }
+
+  function createPreviewDependencyExecutableItems(actions: PreviewDependencyAction[]): ExecutableDownloadTaskItem[] {
+    const byKey = new Map<string, PreviewDependencyAction>();
+    for (const action of actions) {
+      if (!byKey.has(dependencyActionKey(action))) byKey.set(dependencyActionKey(action), action);
+    }
+    const selectedIds = new Set([...byKey.values()].map(previewActionId));
+    return [...byKey.values()].map((action) => {
+      const dependsOn = action.dependsOn.filter((id) => selectedIds.has(id));
+      if (action.kind === "everest") return { ...createEverestExecutableItem(action.release), dependsOn };
+      if (action.kind === "update") {
+        return createModUpdateExecutableItem(
+          action.candidate,
+          dependsOn,
+          action.staged ? { dependencies: [], staged: action.staged } : undefined
+        );
+      }
+      return createCatalogInstallExecutableItem(
+        action.entry,
+        dependsOn,
+        action.staged ? { dependencies: [], staged: action.staged } : undefined
+      );
+    });
+  }
+
+  function filterSelectedPreviewActions(actions: PreviewDependencyAction[], selectedOptionalIds: Set<string>) {
+    return actions.filter((action) => action.optionalAncestorIds.every((optionalId) => selectedOptionalIds.has(optionalId)));
+  }
+
+  function previewActionId(action: DependencyUpdateAction) {
+    if (action.kind === "everest") return createEverestInstallTaskDescriptor(action.release).id;
+    if (action.kind === "update") return createModUpdateTaskId(action.candidate);
+    return createCatalogInstallTaskDescriptor(action.entry).id;
+  }
+
+  function basePreviewNode(
+    dependency: Dependency,
+    kind: Exclude<DependencyTreeNodeKind, "target">,
+    id: string,
+    status: DependencyTreeNode["status"],
+    detail: string
+  ): DependencyTreeNode {
+    return {
+      id,
+      name: dependency.name,
+      kind,
+      status,
+      detail,
+      selected: kind === "required",
+      selectable: kind === "optional",
+      children: []
+    };
+  }
+
+  function emptyPreviewNode(node: DependencyTreeNode): PreviewDependencyResolution & { node: DependencyTreeNode } {
+    return {
+      node,
+      actionIds: [],
+      actions: [],
+      staged: [],
+      unavailableCount: 0
+    };
+  }
+
+  async function cleanupStagedDownloads(staged: StagedDownload[]) {
+    await Promise.allSettled(staged.map((item) => deleteStagedDownload(celestePath, item.stagedId)));
   }
 
   async function prepareDependencyItems(entry: ModCatalogEntry, targetName: string, actionLabel: DependencyActionLabel) {
@@ -533,9 +908,16 @@ export function useModInstallWorkflow({
   }
 
   async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {
+    const preview = await prepareTargetDependencyPreview(entry, entry.name, "安装");
+    if (!preview) return false;
     return await runExecutableDownloadTask(
       createOperationId("mod-install-task"),
-      [createCatalogInstallExecutableItem(entry)],
+      [
+        createCatalogInstallExecutableItem(entry, [], {
+          dependencies: preview.dependencyItems,
+          staged: preview.targetStaged
+        })
+      ],
       message,
       successMessage
     );
@@ -556,9 +938,11 @@ export function useModInstallWorkflow({
     checkUpdatesForMods,
     closeConfirmPrompt,
     closeDependencyPrompt,
+    closeDependencyTreePrompt,
     closeEverestDependencyPrompt,
     confirmPrompt,
     dependencyPrompt,
+    dependencyTreePrompt,
     downloadableModUpdates,
     everestDependencyPrompt,
     installCatalogEntry,

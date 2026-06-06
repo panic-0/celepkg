@@ -110,9 +110,11 @@ export function App() {
     checkUpdatesForMods,
     closeConfirmPrompt,
     closeDependencyPrompt,
+    closeDependencyTreePrompt,
     closeEverestDependencyPrompt,
     confirmPrompt,
     dependencyPrompt,
+    dependencyTreePrompt,
     downloadableModUpdates,
     everestDependencyPrompt,
     installCatalogEntry,
@@ -157,6 +159,7 @@ export function App() {
     () => findDependencyReferencesByModId([...scan.maps, ...scan.otherMods], scan.otherMods),
     [scan.maps, scan.otherMods]
   );
+  const allRecords = useMemo(() => [...scan.maps, ...scan.otherMods], [scan.maps, scan.otherMods]);
   const workspaceView = useWorkspaceView({
     enabledMapDraft: profileDraft.enabledMapDraft,
     enabledModDraft: profileDraft.enabledModDraft,
@@ -358,6 +361,7 @@ export function App() {
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
+            allRecords={allRecords}
             map={workspaceView.selectedMap}
             optionalReferences={dependencyReferences.optionalReferencesByModId.get(workspaceView.selectedMap?.id ?? "") ?? []}
             requiredReferences={dependencyReferences.requiredReferencesByModId.get(workspaceView.selectedMap?.id ?? "") ?? []}
@@ -376,6 +380,7 @@ export function App() {
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "mods" ? (
           <ModDetail
             activeTab={uiLayout.modDetailTab}
+            allRecords={allRecords}
             modItem={workspaceView.selectedMod}
             optionalReferences={dependencyReferences.optionalReferencesByModId.get(workspaceView.selectedMod?.id ?? "") ?? []}
             requiredReferences={dependencyReferences.requiredReferencesByModId.get(workspaceView.selectedMod?.id ?? "") ?? []}
@@ -431,6 +436,7 @@ export function App() {
         configWarnings={configWarnings}
         confirmPrompt={confirmPrompt}
         dependencyPrompt={dependencyPrompt}
+        dependencyTreePrompt={dependencyTreePrompt}
         everestDependencyPrompt={everestDependencyPrompt}
         issuesOpen={issuesOpen}
         itemWarnings={itemWarnings}
@@ -438,6 +444,7 @@ export function App() {
         scanWarnings={scan.warnings}
         onConfirmPromptClose={closeConfirmPrompt}
         onDependencyPromptClose={closeDependencyPrompt}
+        onDependencyTreePromptClose={closeDependencyTreePrompt}
         onEverestDependencyPromptClose={closeEverestDependencyPrompt}
         onIssuesClose={() => setIssuesOpen(false)}
         onNoticeClose={clearNotice}

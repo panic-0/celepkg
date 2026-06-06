@@ -10,6 +10,7 @@ import {
   validateModCatalogSearchResult,
   validateModInstallResult,
   validateModMetadata,
+  validateModPreviewStaging,
   validateModUpdateCheckResult,
   validateNullableString,
   validateProfilesState,
@@ -29,6 +30,7 @@ import type {
   ModCatalogSourceKind,
   ModInstallResult,
   ModMetadata,
+  ModPreviewStaging,
   ModUpdateCheckResult,
   Profile,
   ProfilesState,
@@ -129,6 +131,15 @@ export async function previewModUpdateMetadata(celestePath: string, entry: ModCa
   return invokeChecked("preview_mod_update_metadata", validateModMetadata, { celestePath, entry });
 }
 
+export async function stageModPreview(
+  celestePath: string,
+  entry: ModCatalogEntry,
+  operationId = createOperationId("mod-preview")
+): Promise<ModPreviewStaging> {
+  if (isMockMode()) return mockApi.stageModPreview(celestePath, entry, operationId);
+  return invokeChecked("stage_mod_preview", validateModPreviewStaging, { celestePath, entry, operationId });
+}
+
 export async function listEverestReleases(): Promise<EverestReleaseList> {
   if (isMockMode()) return mockApi.listEverestReleases();
   return invokeChecked("list_everest_releases", validateEverestReleaseList);
@@ -172,6 +183,11 @@ export async function installStagedMod(
     entry,
     installedPath: installedPath ?? null
   });
+}
+
+export async function deleteStagedDownload(celestePath: string, stagedId: string): Promise<boolean> {
+  if (isMockMode()) return mockApi.deleteStagedDownload(celestePath, stagedId);
+  return invokeChecked("delete_staged_download", validateBoolean, { celestePath, stagedId });
 }
 
 export async function cancelModDownload(operationId: string): Promise<boolean> {

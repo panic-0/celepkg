@@ -2,12 +2,14 @@ import { ArrowLeft, FolderOpen } from "lucide-react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
+import { buildLocalDependencyTree } from "../utils/dependencyTree";
 import type { ModDetailTab } from "../hooks/useUiLayout";
 import { Info } from "./common";
-import { DependencyReferenceList, LongValue, TabButton } from "./detailCommon";
+import { DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
 
 type ModDetailProps = {
   activeTab: ModDetailTab;
+  allRecords: ModRecord[];
   draftEnabled: boolean;
   modItem?: ModRecord;
   optionalReferences: DependencyReference[];
@@ -20,6 +22,7 @@ type ModDetailProps = {
 
 export function ModDetail({
   activeTab,
+  allRecords,
   draftEnabled,
   modItem,
   optionalReferences,
@@ -31,6 +34,7 @@ export function ModDetail({
 }: ModDetailProps) {
   const modId = modItem?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`mod:${modId}:${activeTab}:panel`, scrollMemory);
+  const dependencyTree = modItem ? buildLocalDependencyTree(modItem, allRecords) : null;
 
   if (!modItem) {
     return (
@@ -101,7 +105,16 @@ export function ModDetail({
       {activeTab === "dependencies" && (
         <div className="detail-tab-panel detail-split-panel" ref={detailPanelRef}>
           <section className="detail-section flush">
-            <h3>依赖</h3>
+            <h3>依赖树</h3>
+            {dependencyTree && dependencyTree.children.length ? (
+              <DependencyTreeView nodes={dependencyTree.children} />
+            ) : (
+              <p className="muted">没有声明依赖。</p>
+            )}
+          </section>
+
+          <section className="detail-section">
+            <h3>直接依赖</h3>
             {modItem.dependencies.length ? (
               <div className="dependency-list">
                 {modItem.dependencies.map((dependency) => (

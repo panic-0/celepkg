@@ -230,6 +230,11 @@ export type StagedDownload = {
   hash: string | null;
 };
 
+export type ModPreviewStaging = {
+  staged: StagedDownload;
+  metadata: ModMetadata;
+};
+
 export type ModDownloadProgress = {
   operationId: string;
   modName: string;

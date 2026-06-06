@@ -31,6 +31,8 @@ pub fn run() {
             commands::downloads::download_everest_to_staging,
             commands::downloads::install_staged_everest,
             commands::downloads::download_mod_to_staging,
+            commands::downloads::stage_mod_preview,
+            commands::downloads::delete_staged_download,
             commands::downloads::install_staged_mod,
             commands::downloads::cancel_mod_download,
             commands::records::set_record_favorite,

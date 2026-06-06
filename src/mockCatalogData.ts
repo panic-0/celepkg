@@ -53,6 +53,33 @@ export function createMockCatalog(): ModCatalogEntry[] {
       ["loading-hash"],
       "Other/Misc"
     ),
+    catalogEntry(
+      "everestMirror",
+      "Mock Dependency Tree Root",
+      "1.1.0",
+      "Mod",
+      "https://gamebanana.com/mmdl/5555",
+      ["mock-dependency-tree-root-new-hash"],
+      "Helpers"
+    ),
+    catalogEntry(
+      "everestMirror",
+      "Mock Dependency Tree Outdated",
+      "2.0.0",
+      "Mod",
+      "https://gamebanana.com/mmdl/5556",
+      ["mock-dependency-tree-outdated-new-hash"],
+      "Helpers"
+    ),
+    catalogEntry(
+      "everestMirror",
+      "Mock Dependency Tree Missing",
+      "1.0.0",
+      "Mod",
+      "https://gamebanana.com/mmdl/5557",
+      ["mock-dependency-tree-missing-hash"],
+      "Helpers"
+    ),
     ...createMockBulkCatalogEntries()
   ];
 }
@@ -90,6 +117,24 @@ export function mockUpdateMetadata(entry: ModCatalogEntry): ModMetadata {
         { name: "CommunalHelper", version: "1.24.0" }
       ],
       optionalDependencies: []
+    };
+  }
+  if (entry.name === "Mock Dependency Tree Root") {
+    return {
+      name: entry.name,
+      version: entry.version,
+      author: "Mock Author",
+      description: "",
+      dependencies: [
+        { name: "Mock Dependency Tree Helper", version: "1.0.0" },
+        { name: "Mock Dependency Tree Outdated", version: "2.0.0" },
+        { name: "Mock Dependency Tree Missing", version: "1.0.0" },
+        { name: "EverestCore", version: "1.4980.0" }
+      ],
+      optionalDependencies: [
+        { name: "Mock Dependency Tree Optional", version: "1.0.0" },
+        { name: "Mock Dependency Tree Cycle A", version: "1.0.0" }
+      ]
     };
   }
   return {

@@ -11,6 +11,7 @@ import type {
   ModCatalogSourceKind,
   ModInstallResult,
   ModMetadata,
+  ModPreviewStaging,
   ModRecord,
   ModUpdateCheckResult,
   Profile,
@@ -173,7 +174,7 @@ export const mockApi = {
       .flatMap((entry) => {
         const record = installed.find((item) => item.name.toLowerCase() === entry.name.toLowerCase());
         if (!record) return [];
-        const updateAvailable = ["CommunalHelper", "Galactica"].includes(record.name);
+        const updateAvailable = ["CommunalHelper", "Galactica", "Mock Dependency Tree Root"].includes(record.name);
         return [
           {
             entry,
@@ -191,32 +192,35 @@ export const mockApi = {
           }
         ];
       });
-    const mockBulkUpdates = Array.from({ length: 109 }, (_, index) => {
-      const entry = catalogEntry(
-        index % 2 ? "wegfan" : "everestMirror",
-        `MockBulkUpdate${index + 1}`,
-        `1.${index + 1}.0`,
-        "Mod",
-        `https://gamebanana.com/mmdl/${9000 + index}`,
-        [`mock-bulk-hash-${index + 1}`],
-        index % 3 === 0 ? "Helpers" : index % 3 === 1 ? "Maps" : "Tools",
-        index % 3 === 1 ? "Standalone" : ""
-      );
-      return {
-        entry,
-        installed: {
-          recordId: `mock-bulk-${index + 1}`,
-          name: entry.name,
-          fileName: `${entry.name}.zip`,
-          relativePath: `Mods/${entry.name}.zip`,
-          absolutePath: `${mockCelestePath}\\Mods\\${entry.name}.zip`,
-          version: "0.1.0",
-          hash: "old-local-hash"
-        },
-        updateAvailable: true,
-        reason: "Mock：用于预览大量更新时的按钮显示"
-      };
-    });
+    const mockBulkUpdates = installed
+      .filter((record) => record.name.startsWith("Mock Helper "))
+      .slice(0, 109)
+      .map((record, index) => {
+        const entry = catalogEntry(
+          index % 2 ? "wegfan" : "everestMirror",
+          record.name,
+          `2.${index + 1}.0`,
+          "Mod",
+          `https://gamebanana.com/mmdl/${9000 + index}`,
+          [`mock-bulk-hash-${index + 1}`],
+          index % 3 === 0 ? "Helpers" : index % 3 === 1 ? "Maps" : "Tools",
+          index % 3 === 1 ? "Standalone" : ""
+        );
+        return {
+          entry,
+          installed: {
+            recordId: record.id,
+            name: record.name,
+            fileName: record.fileName,
+            relativePath: record.relativePath,
+            absolutePath: record.absolutePath,
+            version: record.metadata.version,
+            hash: "old-local-hash"
+          },
+          updateAvailable: true,
+          reason: "Mock：本地列表中的批量更新候选"
+        };
+      });
     const allMatched = [...matched, ...mockBulkUpdates];
     return clone({
       sources: selectedSources,
@@ -228,6 +232,19 @@ export const mockApi = {
 
   async previewModUpdateMetadata(_celestePath: string, entry: ModCatalogEntry): Promise<ModMetadata> {
     return clone(mockUpdateMetadata(entry));
+  },
+
+  async stageModPreview(_celestePath: string, entry: ModCatalogEntry, operationId: string): Promise<ModPreviewStaging> {
+    await delay(300);
+    const staged = stagedDownload(
+      `mod-preview-${entry.id || entry.name}-${operationId}`,
+      entry.name,
+      "mod",
+      entry.size,
+      entry.xxHash[0] ?? null
+    );
+    stagedDownloads.set(staged.stagedId, staged);
+    return clone({ staged, metadata: mockUpdateMetadata(entry) });
   },
 
   async listEverestReleases(): Promise<EverestReleaseList> {
@@ -394,6 +411,10 @@ export const mockApi = {
   async cancelModDownload(operationId: string): Promise<boolean> {
     void operationId;
     return true;
+  },
+
+  async deleteStagedDownload(_celestePath: string, stagedId: string): Promise<boolean> {
+    return stagedDownloads.delete(stagedId);
   },
 
   async createBackup(celestePath: string, kind: "manual" | "auto" = "manual"): Promise<BackupInfo> {
@@ -663,6 +684,7 @@ function createMockScan(): ScanResult {
       description: "用于检查较长 Mod 名称与列表密度。",
       version: "0.5.0"
     }),
+    ...createMockDependencyTreeMods(),
     ...createMockBulkMods()
   ];
   return {
@@ -761,6 +783,97 @@ function createMockBulkMods(): ModRecord[] {
           : []
     });
   });
+}
+
+function createMockDependencyTreeMods(): ModRecord[] {
+  return [
+    record({
+      id: "mock-dependency-tree-root",
+      name: "Mock Dependency Tree Root",
+      fileName: "MockDependencyTreeRoot.zip",
+      relativePath: "Mods/MockDependencyTreeRoot.zip",
+      kind: "mod",
+      enabled: true,
+      favorite: true,
+      description: "用于在 mock 本地列表中检查依赖树：已满足、版本不足、缺失、可选、Everest 和循环依赖。",
+      version: "1.0.0",
+      dependencies: [
+        { name: "Mock Dependency Tree Helper", version: "1.0.0" },
+        { name: "Mock Dependency Tree Outdated", version: "2.0.0" },
+        { name: "Mock Dependency Tree Missing", version: "1.0.0" },
+        { name: "EverestCore", version: "1.4980.0" }
+      ],
+      optionalDependencies: [
+        { name: "Mock Dependency Tree Optional", version: "1.0.0" },
+        { name: "Mock Dependency Tree Cycle A", version: "1.0.0" }
+      ],
+      warnings: ["Mock：Mock Dependency Tree Outdated 版本不足，需要 2.0.0，本地 1.0.0", "Mock：缺少 Mock Dependency Tree Missing 1.0.0"]
+    }),
+    record({
+      id: "mock-dependency-tree-helper",
+      name: "Mock Dependency Tree Helper",
+      fileName: "MockDependencyTreeHelper.zip",
+      relativePath: "Mods/MockDependencyTreeHelper.zip",
+      kind: "mod",
+      enabled: true,
+      description: "依赖树演示用 Helper，继续依赖一个叶子 Mod。",
+      version: "1.0.0",
+      dependencies: [{ name: "Mock Dependency Tree Leaf", version: "1.0.0" }]
+    }),
+    record({
+      id: "mock-dependency-tree-leaf",
+      name: "Mock Dependency Tree Leaf",
+      fileName: "MockDependencyTreeLeaf.zip",
+      relativePath: "Mods/MockDependencyTreeLeaf.zip",
+      kind: "mod",
+      enabled: true,
+      description: "依赖树演示用叶子 Mod。",
+      version: "1.0.0"
+    }),
+    record({
+      id: "mock-dependency-tree-outdated",
+      name: "Mock Dependency Tree Outdated",
+      fileName: "MockDependencyTreeOutdated.zip",
+      relativePath: "Mods/MockDependencyTreeOutdated.zip",
+      kind: "mod",
+      enabled: true,
+      description: "依赖树演示用旧版本 Mod，Root 会要求 2.0.0。",
+      version: "1.0.0"
+    }),
+    record({
+      id: "mock-dependency-tree-optional",
+      name: "Mock Dependency Tree Optional",
+      fileName: "MockDependencyTreeOptional.zip",
+      relativePath: "Mods/MockDependencyTreeOptional.zip",
+      kind: "mod",
+      enabled: false,
+      description: "依赖树演示用可选依赖。",
+      version: "1.0.0",
+      dependencies: [{ name: "Mock Dependency Tree Leaf", version: "1.0.0" }]
+    }),
+    record({
+      id: "mock-dependency-tree-cycle-a",
+      name: "Mock Dependency Tree Cycle A",
+      fileName: "MockDependencyTreeCycleA.zip",
+      relativePath: "Mods/MockDependencyTreeCycleA.zip",
+      kind: "mod",
+      enabled: false,
+      description: "依赖树演示用循环依赖 A。",
+      version: "1.0.0",
+      dependencies: [{ name: "Mock Dependency Tree Cycle B", version: "1.0.0" }]
+    }),
+    record({
+      id: "mock-dependency-tree-cycle-b",
+      name: "Mock Dependency Tree Cycle B",
+      fileName: "MockDependencyTreeCycleB.zip",
+      relativePath: "Mods/MockDependencyTreeCycleB.zip",
+      kind: "mod",
+      enabled: false,
+      description: "依赖树演示用循环依赖 B。",
+      version: "1.0.0",
+      dependencies: [{ name: "Mock Dependency Tree Cycle A", version: "1.0.0" }]
+    })
+  ];
 }
 
 function record(options: MockRecordOptions): ModRecord {

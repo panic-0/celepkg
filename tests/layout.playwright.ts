@@ -101,12 +101,21 @@ test("record table columns remain ordered without cell overlap", async ({ page }
   expect(tableLayout.tableWidth).toBeGreaterThan(0);
 });
 
-test("detail dependency panel shows dependency and reverse dependency areas", async ({ page }) => {
+test("detail dependency panel shows mock dependency tree states", async ({ page }) => {
   await openMock(page);
-  await page.locator("tbody tr", { hasText: "Galactica" }).click();
-  await page.getByRole("tab", { name: "依赖/文件" }).click();
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByPlaceholder("搜索 Mod、依赖").fill("Dependency Tree");
+  const rootRow = page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" });
+  await expect(rootRow).toHaveCount(1);
+  await rootRow.click();
+  await page.getByRole("tab", { name: "依赖" }).click();
 
-  await expect(page.locator(".detail-tab-panel")).toContainText("依赖");
+  await expect(page.locator(".detail-tab-panel")).toContainText("依赖树");
+  await expect(page.locator(".detail-tab-panel")).toContainText("必需 已满足");
+  await expect(page.locator(".detail-tab-panel")).toContainText("必需 版本不足");
+  await expect(page.locator(".detail-tab-panel")).toContainText("必需 缺失");
+  await expect(page.locator(".detail-tab-panel")).toContainText("可选 已满足");
+  await expect(page.locator(".detail-tab-panel")).toContainText("循环");
   await expect(page.locator(".detail-tab-panel")).toContainText("被依赖");
   await expect(page.locator(".detail-tab-panel")).toContainText("被可选依赖");
   await expect(page.locator(".dependency-list").first()).toBeVisible();

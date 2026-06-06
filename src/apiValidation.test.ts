@@ -8,6 +8,7 @@ import {
   validateModCatalogSearchResult,
   validateModInstallResult,
   validateModMetadata,
+  validateModPreviewStaging,
   validateModUpdateCheckResult,
   validateScanResult,
   validateStagedDownload
@@ -80,6 +81,12 @@ describe("api validation", () => {
     expect(validateModUpdateCheckResult(apiContract.modUpdateCheckResult)).toEqual(apiContract.modUpdateCheckResult);
     expect(validateModInstallResult(apiContract.modInstallResult)).toEqual(apiContract.modInstallResult);
     expect(validateStagedDownload(apiContract.stagedDownload)).toEqual(apiContract.stagedDownload);
+    expect(
+      validateModPreviewStaging({
+        staged: apiContract.stagedDownload,
+        metadata: apiContract.modMetadata
+      }).metadata.name
+    ).toBe(apiContract.modMetadata.name);
     expect(validateEverestReleaseList(apiContract.everestReleaseList)).toEqual(apiContract.everestReleaseList);
     expect(validateEverestInstallResult(apiContract.everestInstallResult)).toEqual(apiContract.everestInstallResult);
     expect(validateBackupInfo(apiContract.backupInfo)).toEqual(apiContract.backupInfo);

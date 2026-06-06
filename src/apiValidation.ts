@@ -14,6 +14,7 @@ import type {
   ModCatalogSourceKind,
   ModInstallResult,
   ModMetadata,
+  ModPreviewStaging,
   ModRecord,
   ModUpdateCandidate,
   ModUpdateCheckResult,
@@ -165,6 +166,14 @@ export function validateStagedDownload(value: unknown): StagedDownload {
     kind: oneOfAt(object.kind, ["mod", "everest"], "staged download.kind"),
     size: nullableNumberAt(object.size, "staged download.size"),
     hash: object.hash === null ? null : stringAt(object.hash, "staged download.hash")
+  };
+}
+
+export function validateModPreviewStaging(value: unknown): ModPreviewStaging {
+  const object = objectAt(value, "mod preview staging");
+  return {
+    staged: validateStagedDownload(object.staged),
+    metadata: validateModMetadata(object.metadata, "mod preview staging.metadata")
   };
 }
 
