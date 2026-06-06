@@ -15,6 +15,8 @@ export type ModMetadata = {
 export type MapStats = {
   deaths: number;
   strawberries: number;
+  totalStrawberries: number;
+  staleStrawberries: number;
   strawberriesKnown: boolean;
   timePlayed: number;
   completed: boolean;

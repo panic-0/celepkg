@@ -1,4 +1,5 @@
 import type { CompletionStatus, MapStats, ModRecord, Profile } from "../types";
+import type { StrawberryDenominator } from "../viewTypes";
 
 export function readError(error: unknown) {
   if (typeof error === "string") return error;
@@ -45,6 +46,11 @@ export function formatStrawberries(collected?: number | null, total?: number | n
     return `${collected}`;
   }
   return "-";
+}
+
+export function strawberryCollected(stats: MapStats | null | undefined, denominator: StrawberryDenominator) {
+  if (!stats) return undefined;
+  return denominator === "total" ? stats.totalStrawberries : stats.strawberries;
 }
 
 export function formatCompletionStatus(status?: CompletionStatus | null) {

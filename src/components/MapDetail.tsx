@@ -3,7 +3,7 @@ import { Fragment, useMemo } from "react";
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
-import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime } from "../utils/format";
+import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
 import { sortSubMaps } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
 import {
@@ -151,7 +151,7 @@ export function MapDetail({
                 icon={<CircleDot size={18} />}
                 label="草莓"
                 value={formatStrawberries(
-                  map.stats?.strawberries,
+                  strawberryCollected(map.stats, strawberryDenominator),
                   strawberryTotal(map, strawberryDenominator),
                   map.stats?.strawberriesKnown ?? true
                 )}
@@ -249,7 +249,7 @@ export function MapDetail({
                           <td className="num">{formatTime(subMap.stats?.timePlayed)}</td>
                           <td className="num">
                             {formatStrawberries(
-                              subMap.stats?.strawberries,
+                              strawberryCollected(subMap.stats, strawberryDenominator),
                               strawberryTotal(subMap, strawberryDenominator),
                               subMap.stats?.strawberriesKnown ?? true
                             )}
@@ -267,7 +267,7 @@ export function MapDetail({
                                 <Info
                                   label="草莓"
                                   value={formatStrawberries(
-                                    subMap.stats?.strawberries,
+                                    strawberryCollected(subMap.stats, strawberryDenominator),
                                     strawberryTotal(subMap, strawberryDenominator),
                                     subMap.stats?.strawberriesKnown ?? true
                                   )}
@@ -276,6 +276,9 @@ export function MapDetail({
                                 <Info label="文件" value={subMap.filePath} />
                               </div>
                               <p className="muted">{subMap.stats?.saveFiles.join(", ") || "未在存档中匹配到这张小图。"}</p>
+                              {subMap.stats && subMap.stats.staleStrawberries > 0 && (
+                                <p className="warning-text">存档含 {subMap.stats.staleStrawberries} 个当前地图不存在的历史草莓记录。</p>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -344,6 +347,9 @@ export function MapDetail({
           <section className="detail-section flush">
             <h3>存档来源</h3>
             <LongList values={map.stats?.saveFiles ?? []} emptyText="未在 Saves/*.celeste 中匹配到该地图统计。" />
+            {map.stats && map.stats.staleStrawberries > 0 && (
+              <p className="warning-text">存档含 {map.stats.staleStrawberries} 个当前地图不存在的历史草莓记录。</p>
+            )}
           </section>
         </div>
       )}
@@ -355,7 +361,10 @@ function summarizeSubMapFolder(subMaps: SubMapInfo[], path: string, strawberryDe
   const members = subMaps.filter((subMap) => subMapMatchesFolder(subMap, path));
   const statsMembers = members.filter((subMap) => subMap.stats);
   const totalStrawberries = members.reduce((sum, subMap) => sum + strawberryTotal(subMap, strawberryDenominator), 0);
-  const collectedStrawberries = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.strawberries ?? 0), 0);
+  const collectedStrawberries = statsMembers.reduce(
+    (sum, subMap) => sum + (strawberryCollected(subMap.stats, strawberryDenominator) ?? 0),
+    0
+  );
   const strawberriesKnown = statsMembers.every((subMap) => subMap.stats?.strawberriesKnown ?? true);
   const deaths = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.deaths ?? 0), 0);
   const timePlayed = statsMembers.reduce((sum, subMap) => sum + (subMap.stats?.timePlayed ?? 0), 0);

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, ModUpdateCandidate } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
-import { formatCompletionStatus, formatStrawberries, formatTime } from "../utils/format";
+import { formatCompletionStatus, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
 import { formatModUpdateVersionChange } from "../utils/modUpdateTask";
 import { clampPage, paginateItems } from "../utils/pagination";
 import type { ActiveView, StrawberryDenominator } from "../viewTypes";
@@ -288,7 +288,7 @@ function MapTable({
               <td className="num">{formatTime(map.stats?.timePlayed)}</td>
               <td className="num">
                 {formatStrawberries(
-                  map.stats?.strawberries,
+                  strawberryCollected(map.stats, strawberryDenominator),
                   strawberryDenominator === "total" ? map.strawberryTotalCount : map.strawberryCount,
                   map.stats?.strawberriesKnown ?? true
                 )}

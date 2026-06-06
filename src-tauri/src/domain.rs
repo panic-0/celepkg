@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +47,10 @@ pub struct ModMetadata {
 pub struct MapStats {
     pub deaths: u64,
     pub strawberries: u64,
+    #[serde(default)]
+    pub total_strawberries: u64,
+    #[serde(default)]
+    pub stale_strawberries: u64,
     pub strawberries_known: bool,
     pub time_played: u64,
     pub completed: bool,
@@ -79,6 +84,12 @@ pub struct SubMapInfo {
     pub strawberry_total_count: u64,
     pub completion_status: CompletionStatus,
     pub stats: Option<MapStats>,
+    #[serde(skip)]
+    pub current_visible_strawberry_ids: HashSet<String>,
+    #[serde(skip)]
+    pub current_total_strawberry_ids: HashSet<String>,
+    #[serde(skip)]
+    pub current_strawberry_ids_complete: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

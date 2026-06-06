@@ -41,9 +41,39 @@ impl SaveStatsAccumulator {
         }
     }
 
+    #[cfg(test)]
     fn finish(mut self) -> MapStats {
-        self.stats.strawberries = self.berry_ids.len() as u64;
+        let strawberries = self.berry_ids.len() as u64;
+        self.stats.strawberries = strawberries;
+        self.stats.total_strawberries = strawberries;
         self.stats.strawberries_known = !self.missing_berry_ids;
+        self.stats
+    }
+
+    fn finish_for_sub_map(mut self, sub_map: &SubMapInfo) -> MapStats {
+        self.stats.strawberries_known = !self.missing_berry_ids;
+        if !self.stats.strawberries_known {
+            return self.stats;
+        }
+        if !sub_map.current_strawberry_ids_complete {
+            let strawberries = self.berry_ids.len() as u64;
+            self.stats.strawberries = strawberries;
+            self.stats.total_strawberries = strawberries;
+            return self.stats;
+        }
+        let visible = self
+            .berry_ids
+            .iter()
+            .filter(|key| sub_map.current_visible_strawberry_ids.contains(*key))
+            .count() as u64;
+        let total = self
+            .berry_ids
+            .iter()
+            .filter(|key| sub_map.current_total_strawberry_ids.contains(*key))
+            .count() as u64;
+        self.stats.strawberries = visible;
+        self.stats.total_strawberries = total;
+        self.stats.stale_strawberries = (self.berry_ids.len() as u64).saturating_sub(total);
         self.stats
     }
 }
@@ -126,8 +156,12 @@ pub fn read_save_stats(
                 .into_iter()
                 .map(|mut sub_map| {
                     let sub_needles = sub_map_needles(&sub_map);
-                    sub_map.stats =
-                        collect_stats_from_saves(&save_files, &sub_needles, sub_map.mode_index);
+                    sub_map.stats = collect_stats_from_saves(
+                        &save_files,
+                        &sub_needles,
+                        sub_map.mode_index,
+                        &sub_map,
+                    );
                     sub_map.completion_status = sub_map_completion_status(&sub_map);
                     sub_map
                 })
@@ -162,6 +196,7 @@ fn collect_stats_from_saves(
     save_files: &[ParsedSaveFile],
     needles: &[String],
     mode_index: Option<u8>,
+    sub_map: &SubMapInfo,
 ) -> Option<MapStats> {
     let mut accumulator = SaveStatsAccumulator::new();
     for file in save_files {
@@ -181,7 +216,7 @@ fn collect_stats_from_saves(
             accumulator.stats.save_files.push(file.name.clone());
         }
     }
-    let mut stats = accumulator.finish();
+    let mut stats = accumulator.finish_for_sub_map(sub_map);
     stats.save_files.sort();
     stats.save_files.dedup();
     if stats.save_files.is_empty() {
@@ -227,7 +262,6 @@ fn parse_save_areas(xml: &str) -> Vec<ParsedAreaStats> {
     let mut buf = Vec::new();
     let mut areas = vec![];
     let mut current_area: Option<ParsedAreaStats> = None;
-    let mut current_area_sid = String::new();
     let mut current_mode: Option<ParsedModeStats> = None;
     let mut area_depth: Option<usize> = None;
     let mut area_mode_depth: Option<usize> = None;
@@ -242,7 +276,6 @@ fn parse_save_areas(xml: &str) -> Vec<ParsedAreaStats> {
                 if is_area_stats_event(&event) {
                     let mut area_stats = MapStats::default();
                     add_area_event_stats(&event, &mut area_stats);
-                    current_area_sid = attr_value(&event, b"SID").unwrap_or_default();
                     current_area = Some(ParsedAreaStats {
                         haystack: event_haystack(&event),
                         area_stats,
@@ -265,7 +298,7 @@ fn parse_save_areas(xml: &str) -> Vec<ParsedAreaStats> {
                     strawberry_depth = Some(depth);
                 } else if strawberry_depth.is_some()
                     && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
-                    && add_berry_id_to_mode(&event, &current_area_sid, &mut current_mode)
+                    && add_berry_id_to_mode(&event, &mut current_mode)
                 {
                     area_mode_berry_ids_seen += 1;
                 }
@@ -283,7 +316,7 @@ fn parse_save_areas(xml: &str) -> Vec<ParsedAreaStats> {
                     }
                 } else if strawberry_depth.is_some()
                     && event.name().as_ref().eq_ignore_ascii_case(b"EntityID")
-                    && add_berry_id_to_mode(&event, &current_area_sid, &mut current_mode)
+                    && add_berry_id_to_mode(&event, &mut current_mode)
                 {
                     area_mode_berry_ids_seen += 1;
                 }
@@ -312,7 +345,6 @@ fn parse_save_areas(xml: &str) -> Vec<ParsedAreaStats> {
                         areas.push(area);
                     }
                     area_depth = None;
-                    current_area_sid.clear();
                 }
                 depth = depth.saturating_sub(1);
             }
@@ -347,6 +379,12 @@ fn merge_stats(target: &mut MapStats, source: &MapStats) {
     target.strawberries_known = target.strawberries_known && source.strawberries_known;
     if target.strawberries_known {
         target.strawberries = target.strawberries.saturating_add(source.strawberries);
+        target.total_strawberries = target
+            .total_strawberries
+            .saturating_add(source.total_strawberries);
+        target.stale_strawberries = target
+            .stale_strawberries
+            .saturating_add(source.stale_strawberries);
     }
     target.time_played = target.time_played.saturating_add(source.time_played);
     target.completed = target.completed || source.completed;
@@ -613,11 +651,11 @@ fn add_event_stats(event: &BytesStart<'_>, stats: &mut MapStats) -> u64 {
 #[cfg(test)]
 fn add_berry_id(
     event: &BytesStart<'_>,
-    area_sid: &str,
+    _area_sid: &str,
     accumulator: &mut SaveStatsAccumulator,
 ) -> bool {
     if let Some(key) = attr_value(event, b"Key") {
-        accumulator.berry_ids.insert(format!("{area_sid}:{key}"));
+        accumulator.berry_ids.insert(key);
         true
     } else {
         accumulator.missing_berry_ids = true;
@@ -625,16 +663,12 @@ fn add_berry_id(
     }
 }
 
-fn add_berry_id_to_mode(
-    event: &BytesStart<'_>,
-    area_sid: &str,
-    mode: &mut Option<ParsedModeStats>,
-) -> bool {
+fn add_berry_id_to_mode(event: &BytesStart<'_>, mode: &mut Option<ParsedModeStats>) -> bool {
     let Some(mode) = mode.as_mut() else {
         return false;
     };
     if let Some(key) = attr_value(event, b"Key") {
-        mode.berry_ids.insert(format!("{area_sid}:{key}"));
+        mode.berry_ids.insert(key);
         true
     } else {
         mode.missing_berry_ids = true;
@@ -833,6 +867,61 @@ mod tests {
     }
 
     #[test]
+    fn strawberries_are_filtered_to_current_map_ids() {
+        let mut accumulator = SaveStatsAccumulator::new();
+        accumulate_save_stats(
+            r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="3"><Strawberries><EntityID Key="a:1" /><EntityID Key="a:2" /><EntityID Key="a:3" /></Strawberries></AreaModeStats></AreaStats></Save>"#,
+            &["map".to_string()],
+            None,
+            &mut accumulator,
+        );
+        let sub_map = sub_map_with_ids("Map", ["a:1", "a:2"], ["a:1", "a:2"], true);
+
+        let stats = accumulator.finish_for_sub_map(&sub_map);
+
+        assert!(stats.strawberries_known);
+        assert_eq!(stats.strawberries, 2);
+        assert_eq!(stats.total_strawberries, 2);
+        assert_eq!(stats.stale_strawberries, 1);
+    }
+
+    #[test]
+    fn total_strawberries_include_current_total_only_ids() {
+        let mut accumulator = SaveStatsAccumulator::new();
+        accumulate_save_stats(
+            r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="2"><Strawberries><EntityID Key="a:1" /><EntityID Key="a:2" /></Strawberries></AreaModeStats></AreaStats></Save>"#,
+            &["map".to_string()],
+            None,
+            &mut accumulator,
+        );
+        let sub_map = sub_map_with_ids("Map", ["a:1"], ["a:1", "a:2"], true);
+
+        let stats = accumulator.finish_for_sub_map(&sub_map);
+
+        assert_eq!(stats.strawberries, 1);
+        assert_eq!(stats.total_strawberries, 2);
+        assert_eq!(stats.stale_strawberries, 0);
+    }
+
+    #[test]
+    fn incomplete_current_ids_keep_legacy_strawberry_count() {
+        let mut accumulator = SaveStatsAccumulator::new();
+        accumulate_save_stats(
+            r#"<Save><AreaStats SID="Map"><AreaModeStats TotalStrawberries="3"><Strawberries><EntityID Key="a:1" /><EntityID Key="a:2" /><EntityID Key="a:3" /></Strawberries></AreaModeStats></AreaStats></Save>"#,
+            &["map".to_string()],
+            None,
+            &mut accumulator,
+        );
+        let sub_map = sub_map_with_ids("Map", [], [], false);
+
+        let stats = accumulator.finish_for_sub_map(&sub_map);
+
+        assert_eq!(stats.strawberries, 3);
+        assert_eq!(stats.total_strawberries, 3);
+        assert_eq!(stats.stale_strawberries, 0);
+    }
+
+    #[test]
     fn mode_index_selects_official_side_stats() {
         let mut accumulator = SaveStatsAccumulator::new();
         accumulate_save_stats(
@@ -912,6 +1001,23 @@ mod tests {
             strawberry_total_count: 0,
             completion_status,
             stats: None,
+            current_visible_strawberry_ids: HashSet::new(),
+            current_total_strawberry_ids: HashSet::new(),
+            current_strawberry_ids_complete: true,
         }
+    }
+
+    fn sub_map_with_ids<const V: usize, const T: usize>(
+        sid: &str,
+        visible: [&str; V],
+        total: [&str; T],
+        complete: bool,
+    ) -> SubMapInfo {
+        let mut sub_map = sub_map(sid, CompletionStatus::Unknown);
+        sub_map.current_visible_strawberry_ids =
+            visible.into_iter().map(ToString::to_string).collect();
+        sub_map.current_total_strawberry_ids = total.into_iter().map(ToString::to_string).collect();
+        sub_map.current_strawberry_ids_complete = complete;
+        sub_map
     }
 }

@@ -1,13 +1,33 @@
+use std::collections::HashSet;
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StrawberryCounts {
     pub visible: u64,
     pub total: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrawberryIdSets {
+    pub visible: HashSet<String>,
+    pub total: HashSet<String>,
+    pub complete: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MapBinSummary {
     pub strawberry_counts: StrawberryCounts,
+    pub strawberry_ids: StrawberryIdSets,
     pub map_icon: Option<String>,
+}
+
+impl Default for StrawberryIdSets {
+    fn default() -> Self {
+        Self {
+            visible: HashSet::new(),
+            total: HashSet::new(),
+            complete: true,
+        }
+    }
 }
 
 impl StrawberryCounts {
@@ -54,7 +74,7 @@ pub fn read_map_summary(bytes: &[u8]) -> Option<MapBinSummary> {
     for _ in 0..lookup_count {
         lookup.push(LookupEntry::new(reader.take_string().ok()?));
     }
-    read_element_summary(&mut reader, &lookup).ok()
+    read_element_summary(&mut reader, &lookup, None).ok()
 }
 
 #[cfg(test)]
@@ -65,10 +85,13 @@ pub fn is_strawberry_entity(name: &str) -> bool {
 fn read_element_summary(
     reader: &mut BinReader<'_>,
     lookup: &[LookupEntry],
+    current_level: Option<&str>,
 ) -> Result<MapBinSummary, ()> {
     let name = reader.take_lookup(lookup)?;
     let mut moon = false;
     let mut map_icon = None;
+    let mut level_name: Option<String> = None;
+    let mut entity_id: Option<String> = None;
     let attr_count = reader.take_u8()?;
     for _ in 0..attr_count {
         let key = reader.take_lookup(lookup)?;
@@ -79,20 +102,43 @@ fn read_element_summary(
             if !value.trim().is_empty() {
                 map_icon = Some(value);
             }
+        } else if name.is_level && key.is_name {
+            let value = reader.take_attr_string(lookup)?;
+            if !value.trim().is_empty() {
+                level_name = Some(value);
+            }
+        } else if key.is_id {
+            let value = reader.take_attr_string(lookup)?;
+            if !value.trim().is_empty() {
+                entity_id = Some(value);
+            }
         } else {
             reader.skip_attr(lookup)?;
         }
     }
+    let level = level_name.as_deref().or(current_level);
+    let strawberry_counts = strawberry_counts_for_kind(name.strawberry_kind, moon);
     let mut summary = MapBinSummary {
-        strawberry_counts: strawberry_counts_for_kind(name.strawberry_kind, moon),
+        strawberry_counts,
+        strawberry_ids: strawberry_ids_for_entity(strawberry_counts, level, entity_id.as_deref()),
         map_icon,
     };
     let child_count = reader.take_u16()?;
     for _ in 0..child_count {
-        let child = read_element_summary(reader, lookup)?;
+        let child = read_element_summary(reader, lookup, level)?;
         summary.strawberry_counts = summary
             .strawberry_counts
             .saturating_add(child.strawberry_counts);
+        summary
+            .strawberry_ids
+            .visible
+            .extend(child.strawberry_ids.visible);
+        summary
+            .strawberry_ids
+            .total
+            .extend(child.strawberry_ids.total);
+        summary.strawberry_ids.complete =
+            summary.strawberry_ids.complete && child.strawberry_ids.complete;
         if summary.map_icon.is_none() {
             summary.map_icon = child.map_icon;
         }
@@ -105,8 +151,11 @@ struct LookupEntry {
     text: String,
     strawberry_kind: StrawberryKind,
     is_meta: bool,
+    is_level: bool,
     is_moon: bool,
     is_icon: bool,
+    is_name: bool,
+    is_id: bool,
 }
 
 impl LookupEntry {
@@ -114,8 +163,11 @@ impl LookupEntry {
         Self {
             strawberry_kind: strawberry_kind_for_name(&text),
             is_meta: text.eq_ignore_ascii_case("meta"),
+            is_level: text.eq_ignore_ascii_case("level"),
             is_moon: text.eq_ignore_ascii_case("moon"),
             is_icon: text.eq_ignore_ascii_case("Icon"),
+            is_name: text.eq_ignore_ascii_case("name"),
+            is_id: text.eq_ignore_ascii_case("id"),
             text,
         }
     }
@@ -198,6 +250,31 @@ fn strawberry_counts_for_kind(kind: StrawberryKind, moon: bool) -> StrawberryCou
             total: 1,
         },
     }
+}
+
+fn strawberry_ids_for_entity(
+    counts: StrawberryCounts,
+    level: Option<&str>,
+    entity_id: Option<&str>,
+) -> StrawberryIdSets {
+    if counts.total == 0 {
+        return StrawberryIdSets::default();
+    }
+    let mut ids = StrawberryIdSets::default();
+    let Some(level) = level else {
+        ids.complete = false;
+        return ids;
+    };
+    let Some(entity_id) = entity_id else {
+        ids.complete = false;
+        return ids;
+    };
+    let key = format!("{level}:{entity_id}");
+    if counts.visible > 0 {
+        ids.visible.insert(key.clone());
+    }
+    ids.total.insert(key);
+    ids
 }
 
 struct BinReader<'a> {
@@ -344,6 +421,7 @@ impl<'a> BinReader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn recognizes_vanilla_and_namespaced_berries() {
@@ -409,6 +487,31 @@ mod tests {
         );
     }
 
+    #[test]
+    fn records_visible_and_total_strawberry_ids() {
+        let bytes = fake_map_bin(&[
+            fake_entity("strawberry", &[]),
+            fake_entity("strawberry", &[("moon", true)]),
+            fake_entity("goldenBerry", &[]),
+        ]);
+
+        let summary = read_map_summary(&bytes).expect("map summary");
+
+        assert!(summary.strawberry_ids.complete);
+        assert_eq!(
+            summary.strawberry_ids.visible,
+            HashSet::from(["test:1".to_string()])
+        );
+        assert_eq!(
+            summary.strawberry_ids.total,
+            HashSet::from([
+                "test:1".to_string(),
+                "test:2".to_string(),
+                "test:3".to_string()
+            ])
+        );
+    }
+
     fn fake_entity(name: &'static str, attrs: &'static [(&'static str, bool)]) -> FakeEntity {
         FakeEntity { name, attrs }
     }
@@ -419,7 +522,7 @@ mod tests {
     }
 
     fn fake_map_bin(entities: &[FakeEntity]) -> Vec<u8> {
-        let mut lookup = vec!["Map", "levels", "level", "entities"];
+        let mut lookup = vec!["Map", "levels", "level", "entities", "name", "test", "id"];
         for entity in entities {
             push_lookup(&mut lookup, entity.name);
             for (key, _) in entity.attrs {
@@ -436,17 +539,18 @@ mod tests {
 
         let entity_children: Vec<Vec<u8>> = entities
             .iter()
-            .map(|entity| {
-                element(
+            .enumerate()
+            .map(|(index, entity)| {
+                entity_element(
                     lookup_index(&lookup, entity.name),
+                    (index + 1) as u16,
                     entity.attrs,
-                    vec![],
                     &lookup,
                 )
             })
             .collect();
         let entities = element(3, &[], entity_children, &lookup);
-        let level = element(2, &[], vec![entities], &lookup);
+        let level = element_with_string_attrs(2, &[("name", "test")], vec![entities], &lookup);
         let levels = element(1, &[], vec![level], &lookup);
         bytes.extend(element(0, &[], vec![levels], &lookup));
         bytes
@@ -463,6 +567,27 @@ mod tests {
         }
         let meta = element_with_string_attrs(1, &[("Icon", icon)], vec![], &lookup);
         bytes.extend(element_with_string_attrs(0, &[], vec![meta], &lookup));
+        bytes
+    }
+
+    fn entity_element(
+        name_index: u16,
+        id: u16,
+        attrs: &[(&str, bool)],
+        lookup: &[&str],
+    ) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&name_index.to_le_bytes());
+        bytes.push((attrs.len() + 1) as u8);
+        bytes.extend_from_slice(&lookup_index(lookup, "id").to_le_bytes());
+        bytes.push(2);
+        bytes.extend_from_slice(&id.to_le_bytes());
+        for (key, value) in attrs {
+            bytes.extend_from_slice(&lookup_index(lookup, key).to_le_bytes());
+            bytes.push(0);
+            bytes.push(u8::from(*value));
+        }
+        bytes.extend_from_slice(&0u16.to_le_bytes());
         bytes
     }
 

@@ -68,6 +68,8 @@
             "stats": {
               "deaths": 12,
               "strawberries": 3,
+              "totalStrawberries": 3,
+              "staleStrawberries": 0,
               "strawberriesKnown": true,
               "timePlayed": 3600,
               "completed": false,
@@ -87,6 +89,8 @@
         "stats": {
           "deaths": 12,
           "strawberries": 3,
+          "totalStrawberries": 3,
+          "staleStrawberries": 0,
           "strawberriesKnown": true,
           "timePlayed": 3600,
           "completed": false,

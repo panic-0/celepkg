@@ -4,7 +4,7 @@ use crate::domain::{
 };
 use crate::parsers::dialog::{dialog_title_for_key, dialog_title_for_sid, read_dialog_titles};
 use crate::parsers::everest::{is_builtin_dependency, parse_metadata, parse_metadata_checked};
-use crate::parsers::map_bin::{read_map_summary, StrawberryCounts};
+use crate::parsers::map_bin::{read_map_summary, StrawberryCounts, StrawberryIdSets};
 use crate::parsers::save_stats::{
     is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
 };
@@ -21,7 +21,7 @@ use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 16;
+const SCAN_CACHE_VERSION: u32 = 17;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -843,10 +843,16 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
     let sub_maps: Vec<SubMapInfo> = files
         .iter()
         .map(|file| {
-            let strawberry_counts = fs::read(&file.path)
+            let summary = fs::read(&file.path)
                 .ok()
-                .and_then(|bytes| read_map_summary(&bytes).map(|summary| summary.strawberry_counts))
+                .and_then(|bytes| read_map_summary(&bytes));
+            let strawberry_counts = summary
+                .as_ref()
+                .map(|summary| summary.strawberry_counts)
                 .unwrap_or_default();
+            let strawberry_ids = summary
+                .map(|summary| summary.strawberry_ids)
+                .unwrap_or_else(incomplete_strawberry_ids);
             let sid = format!("{}/{}", file.sid, file.side_name);
             SubMapInfo {
                 id: stable_id(&format!("vanilla::{sid}")),
@@ -860,6 +866,9 @@ fn scan_official_maps(celeste_path: &Path, favorites: &HashSet<String>) -> Vec<M
                 strawberry_total_count: strawberry_counts.total,
                 completion_status: CompletionStatus::Unknown,
                 stats: None,
+                current_visible_strawberry_ids: strawberry_ids.visible,
+                current_total_strawberry_ids: strawberry_ids.total,
+                current_strawberry_ids_complete: strawberry_ids.complete,
             }
         })
         .collect();
@@ -1174,6 +1183,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
+    let mut strawberry_ids = HashMap::new();
     let mut map_difficulties = HashMap::new();
     for entry in WalkDir::new(dir_path).into_iter().flatten() {
         if !entry.file_type().is_file() {
@@ -1186,6 +1196,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             if let Ok(bytes) = fs::read(entry.path()) {
                 if let Some(summary) = read_map_summary(&bytes) {
                     strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
+                    strawberry_ids.insert(sid.clone(), summary.strawberry_ids.clone());
                     if let Some(difficulty) = summary
                         .map_icon
                         .and_then(|icon| difficulty_from_map_icon(&icon))
@@ -1227,6 +1238,7 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             metadata: parse_metadata(&yaml_text),
             dialog_titles: read_dialog_titles(dialog_texts),
             strawberry_counts,
+            strawberry_ids,
             map_difficulties,
         },
     ))
@@ -1258,6 +1270,7 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
+    let mut strawberry_ids = HashMap::new();
     let mut map_difficulties = HashMap::new();
     let mut warnings = vec![];
     for index in 0..archive.len() {
@@ -1280,6 +1293,7 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             map_ids.push(sid.clone());
             if let Some(summary) = bytes.as_deref().and_then(read_map_summary) {
                 strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
+                strawberry_ids.insert(sid.clone(), summary.strawberry_ids.clone());
                 if let Some(difficulty) = summary
                     .map_icon
                     .and_then(|icon| difficulty_from_map_icon(&icon))
@@ -1328,6 +1342,7 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             metadata,
             dialog_titles: read_dialog_titles(dialog_texts),
             strawberry_counts,
+            strawberry_ids,
             map_difficulties,
         },
     );
@@ -1346,6 +1361,7 @@ fn unreadable_zip_record(zip_path: &Path, mods_path: &Path, warning: String) -> 
             metadata: ModMetadata::default(),
             dialog_titles: HashMap::new(),
             strawberry_counts: HashMap::new(),
+            strawberry_ids: HashMap::new(),
             map_difficulties: HashMap::new(),
         },
     );
@@ -1381,6 +1397,7 @@ struct ScannedModData {
     metadata: ModMetadata,
     dialog_titles: HashMap<String, String>,
     strawberry_counts: HashMap<String, StrawberryCounts>,
+    strawberry_ids: HashMap<String, StrawberryIdSets>,
     map_difficulties: HashMap<String, String>,
 }
 
@@ -1396,6 +1413,7 @@ fn create_mod_record(
         metadata,
         dialog_titles,
         strawberry_counts,
+        strawberry_ids,
         map_difficulties,
     } = data;
     let relative_path = normalize_slash(
@@ -1410,25 +1428,29 @@ fn create_mod_record(
         .unwrap_or_else(|| relative_path.clone());
     let sub_maps: Vec<SubMapInfo> = map_ids
         .iter()
-        .map(|sid| SubMapInfo {
-            id: stable_id(&format!("{}::{sid}", relative_path.to_lowercase())),
-            sid: sid.clone(),
-            mode_index: None,
-            display_name: dialog_title_for_sid(sid, &dialog_titles)
-                .unwrap_or_else(|| sub_map_display_name(sid)),
-            chapter: sub_map_chapter(sid),
-            file_path: format!("Maps/{sid}.bin"),
-            difficulty: map_difficulties.get(sid).cloned().unwrap_or_default(),
-            strawberry_count: strawberry_counts
+        .map(|sid| {
+            let counts = strawberry_counts.get(sid).copied().unwrap_or_default();
+            let ids = strawberry_ids
                 .get(sid)
-                .map(|counts| counts.visible)
-                .unwrap_or(0),
-            strawberry_total_count: strawberry_counts
-                .get(sid)
-                .map(|counts| counts.total)
-                .unwrap_or(0),
-            completion_status: CompletionStatus::Unknown,
-            stats: None,
+                .cloned()
+                .unwrap_or_else(incomplete_strawberry_ids);
+            SubMapInfo {
+                id: stable_id(&format!("{}::{sid}", relative_path.to_lowercase())),
+                sid: sid.clone(),
+                mode_index: None,
+                display_name: dialog_title_for_sid(sid, &dialog_titles)
+                    .unwrap_or_else(|| sub_map_display_name(sid)),
+                chapter: sub_map_chapter(sid),
+                file_path: format!("Maps/{sid}.bin"),
+                difficulty: map_difficulties.get(sid).cloned().unwrap_or_default(),
+                strawberry_count: counts.visible,
+                strawberry_total_count: counts.total,
+                completion_status: CompletionStatus::Unknown,
+                stats: None,
+                current_visible_strawberry_ids: ids.visible,
+                current_total_strawberry_ids: ids.total,
+                current_strawberry_ids_complete: ids.complete,
+            }
         })
         .collect();
     let strawberry_count = sub_maps
@@ -1478,6 +1500,13 @@ fn create_mod_record(
         strawberry_count,
         strawberry_total_count,
         warnings: vec![],
+    }
+}
+
+fn incomplete_strawberry_ids() -> StrawberryIdSets {
+    StrawberryIdSets {
+        complete: false,
+        ..StrawberryIdSets::default()
     }
 }
 
@@ -1806,6 +1835,7 @@ mod tests {
                 metadata: metadata("BerryPack"),
                 dialog_titles: HashMap::new(),
                 strawberry_counts,
+                strawberry_ids: HashMap::new(),
                 map_difficulties,
             },
         );

@@ -839,6 +839,8 @@ function stats(
   return {
     deaths,
     strawberries,
+    totalStrawberries: strawberries,
+    staleStrawberries: 0,
     strawberriesKnown: total >= strawberries,
     timePlayed,
     completed,

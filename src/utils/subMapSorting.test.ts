@@ -17,6 +17,8 @@ function subMap(id: string, difficulty: string, displayName: string, deaths = 0)
     stats: {
       deaths,
       strawberries: 0,
+      totalStrawberries: 0,
+      staleStrawberries: 0,
       strawberriesKnown: true,
       timePlayed: 0,
       completed: false,
@@ -52,5 +54,28 @@ describe("sub-map sorting", () => {
     );
 
     expect(result.map((item) => item.id)).toEqual(["easy-high", "easy-low", "hard"]);
+  });
+
+  it("uses total strawberry progress when sorting by total denominator", () => {
+    const visibleOnly = subMap("visible", "Easy", "Visible");
+    visibleOnly.strawberryCount = 5;
+    visibleOnly.strawberryTotalCount = 10;
+    visibleOnly.stats!.strawberries = 5;
+    visibleOnly.stats!.totalStrawberries = 5;
+
+    const totalProgress = subMap("total", "Easy", "Total");
+    totalProgress.strawberryCount = 5;
+    totalProgress.strawberryTotalCount = 10;
+    totalProgress.stats!.strawberries = 1;
+    totalProgress.stats!.totalStrawberries = 9;
+
+    const result = sortSubMaps([visibleOnly, totalProgress], {
+      descending: true,
+      groupByDifficulty: false,
+      sortKey: "strawberries",
+      strawberryDenominator: "total"
+    });
+
+    expect(result.map((item) => item.id)).toEqual(["total", "visible"]);
   });
 });

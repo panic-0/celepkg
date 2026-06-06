@@ -1,4 +1,5 @@
 import type { SubMapInfo } from "../types";
+import { strawberryCollected } from "./format";
 import type { StrawberryDenominator } from "../viewTypes";
 
 export type SubMapSortKey = "file" | "name" | "completion" | "deaths" | "time" | "strawberries";
@@ -77,7 +78,8 @@ function compareOptionalNumber(left?: number, right?: number) {
 function strawberrySortValue(subMap: SubMapInfo, strawberryDenominator: StrawberryDenominator) {
   if (!subMap.stats) return undefined;
   const total = strawberryDenominator === "total" ? subMap.strawberryTotalCount : subMap.strawberryCount;
-  return total ? subMap.stats.strawberries / total : subMap.stats.strawberries;
+  const collected = strawberryCollected(subMap.stats, strawberryDenominator) ?? 0;
+  return total ? collected / total : collected;
 }
 
 function difficultyRank(value: string) {

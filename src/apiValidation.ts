@@ -388,6 +388,8 @@ function nullableMapStatsAt(value: unknown, path: string): MapStats | null {
   return {
     deaths: numberAt(object.deaths, `${path}.deaths`),
     strawberries: numberAt(object.strawberries, `${path}.strawberries`),
+    totalStrawberries: numberAt(object.totalStrawberries, `${path}.totalStrawberries`),
+    staleStrawberries: numberAt(object.staleStrawberries, `${path}.staleStrawberries`),
     strawberriesKnown: booleanAt(object.strawberriesKnown, `${path}.strawberriesKnown`),
     timePlayed: numberAt(object.timePlayed, `${path}.timePlayed`),
     completed: booleanAt(object.completed, `${path}.completed`),
