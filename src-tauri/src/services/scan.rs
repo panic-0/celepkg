@@ -1452,7 +1452,7 @@ fn is_test_map_sid(sid: &str) -> bool {
     lower.split('/').any(|part| {
         matches!(
             part,
-            "test" | "debug" | "sample" | "example" | "preview" | "dev" | "sandbox"
+            "test" | "debug" | "sample" | "example" | "preview" | "dev" | "sandbox" | "demo"
         ) || part.ends_with("test")
             || part.contains("testmap")
     })
@@ -1605,6 +1605,19 @@ mod tests {
             "Example.zip",
             "Example.zip",
             &metadata("Example"),
+            &map_ids,
+            true,
+        ));
+    }
+
+    #[test]
+    fn classifies_code_mod_with_demo_map_as_other_mod() {
+        let map_ids = vec!["bitsbolts/demo".to_string()];
+
+        assert!(!is_map_mod_record(
+            "BitsBolts.zip",
+            "BitsBolts.zip",
+            &metadata("BitsBolts"),
             &map_ids,
             true,
         ));
