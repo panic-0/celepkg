@@ -87,9 +87,16 @@ jobs:
             src-tauri/target/release/bundle/**/*.exe
             src-tauri/target/release/bundle/**/*.msi
             src-tauri/target/release/bundle/**/*.rpm
-            src-tauri/target/release/bundle/**/*.sig
-            src-tauri/target/release/bundle/**/*.tar.gz
+            src-tauri/target/release/bundle/**/*.app.tar.gz
             src-tauri/target/release/bundle/**/*.zip
+            src-tauri/target/release/bundle/**/*.AppImage.sig
+            src-tauri/target/release/bundle/**/*.deb.sig
+            src-tauri/target/release/bundle/**/*.dmg.sig
+            src-tauri/target/release/bundle/**/*.exe.sig
+            src-tauri/target/release/bundle/**/*.msi.sig
+            src-tauri/target/release/bundle/**/*.rpm.sig
+            src-tauri/target/release/bundle/**/*.app.tar.gz.sig
+            src-tauri/target/release/bundle/**/*.zip.sig
           if-no-files-found: error
 
   publish:
@@ -137,7 +144,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          mapfile -d '' assets < <(find release-assets -type f -print0)
+          mapfile -d '' assets < <(
+            find release-assets -type f \( \
+              -name '*.AppImage' -o \
+              -name '*.deb' -o \
+              -name '*.dmg' -o \
+              -name '*.exe' -o \
+              -name '*.msi' -o \
+              -name '*.rpm' -o \
+              -name '*.app.tar.gz' -o \
+              -name '*.zip' -o \
+              -name '*.AppImage.sig' -o \
+              -name '*.deb.sig' -o \
+              -name '*.dmg.sig' -o \
+              -name '*.exe.sig' -o \
+              -name '*.msi.sig' -o \
+              -name '*.rpm.sig' -o \
+              -name '*.app.tar.gz.sig' -o \
+              -name '*.zip.sig' -o \
+              -name 'latest.json' \
+            \) -print0
+          )
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No release assets found."
             exit 1
