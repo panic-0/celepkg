@@ -69,11 +69,23 @@ jobs:
       - name: Lint frontend
         run: npm run lint
 
+      - name: Lint CSS
+        run: npm run lint:css
+
       - name: Test frontend
         run: npm test
 
+      - name: Test release scripts
+        run: npm run test:scripts
+
       - name: Build frontend
         run: npm run build:web
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Test UI layout
+        run: npm run test:layout
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

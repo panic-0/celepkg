@@ -87,8 +87,11 @@ npm run build
 ```bash
 npm run format:check
 npm run lint
+npm run lint:css
 npm run test
+npm run test:scripts
 npm run build:web
+npm run test:layout
 ```
 
 Rust 检查使用和 CI 一致的命令：
@@ -123,8 +126,11 @@ cargo fmt
 ```bash
 npm run format:check
 npm run lint
+npm run lint:css
 npm run test
+npm run test:scripts
 npm run build:web
+npm run test:layout
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml --locked
