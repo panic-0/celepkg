@@ -24,8 +24,3 @@ src-tauri/gen/schemas/
 Thumbs.db
 .idea/
 .vscode/
-
-# Codex/local assistant files
-AGENTS.md
-.Codex/
-.codex/
