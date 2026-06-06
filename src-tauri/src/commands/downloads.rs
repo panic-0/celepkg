@@ -1,6 +1,6 @@
 use crate::domain::{
-    EverestInstallResult, EverestRelease, ModDownloadProgress, ModInstallResult, ModPreviewStaging,
-    StagedDownload,
+    EverestInstallResult, EverestRelease, ModDownloadProgress, ModInstallResult, ModMetadata,
+    ModPreviewStaging, StagedDownload,
 };
 use crate::services;
 use crate::storage::{load_state, resolve_required_celeste_path_from_state};
@@ -143,6 +143,20 @@ pub async fn stage_mod_preview(
     })
     .await
     .map_err(|error| format!("预览 Mod 依赖任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn read_staged_mod_metadata(
+    celeste_path: String,
+    staged_id: String,
+) -> Result<ModMetadata, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = load_state()?;
+        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
+        services::mod_catalog::read_staged_metadata(&path, &staged_id)
+    })
+    .await
+    .map_err(|error| format!("读取 staged Mod 元数据任务失败：{error}"))?
 }
 
 #[tauri::command]

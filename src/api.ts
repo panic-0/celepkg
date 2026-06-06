@@ -7,6 +7,7 @@ import {
   validateEverestInstallResult,
   validateEverestReleaseList,
   validateLaunchResult,
+  validateModCatalogDependencyResolutionResult,
   validateModCatalogSearchResult,
   validateModInstallResult,
   validateModMetadata,
@@ -22,10 +23,12 @@ import { isMockMode, mockApi } from "./mockApi";
 import type {
   BackupInfo,
   ConfigResponse,
+  Dependency,
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
   ModCatalogEntry,
+  ModCatalogDependencyResolutionResult,
   ModCatalogSearchResult,
   ModCatalogSourceKind,
   ModInstallResult,
@@ -121,6 +124,14 @@ export async function refreshModCatalogCache(sources: ModCatalogSourceKind[]): P
   return invokeChecked("refresh_mod_catalog_cache", validateModCatalogSearchResult, { sources });
 }
 
+export async function resolveModCatalogDependencies(
+  dependencies: Dependency[],
+  sources: ModCatalogSourceKind[]
+): Promise<ModCatalogDependencyResolutionResult> {
+  if (isMockMode()) return mockApi.resolveModCatalogDependencies(dependencies, sources);
+  return invokeChecked("resolve_mod_catalog_dependencies", validateModCatalogDependencyResolutionResult, { dependencies, sources });
+}
+
 export async function checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
   if (isMockMode()) return mockApi.checkModUpdates(celestePath, sources);
   return invokeChecked("check_mod_updates", validateModUpdateCheckResult, { celestePath, sources });
@@ -138,6 +149,11 @@ export async function stageModPreview(
 ): Promise<ModPreviewStaging> {
   if (isMockMode()) return mockApi.stageModPreview(celestePath, entry, operationId);
   return invokeChecked("stage_mod_preview", validateModPreviewStaging, { celestePath, entry, operationId });
+}
+
+export async function readStagedModMetadata(celestePath: string, stagedId: string): Promise<ModMetadata> {
+  if (isMockMode()) return mockApi.readStagedModMetadata(celestePath, stagedId);
+  return invokeChecked("read_staged_mod_metadata", validateModMetadata, { celestePath, stagedId });
 }
 
 export async function listEverestReleases(): Promise<EverestReleaseList> {

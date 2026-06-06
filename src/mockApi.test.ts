@@ -58,8 +58,25 @@ describe("mock staged downloads", () => {
     const preview = await mockApi.stageModPreview("D:\\Games\\Celeste", entry!, "mock-preview");
     expect(preview.staged.kind).toBe("mod");
     expect(preview.metadata.dependencies).toContainEqual({ name: "CommunalHelper", version: "1.24.0" });
+    await expect(mockApi.readStagedModMetadata("D:\\Games\\Celeste", preview.staged.stagedId)).resolves.toMatchObject({
+      name: "Galactica"
+    });
     expect(await mockApi.deleteStagedDownload("D:\\Games\\Celeste", preview.staged.stagedId)).toBe(true);
+    await expect(mockApi.readStagedModMetadata("D:\\Games\\Celeste", preview.staged.stagedId)).rejects.toThrow("staged");
     expect(await mockApi.deleteStagedDownload("D:\\Games\\Celeste", preview.staged.stagedId)).toBe(false);
+  });
+
+  it("resolves catalog dependencies in a batch", async () => {
+    const result = await mockApi.resolveModCatalogDependencies(
+      [
+        { name: "CommunalHelper", version: "1.0.0" },
+        { name: "Missing Helper", version: "" }
+      ],
+      ["everestMirror", "wegfan"]
+    );
+
+    expect(result.resolutions[0].entry?.name).toBe("CommunalHelper");
+    expect(result.resolutions[1].entry).toBeNull();
   });
 
   it("includes local mock mods that exercise dependency tree states", async () => {

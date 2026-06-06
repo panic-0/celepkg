@@ -1,5 +1,6 @@
 use crate::domain::{
-    EverestReleaseList, ModCatalogSearchResult, ModMetadata, ModUpdateCheckResult,
+    Dependency, EverestReleaseList, ModCatalogDependencyResolutionResult, ModCatalogSearchResult,
+    ModMetadata, ModUpdateCheckResult,
 };
 use crate::services;
 use crate::storage::{load_state, resolve_required_celeste_path_from_state};
@@ -27,6 +28,22 @@ pub async fn refresh_mod_catalog_cache(
     })
     .await
     .map_err(|error| format!("刷新 Mod 目录缓存任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn resolve_mod_catalog_dependencies(
+    dependencies: Vec<Dependency>,
+    sources: Vec<String>,
+) -> Result<ModCatalogDependencyResolutionResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let sources = services::mod_catalog::parse_sources(&sources);
+        Ok(services::mod_catalog::resolve_catalog_dependencies(
+            &dependencies,
+            &sources,
+        ))
+    })
+    .await
+    .map_err(|error| format!("解析 Mod 依赖目录任务失败：{error}"))?
 }
 
 #[tauri::command]

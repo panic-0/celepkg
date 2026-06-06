@@ -1,8 +1,9 @@
-use crate::domain::StagedDownload;
+use crate::domain::{Dependency, StagedDownload};
 use crate::domain::{
-    InstalledModMatch, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind,
-    ModDownloadProgress, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
-    ModUpdateCheckResult, ProfilesState,
+    InstalledModMatch, ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult,
+    ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModDownloadProgress,
+    ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate, ModUpdateCheckResult,
+    ProfilesState,
 };
 use crate::services::mod_catalog_cache::{
     read_catalog_cache, read_valid_catalog_cache, write_catalog_cache,
@@ -142,6 +143,27 @@ pub fn refresh_catalog_cache(sources: &[ModCatalogSourceKind]) -> ModCatalogSear
     ModCatalogSearchResult {
         sources: load.sources,
         entries,
+        warnings: load.warnings,
+    }
+}
+
+pub fn resolve_catalog_dependencies(
+    dependencies: &[Dependency],
+    sources: &[ModCatalogSourceKind],
+) -> ModCatalogDependencyResolutionResult {
+    let load = load_catalogs(sources);
+    let mut entries = load.entries;
+    sort_catalog_entries(&mut entries);
+    let resolutions = dependencies
+        .iter()
+        .map(|dependency| ModCatalogDependencyResolution {
+            dependency: dependency.clone(),
+            entry: find_catalog_entry_for_dependency(&entries, dependency).cloned(),
+        })
+        .collect();
+    ModCatalogDependencyResolutionResult {
+        sources: load.sources,
+        resolutions,
         warnings: load.warnings,
     }
 }
@@ -765,6 +787,63 @@ fn entry_matches_query(
             && normalize_dependency_name(&entry.page_url).contains(normalized_query))
 }
 
+fn find_catalog_entry_for_dependency<'a>(
+    entries: &'a [ModCatalogEntry],
+    dependency: &Dependency,
+) -> Option<&'a ModCatalogEntry> {
+    let normalized = normalize_dependency_name(&dependency.name);
+    if normalized.is_empty() {
+        return None;
+    }
+    entries.iter().find(|entry| {
+        normalize_dependency_name(&entry.name) == normalized
+            && catalog_entry_satisfies_dependency(entry, dependency)
+    })
+}
+
+fn catalog_entry_satisfies_dependency(entry: &ModCatalogEntry, dependency: &Dependency) -> bool {
+    !entry.download_url.trim().is_empty() && !version_too_low(&entry.version, &dependency.version)
+}
+
+fn version_too_low(installed_version: &str, required_version: &str) -> bool {
+    let Some(installed) = parse_numeric_version(installed_version) else {
+        return false;
+    };
+    let Some(required) = parse_numeric_version(required_version) else {
+        return false;
+    };
+    compare_numeric_versions(&installed, &required) == std::cmp::Ordering::Less
+}
+
+fn parse_numeric_version(value: &str) -> Option<Vec<u64>> {
+    let mut parts = vec![];
+    let mut current = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_digit() {
+            current.push(ch);
+        } else if !current.is_empty() {
+            parts.push(current.parse().ok()?);
+            current.clear();
+        }
+    }
+    if !current.is_empty() {
+        parts.push(current.parse().ok()?);
+    }
+    (!parts.is_empty()).then_some(parts)
+}
+
+fn compare_numeric_versions(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
+    for index in 0..left.len().max(right.len()) {
+        let left_part = left.get(index).copied().unwrap_or_default();
+        let right_part = right.get(index).copied().unwrap_or_default();
+        match left_part.cmp(&right_part) {
+            std::cmp::Ordering::Equal => {}
+            order => return order,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
 fn query_looks_like_url_or_domain(query: &str) -> bool {
     query
         .split_whitespace()
@@ -1292,9 +1371,11 @@ mod tests {
     use std::fs;
     use std::io::{Cursor, Write};
     use std::net::TcpListener;
-    use std::sync::Mutex;
+    use std::sync::{LazyLock, Mutex};
     use std::thread;
     use zip::write::SimpleFileOptions;
+
+    static CATALOG_CACHE_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     #[test]
     fn http_user_agent_uses_package_version() {
@@ -1379,6 +1460,7 @@ Helper:
 
     #[test]
     fn valid_catalog_cache_round_trips_entries() {
+        let _guard = CATALOG_CACHE_TEST_LOCK.lock().unwrap();
         let entry = test_catalog_entry("helper", "Helper");
         let cache_path = mod_catalog_cache_path(ModCatalogSourceKind::Wegfan);
         let previous = fs::read(&cache_path).ok();
@@ -1394,6 +1476,61 @@ Helper:
         } else {
             let _ = fs::remove_file(cache_path);
         }
+    }
+
+    #[test]
+    fn resolves_catalog_dependencies_from_loaded_catalog_once() {
+        let _guard = CATALOG_CACHE_TEST_LOCK.lock().unwrap();
+        let cache_path = mod_catalog_cache_path(ModCatalogSourceKind::Wegfan);
+        let previous = fs::read(&cache_path).ok();
+        let mut helper = test_catalog_entry("helper", "Helper");
+        helper.version = "2.0.0".to_string();
+        helper.download_url = "https://example.test/helper.zip".to_string();
+        let mut old_helper = test_catalog_entry("old-helper", "OldHelper");
+        old_helper.version = "1.0.0".to_string();
+        old_helper.download_url = "https://example.test/old.zip".to_string();
+        let mut no_download = test_catalog_entry("no-download", "NoDownload");
+        no_download.version = "9.0.0".to_string();
+        write_catalog_cache(
+            ModCatalogSourceKind::Wegfan,
+            &[old_helper, helper, no_download],
+        );
+
+        let result = resolve_catalog_dependencies(
+            &[
+                Dependency {
+                    name: "Helper".to_string(),
+                    version: "1.5.0".to_string(),
+                },
+                Dependency {
+                    name: "OldHelper".to_string(),
+                    version: "2.0.0".to_string(),
+                },
+                Dependency {
+                    name: "NoDownload".to_string(),
+                    version: "1.0.0".to_string(),
+                },
+            ],
+            &[ModCatalogSourceKind::Wegfan],
+        );
+
+        if let Some(previous) = previous {
+            fs::write(cache_path, previous).expect("restore previous catalog cache");
+        } else {
+            let _ = fs::remove_file(cache_path);
+        }
+
+        assert_eq!(result.sources, vec![ModCatalogSourceKind::Wegfan]);
+        assert_eq!(result.resolutions.len(), 3);
+        assert_eq!(
+            result.resolutions[0]
+                .entry
+                .as_ref()
+                .map(|entry| entry.id.as_str()),
+            Some("helper")
+        );
+        assert!(result.resolutions[1].entry.is_none());
+        assert!(result.resolutions[2].entry.is_none());
     }
 
     #[test]
@@ -1710,6 +1847,28 @@ Helper:
         assert!(read_zip_metadata(&not_zip)
             .unwrap_err()
             .contains("读取 Mod 压缩包失败"));
+    }
+
+    #[test]
+    fn reads_metadata_from_valid_staged_download() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = test_catalog_entry("helper", "Helper");
+        let staged_path = staging_download_path(dir.path(), &entry, "metadata-read");
+        fs::create_dir_all(staged_path.parent().unwrap()).unwrap();
+        write_zip(
+            &staged_path,
+            &[("everest.yaml", "Name: Helper\nVersion: 1.2.3\n")],
+        );
+        let staged_id = staged_id_from_path(&staged_path).unwrap();
+
+        let metadata = read_staged_metadata(dir.path(), &staged_id).unwrap();
+
+        assert_eq!(metadata.name, "Helper");
+        assert_eq!(metadata.version, "1.2.3");
+        assert_eq!(
+            read_staged_metadata(dir.path(), "../Helper.zip").unwrap_err(),
+            "无效的 staging id"
+        );
     }
 
     #[test]

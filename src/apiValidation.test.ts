@@ -5,6 +5,7 @@ import {
   validateConfigResponse,
   validateEverestInstallResult,
   validateEverestReleaseList,
+  validateModCatalogDependencyResolutionResult,
   validateModCatalogSearchResult,
   validateModInstallResult,
   validateModMetadata,
@@ -273,6 +274,25 @@ describe("api validation", () => {
         warnings: []
       }).updates[0].entry.source
     ).toBe("everestMirror");
+  });
+
+  it("accepts mod catalog dependency resolution responses", () => {
+    expect(
+      validateModCatalogDependencyResolutionResult({
+        sources: ["everestMirror"],
+        resolutions: [
+          {
+            dependency: { name: "Helper", version: "1.0.0" },
+            entry: catalogEntry
+          },
+          {
+            dependency: { name: "Missing", version: "" },
+            entry: null
+          }
+        ],
+        warnings: []
+      }).resolutions.map((resolution) => resolution.entry?.name ?? null)
+    ).toEqual(["Helper", null]);
   });
 
   it("accepts mod install responses with nested scan", () => {

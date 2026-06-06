@@ -217,8 +217,9 @@ pub fn scan_mods(celeste_path: &Path, profiles: &ProfilesState) -> ScanResult {
         vec!["没有找到 Celeste/Mods 目录。".to_string()]
     };
 
-    records.extend(builtin_mod_records(celeste_path));
-    let dependency_index = DependencyIndex::new(&records, celeste_path);
+    let builtin_versions = builtin_dependency_versions(celeste_path);
+    records.extend(builtin_mod_records(celeste_path, &builtin_versions));
+    let dependency_index = DependencyIndex::new(&records, builtin_versions);
     let mut unknown_builtin_dependencies = HashSet::new();
 
     let mut maps = vec![];
@@ -283,7 +284,7 @@ struct DependencyIndex {
 }
 
 impl DependencyIndex {
-    fn new(records: &[ModRecord], celeste_path: &Path) -> Self {
+    fn new(records: &[ModRecord], builtin_versions: HashMap<String, String>) -> Self {
         let mut mods = HashMap::new();
         for record in records {
             let candidate = DependencyCandidate {
@@ -298,7 +299,7 @@ impl DependencyIndex {
         }
         Self {
             mods,
-            builtin_versions: builtin_dependency_versions(celeste_path),
+            builtin_versions,
         }
     }
 
@@ -455,8 +456,7 @@ fn builtin_dependency_versions(celeste_path: &Path) -> HashMap<String, String> {
     versions
 }
 
-fn builtin_mod_records(celeste_path: &Path) -> Vec<ModRecord> {
-    let versions = builtin_dependency_versions(celeste_path);
+fn builtin_mod_records(celeste_path: &Path, versions: &HashMap<String, String>) -> Vec<ModRecord> {
     let everest_version = versions
         .get(&normalize_dependency_name("Everest"))
         .cloned()
@@ -2024,7 +2024,7 @@ CompleteScreen:
         let mut helper = record("helper-id", "Helper.zip", ModKind::Mod);
         helper.metadata.name = "Helper".to_string();
         helper.metadata.version = "1.1.5".to_string();
-        let index = DependencyIndex::new(&[helper], Path::new(""));
+        let index = DependencyIndex::new(&[helper], HashMap::new());
 
         let warnings =
             dependency_warnings_for_test(&[dependency("Helper", "1.2.0")], &index, true).0;
@@ -2040,7 +2040,7 @@ CompleteScreen:
         let mut helper = record("helper-id", "Helper.zip", ModKind::Mod);
         helper.metadata.name = "Helper".to_string();
         helper.metadata.version = "1.10.0".to_string();
-        let index = DependencyIndex::new(&[helper], Path::new(""));
+        let index = DependencyIndex::new(&[helper], HashMap::new());
 
         assert!(
             dependency_warnings_for_test(&[dependency("Helper", "1.2.0")], &index, true)
@@ -2059,7 +2059,7 @@ CompleteScreen:
         let mut helper = record("helper-id", "Helper.zip", ModKind::Mod);
         helper.metadata.name = "Helper".to_string();
         helper.metadata.version = "preview".to_string();
-        let index = DependencyIndex::new(&[helper], Path::new(""));
+        let index = DependencyIndex::new(&[helper], HashMap::new());
 
         assert!(
             dependency_warnings_for_test(&[dependency("Helper", "")], &index, true)
@@ -2082,7 +2082,7 @@ CompleteScreen:
     fn dependency_warning_matches_normalized_aliases() {
         let mut helper = record("helper-id", "Helper_Pack.zip", ModKind::Mod);
         helper.metadata.version = "1.0.0".to_string();
-        let index = DependencyIndex::new(&[helper], Path::new(""));
+        let index = DependencyIndex::new(&[helper], HashMap::new());
 
         let warnings =
             dependency_warnings_for_test(&[dependency("Helper Pack", "1.1.0")], &index, true).0;
@@ -2095,7 +2095,7 @@ CompleteScreen:
 
     #[test]
     fn builtin_dependency_with_unknown_local_version_gets_warning() {
-        let index = DependencyIndex::new(&[], Path::new(""));
+        let index = DependencyIndex::new(&[], builtin_dependency_versions(Path::new("")));
 
         let (warnings, unknown_builtin_versions) =
             dependency_warnings_for_test(&[dependency("EverestCore", "1.4980.0")], &index, true);
@@ -2109,7 +2109,7 @@ CompleteScreen:
 
     #[test]
     fn celeste_builtin_dependency_uses_common_version() {
-        let index = DependencyIndex::new(&[], Path::new(""));
+        let index = DependencyIndex::new(&[], builtin_dependency_versions(Path::new("")));
 
         let same_version =
             dependency_warnings_for_test(&[dependency("Celeste", "1.4.0.0")], &index, true);
@@ -2134,7 +2134,7 @@ CompleteScreen:
             "Name: EverestCore\nVersion: 1.4970.0\n",
         )
         .expect("everest yaml");
-        let index = DependencyIndex::new(&[], &root);
+        let index = DependencyIndex::new(&[], builtin_dependency_versions(&root));
 
         let warnings =
             dependency_warnings_for_test(&[dependency("EverestCore", "1.4980.0")], &index, true).0;
@@ -2216,7 +2216,7 @@ CompleteScreen:
             "Name: EverestCore\nVersion: 1.4970.0\n",
         )
         .expect("everest yaml");
-        let index = DependencyIndex::new(&[], &root);
+        let index = DependencyIndex::new(&[], builtin_dependency_versions(&root));
 
         let warnings =
             dependency_warnings_for_test(&[dependency("EverestCore", "1.4980.0")], &index, true).0;

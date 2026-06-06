@@ -2,10 +2,12 @@ import type {
   BackupInfo,
   BackupModEntry,
   ConfigResponse,
+  Dependency,
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
   MapStats,
+  ModCatalogDependencyResolutionResult,
   ModCatalogEntry,
   ModCatalogSearchResult,
   ModCatalogSourceKind,
@@ -22,6 +24,8 @@ import type {
   SubMapInfo
 } from "./types";
 import { catalogEntry, createMockCatalog, createMockEverestReleases, mockUpdateMetadata } from "./mockCatalogData";
+import { dependencyEntrySatisfies } from "./utils/appDependencyResolution";
+import { normalizeDependencyName } from "./utils/dependencies";
 
 type MockRecordOptions = Partial<ModRecord> &
   Pick<ModRecord, "id" | "name" | "fileName" | "relativePath" | "kind"> & {
@@ -64,6 +68,7 @@ let profiles: ProfilesState = {
 let scan = createMockScan();
 const catalogEntries = createMockCatalog();
 const stagedDownloads = new Map<string, StagedDownload>();
+const stagedDownloadMetadata = new Map<string, ModMetadata>();
 let backups: BackupInfo[] = [
   backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770048600000000000-auto", true, true),
   backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770045000000000000-auto", true, false),
@@ -165,6 +170,27 @@ export const mockApi = {
     return mockApi.searchModCatalog("", sources);
   },
 
+  async resolveModCatalogDependencies(
+    dependencies: Dependency[],
+    sources: ModCatalogSourceKind[]
+  ): Promise<ModCatalogDependencyResolutionResult> {
+    const selectedSources = sources.length ? sources : (["wegfan", "everestMirror"] satisfies ModCatalogSourceKind[]);
+    const entries = catalogEntries.filter((entry) => selectedSources.includes(entry.source));
+    return clone({
+      sources: selectedSources,
+      resolutions: dependencies.map((dependency) => {
+        const normalized = normalizeDependencyName(dependency.name);
+        return {
+          dependency,
+          entry:
+            entries.find((entry) => normalizeDependencyName(entry.name) === normalized && dependencyEntrySatisfies(entry, dependency)) ??
+            null
+        };
+      }),
+      warnings: []
+    });
+  },
+
   async checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
     void celestePath;
     const selectedSources = sources.length ? sources : (["wegfan", "everestMirror"] satisfies ModCatalogSourceKind[]);
@@ -244,7 +270,9 @@ export const mockApi = {
       entry.xxHash[0] ?? null
     );
     stagedDownloads.set(staged.stagedId, staged);
-    return clone({ staged, metadata: mockUpdateMetadata(entry) });
+    const metadata = mockUpdateMetadata(entry);
+    stagedDownloadMetadata.set(staged.stagedId, metadata);
+    return clone({ staged, metadata });
   },
 
   async listEverestReleases(): Promise<EverestReleaseList> {
@@ -289,12 +317,28 @@ export const mockApi = {
     await delay(300);
     const staged = stagedDownload(`mod-${entry.id || entry.name}-${operationId}`, entry.name, "mod", entry.size, entry.xxHash[0] ?? null);
     stagedDownloads.set(staged.stagedId, staged);
+    stagedDownloadMetadata.set(staged.stagedId, mockUpdateMetadata(entry));
     return clone(staged);
+  },
+
+  async readStagedModMetadata(_celestePath: string, stagedId: string): Promise<ModMetadata> {
+    requireStagedDownload(stagedId, "mod");
+    return clone(
+      stagedDownloadMetadata.get(stagedId) ?? {
+        name: "",
+        version: "",
+        author: "",
+        description: "",
+        dependencies: [],
+        optionalDependencies: []
+      }
+    );
   },
 
   async installStagedMod(celestePath: string, stagedId: string, entry: ModCatalogEntry, installedPath?: string): Promise<ModInstallResult> {
     requireStagedDownload(stagedId, "mod");
     stagedDownloads.delete(stagedId);
+    stagedDownloadMetadata.delete(stagedId);
     await delay(installedPath ? 1100 : 900);
     if (installedPath) {
       scan = updateRecord(scan, entry.name.toLowerCase().replace(/\s+/g, "-"), (item) => ({
@@ -414,6 +458,7 @@ export const mockApi = {
   },
 
   async deleteStagedDownload(_celestePath: string, stagedId: string): Promise<boolean> {
+    stagedDownloadMetadata.delete(stagedId);
     return stagedDownloads.delete(stagedId);
   },
 

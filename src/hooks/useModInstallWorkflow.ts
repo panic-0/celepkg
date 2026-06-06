@@ -9,7 +9,8 @@ import {
   installStagedMod,
   listEverestReleases,
   previewModUpdateMetadata,
-  searchModCatalog,
+  readStagedModMetadata,
+  resolveModCatalogDependencies,
   stageModPreview
 } from "../api";
 import { useAppPrompts } from "./useAppPrompts";
@@ -92,6 +93,11 @@ type PreviewDependencyResolution = {
   unavailableCount: number;
 };
 
+type DependencyResolutionContext = {
+  catalogEntriesByDependencyKey: Map<string, ModCatalogEntry | null>;
+  plannedKeys: Set<string>;
+};
+
 type DependencyPreviewPlan = PreviewDependencyResolution & {
   tree: DependencyTreeNode;
 };
@@ -140,6 +146,13 @@ export function useModInstallWorkflow({
     () => modUpdateResult.updates.filter((candidate) => candidate.entry.downloadUrl.trim().length > 0),
     [modUpdateResult.updates]
   );
+  const allRecords = useMemo(() => [...scan.maps, ...scan.otherMods], [scan.maps, scan.otherMods]);
+  const installedIndex = useMemo(() => buildInstalledDependencyIndex(allRecords), [allRecords]);
+  const downloadableModUpdatesByRecordId = useMemo(() => {
+    const byRecordId = new Map<string, ModUpdateCandidate>();
+    for (const candidate of downloadableModUpdates) byRecordId.set(candidate.installed.recordId, candidate);
+    return byRecordId;
+  }, [downloadableModUpdates]);
 
   const checkUpdatesForMods = useCallback(
     async (mode: "manual" | "startup" = "manual") => {
@@ -312,7 +325,7 @@ export function useModInstallWorkflow({
         : (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, candidate.entry, operationId, taskIndex, taskTotal),
       prepareInstall: prepared
         ? async () => prepared.dependencies
-        : async () => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新"),
+        : async (staged) => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新", staged),
       install: async (staged) => {
         const result = await installStagedMod(celestePath, staged.stagedId, candidate.entry, candidate.installed.absolutePath);
         setScan(result.scan);
@@ -333,7 +346,9 @@ export function useModInstallWorkflow({
       download: prepared
         ? async () => prepared.staged
         : (operationId, taskIndex, taskTotal) => downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
-      prepareInstall: prepared ? async () => prepared.dependencies : async () => await prepareDependencyItems(entry, entry.name, "安装"),
+      prepareInstall: prepared
+        ? async () => prepared.dependencies
+        : async (staged) => await prepareDependencyItems(entry, entry.name, "安装", staged),
       install: async (staged) => {
         const result = await installStagedMod(celestePath, staged.stagedId, entry);
         setScan(result.scan);
@@ -404,7 +419,7 @@ export function useModInstallWorkflow({
   }
 
   async function buildDependencyPreviewPlan(targetName: string, metadata: ModMetadata): Promise<DependencyPreviewPlan> {
-    const context = { plannedKeys: new Set<string>() };
+    const context: DependencyResolutionContext = { catalogEntriesByDependencyKey: new Map(), plannedKeys: new Set<string>() };
     const root: DependencyTreeNode = {
       id: `target:${normalizeDependencyName(targetName)}`,
       name: targetName,
@@ -444,7 +459,7 @@ export function useModInstallWorkflow({
     kind: Exclude<DependencyTreeNodeKind, "target">,
     optionalAncestorIds: string[],
     path: Set<string>,
-    context: { plannedKeys: Set<string> }
+    context: DependencyResolutionContext
   ): Promise<PreviewDependencyResolution & { nodes: DependencyTreeNode[] }> {
     const nodes: DependencyTreeNode[] = [];
     const actionIds: string[] = [];
@@ -469,7 +484,7 @@ export function useModInstallWorkflow({
     kind: Exclude<DependencyTreeNodeKind, "target">,
     optionalAncestorIds: string[],
     path: Set<string>,
-    context: { plannedKeys: Set<string> }
+    context: DependencyResolutionContext
   ): Promise<PreviewDependencyResolution & { node: DependencyTreeNode }> {
     const normalized = normalizeDependencyName(dependency.name);
     const nodeId = `${kind}:${normalized}:${dependency.version}:${path.size}`;
@@ -485,7 +500,6 @@ export function useModInstallWorkflow({
       return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "cycle", "循环依赖"));
     }
 
-    const installedIndex = buildInstalledDependencyIndex([...scan.maps, ...scan.otherMods]);
     const installed = installedIndex.get(normalized);
     if (installed && !versionTooLow(installed.metadata.version, dependency.version)) {
       const nextPath = new Set(path);
@@ -517,7 +531,7 @@ export function useModInstallWorkflow({
       optional: kind === "optional",
       reason: installed ? "tooLow" : "missing"
     };
-    const action = await resolveDependencyAction(issue);
+    const action = await resolveDependencyAction(issue, context.catalogEntriesByDependencyKey);
     if (!action) {
       return {
         ...emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "unavailable", formatDependencyIssue(issue))),
@@ -705,8 +719,13 @@ export function useModInstallWorkflow({
     await Promise.allSettled(staged.map((item) => deleteStagedDownload(celestePath, item.stagedId)));
   }
 
-  async function prepareDependencyItems(entry: ModCatalogEntry, targetName: string, actionLabel: DependencyActionLabel) {
-    const actions = await prepareDependencyActions(entry, targetName, actionLabel);
+  async function prepareDependencyItems(
+    entry: ModCatalogEntry,
+    targetName: string,
+    actionLabel: DependencyActionLabel,
+    staged?: StagedDownload
+  ) {
+    const actions = await prepareDependencyActions(entry, targetName, actionLabel, staged);
     if (!actions) throw new Error("已取消依赖检查");
     return createDependencyExecutableItems(actions);
   }
@@ -718,7 +737,7 @@ export function useModInstallWorkflow({
     );
     const updateDescriptors = createModUpdateTaskDescriptors(
       updateActions.map((action) => action.candidate),
-      [...scan.maps, ...scan.otherMods]
+      allRecords
     );
     const updateItems = updateDescriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
     const nonUpdateItems = dedupedActions
@@ -735,12 +754,13 @@ export function useModInstallWorkflow({
   async function prepareDependencyActions(
     entry: ModCatalogEntry,
     targetName: string,
-    actionLabel: DependencyActionLabel
+    actionLabel: DependencyActionLabel,
+    staged?: StagedDownload
   ): Promise<DependencyUpdateAction[] | null> {
     let metadata;
     try {
       setLoading(true, `正在检查 ${targetName} 的依赖...`);
-      metadata = await previewModUpdateMetadata(celestePath, entry);
+      metadata = staged ? await readStagedModMetadata(celestePath, staged.stagedId) : await previewModUpdateMetadata(celestePath, entry);
     } catch (error) {
       const message = readError(error);
       notifier.showWarning(message);
@@ -831,13 +851,7 @@ export function useModInstallWorkflow({
   async function resolveDependencyActions(plan: DependencyUpdatePlan): Promise<DependencyUpdateAction[] | null> {
     if (plan.choice === "none") return [];
     const selectedIssues = dedupeDependencyIssues(plan.issues.filter((issue) => !issue.optional || plan.choice === "all"));
-    const actions: DependencyUpdateAction[] = [];
-    const unavailable: DependencyIssue[] = [];
-    for (const issue of selectedIssues) {
-      const action = await resolveDependencyAction(issue);
-      if (action) actions.push(action);
-      else unavailable.push(issue);
-    }
+    const { actions, unavailable } = await resolveDependencyActionsForIssues(selectedIssues);
     if (unavailable.length) {
       const actionText = plan.actionLabel === "安装" ? "安装" : "覆盖";
       const confirmed = await requestAppConfirm({
@@ -858,7 +872,6 @@ export function useModInstallWorkflow({
   }
 
   function dependencyIssuesForMetadata(dependencies: Dependency[], optional: boolean): DependencyIssue[] {
-    const installedIndex = buildInstalledDependencyIndex([...scan.maps, ...scan.otherMods]);
     const issues: DependencyIssue[] = [];
     for (const dependency of dependencies) {
       const installed = installedIndex.get(normalizeDependencyName(dependency.name));
@@ -873,15 +886,56 @@ export function useModInstallWorkflow({
     return issues;
   }
 
-  async function resolveDependencyAction(issue: DependencyIssue): Promise<DependencyUpdateAction | null> {
+  async function resolveDependencyActionsForIssues(issues: DependencyIssue[]) {
+    const actions: DependencyUpdateAction[] = [];
+    const unresolved: DependencyIssue[] = [];
+    for (const issue of issues) {
+      const action = resolveInstalledDependencyAction(issue);
+      if (action) actions.push(action);
+      else unresolved.push(issue);
+    }
+
+    const catalogIssues = unresolved.filter((issue) => !isBuiltinDependencyName(issue.dependency.name));
+    const entriesByKey = await findCatalogEntriesForDependencies(catalogIssues.map((issue) => issue.dependency));
+    const unavailable = unresolved.filter((issue) => isBuiltinDependencyName(issue.dependency.name));
+    for (const issue of catalogIssues) {
+      const entry = entriesByKey.get(dependencyResolutionKey(issue.dependency));
+      if (!entry) {
+        unavailable.push(issue);
+        continue;
+      }
+      if (issue.installed) {
+        actions.push({ kind: "update", name: issue.dependency.name, candidate: updateCandidateFromRecord(entry, issue.installed) });
+      } else {
+        actions.push({
+          kind: "install",
+          name: issue.dependency.name,
+          entry
+        });
+      }
+    }
+    return { actions, unavailable };
+  }
+
+  function resolveInstalledDependencyAction(issue: DependencyIssue): DependencyUpdateAction | null {
     if (isBuiltinDependencyName(issue.dependency.name)) return null;
     if (issue.installed) {
-      const candidate = downloadableModUpdates.find((item) => item.installed.recordId === issue.installed?.id);
+      const candidate = downloadableModUpdatesByRecordId.get(issue.installed.id);
       if (candidate && dependencyEntrySatisfies(candidate.entry, issue.dependency)) {
         return { kind: "update", name: issue.dependency.name, candidate };
       }
     }
-    const entry = await findCatalogEntryForDependency(issue.dependency);
+    return null;
+  }
+
+  async function resolveDependencyAction(
+    issue: DependencyIssue,
+    catalogEntriesByDependencyKey?: Map<string, ModCatalogEntry | null>
+  ): Promise<DependencyUpdateAction | null> {
+    const installedAction = resolveInstalledDependencyAction(issue);
+    if (installedAction) return installedAction;
+    if (isBuiltinDependencyName(issue.dependency.name)) return null;
+    const entry = await findCatalogEntryForDependency(issue.dependency, catalogEntriesByDependencyKey);
     if (!entry) return null;
     if (issue.installed) {
       return {
@@ -893,18 +947,38 @@ export function useModInstallWorkflow({
     return { kind: "install", name: issue.dependency.name, entry };
   }
 
-  async function findCatalogEntryForDependency(dependency: Dependency): Promise<ModCatalogEntry | null> {
+  async function findCatalogEntryForDependency(
+    dependency: Dependency,
+    catalogEntriesByDependencyKey?: Map<string, ModCatalogEntry | null>
+  ): Promise<ModCatalogEntry | null> {
+    const key = dependencyResolutionKey(dependency);
+    if (catalogEntriesByDependencyKey?.has(key)) return catalogEntriesByDependencyKey.get(key) ?? null;
     try {
-      const result = await searchModCatalog(dependency.name, modCatalogSources);
-      const normalized = normalizeDependencyName(dependency.name);
-      return (
-        result.entries.find((entry) => normalizeDependencyName(entry.name) === normalized && dependencyEntrySatisfies(entry, dependency)) ??
-        null
-      );
+      const entries = await findCatalogEntriesForDependencies([dependency]);
+      const entry = entries.get(key) ?? null;
+      catalogEntriesByDependencyKey?.set(key, entry);
+      return entry;
     } catch (error) {
       notifyWarning(notifier, error);
       return null;
     }
+  }
+
+  async function findCatalogEntriesForDependencies(dependencies: Dependency[]) {
+    const deduped = [...new Map(dependencies.map((dependency) => [dependencyResolutionKey(dependency), dependency])).values()];
+    if (!deduped.length) return new Map<string, ModCatalogEntry | null>();
+    try {
+      const result = await resolveModCatalogDependencies(deduped, modCatalogSources);
+      if (result.warnings.length) notifier.showWarning(result.warnings.join("；"));
+      return new Map(result.resolutions.map((resolution) => [dependencyResolutionKey(resolution.dependency), resolution.entry] as const));
+    } catch (error) {
+      notifyWarning(notifier, error);
+      return new Map(deduped.map((dependency) => [dependencyResolutionKey(dependency), null] as const));
+    }
+  }
+
+  function dependencyResolutionKey(dependency: Dependency) {
+    return `${normalizeDependencyName(dependency.name)}:${dependency.version}`;
   }
 
   async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {

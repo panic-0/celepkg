@@ -9,6 +9,7 @@ import type {
   EverestReleaseList,
   InstalledModMatch,
   MapStats,
+  ModCatalogDependencyResolutionResult,
   ModCatalogEntry,
   ModCatalogSearchResult,
   ModCatalogSourceKind,
@@ -128,6 +129,26 @@ export function validateModCatalogSearchResult(value: unknown): ModCatalogSearch
       validateModCatalogEntry(item, `mod catalog search.entries[${index}]`)
     ),
     warnings: stringArrayAt(object.warnings, "mod catalog search.warnings")
+  };
+}
+
+export function validateModCatalogDependencyResolutionResult(value: unknown): ModCatalogDependencyResolutionResult {
+  const object = objectAt(value, "mod catalog dependency resolution");
+  return {
+    sources: arrayAt(object.sources, "mod catalog dependency resolution.sources").map((item, index) =>
+      validateModCatalogSourceKind(item, `mod catalog dependency resolution.sources[${index}]`)
+    ),
+    resolutions: arrayAt(object.resolutions, "mod catalog dependency resolution.resolutions").map((item, index) => {
+      const resolution = objectAt(item, `mod catalog dependency resolution.resolutions[${index}]`);
+      return {
+        dependency: validateDependency(resolution.dependency, `mod catalog dependency resolution.resolutions[${index}].dependency`),
+        entry:
+          resolution.entry === null
+            ? null
+            : validateModCatalogEntry(resolution.entry, `mod catalog dependency resolution.resolutions[${index}].entry`)
+      };
+    }),
+    warnings: stringArrayAt(object.warnings, "mod catalog dependency resolution.warnings")
   };
 }
 

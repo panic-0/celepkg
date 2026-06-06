@@ -283,6 +283,21 @@ pub struct ModCatalogSearchResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ModCatalogDependencyResolution {
+    pub dependency: Dependency,
+    pub entry: Option<ModCatalogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModCatalogDependencyResolutionResult {
+    pub sources: Vec<ModCatalogSourceKind>,
+    pub resolutions: Vec<ModCatalogDependencyResolution>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InstalledModMatch {
     pub record_id: String,
     pub name: String,

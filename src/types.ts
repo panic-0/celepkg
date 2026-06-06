@@ -190,6 +190,17 @@ export type ModCatalogSearchResult = {
   warnings: string[];
 };
 
+export type ModCatalogDependencyResolution = {
+  dependency: Dependency;
+  entry: ModCatalogEntry | null;
+};
+
+export type ModCatalogDependencyResolutionResult = {
+  sources: ModCatalogSourceKind[];
+  resolutions: ModCatalogDependencyResolution[];
+  warnings: string[];
+};
+
 export type InstalledModMatch = {
   recordId: string;
   name: string;
