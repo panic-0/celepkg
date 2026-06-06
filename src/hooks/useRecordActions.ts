@@ -1,7 +1,7 @@
 import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { setRecordFavorite, setRecordProtected } from "../api";
 import type { AppNotifier, ModRecord, ScanResult } from "../types";
-import { findDependencyReferencesByModId } from "../utils/dependencies";
+import type { DependencyReference } from "../utils/dependencies";
 import { isDraftEnabled } from "../utils/format";
 import { notifyError } from "../utils/notify";
 import type { ActiveView } from "../viewTypes";
@@ -15,6 +15,7 @@ type RecordActionsOptions = {
   filteredMaps: ModRecord[];
   filteredMods: ModRecord[];
   notifier: AppNotifier;
+  requiredReferencesByModId: Map<string, DependencyReference[]>;
   scan: ScanResult;
   setEnabledExplicitModDraft: Dispatch<SetStateAction<Set<string>>>;
   setEnabledMapDraft: Dispatch<SetStateAction<Set<string>>>;
@@ -35,6 +36,7 @@ export function useRecordActions({
   filteredMaps,
   filteredMods,
   notifier,
+  requiredReferencesByModId,
   scan,
   setEnabledExplicitModDraft,
   setEnabledMapDraft,
@@ -46,8 +48,8 @@ export function useRecordActions({
   toggleMod
 }: RecordActionsOptions) {
   const dependentNamesByModId = useMemo(
-    () => findDependentNamesByModId(scan, enabledMapDraft, enabledModDraft),
-    [enabledMapDraft, enabledModDraft, scan]
+    () => findDependentNamesByModId(scan, enabledMapDraft, enabledModDraft, requiredReferencesByModId),
+    [enabledMapDraft, enabledModDraft, requiredReferencesByModId, scan]
   );
 
   function toggleMapLikeRecord(record: ModRecord) {
@@ -196,12 +198,21 @@ export function useRecordActions({
   };
 }
 
-function findDependentNamesByModId(scan: ScanResult, enabledMapDraft: Set<string>, enabledModDraft: Set<string>) {
-  const enabledItems = [
-    ...scan.maps.filter((map) => map.protected || enabledMapDraft.has(map.id)),
-    ...scan.otherMods.filter((modItem) => modItem.protected || enabledModDraft.has(modItem.id))
-  ];
-  const { requiredReferencesByModId } = findDependencyReferencesByModId(enabledItems, scan.otherMods);
-
-  return new Map([...requiredReferencesByModId].map(([modId, records]) => [modId, records.map((record) => record.name)]));
+function findDependentNamesByModId(
+  scan: ScanResult,
+  enabledMapDraft: Set<string>,
+  enabledModDraft: Set<string>,
+  requiredReferencesByModId: Map<string, DependencyReference[]>
+) {
+  const enabledReferenceIds = new Set([
+    ...scan.maps.filter((map) => map.protected || enabledMapDraft.has(map.id)).map((map) => map.id),
+    ...scan.otherMods.filter((modItem) => modItem.protected || enabledModDraft.has(modItem.id)).map((modItem) => modItem.id)
+  ]);
+  return new Map(
+    [...requiredReferencesByModId]
+      .map(
+        ([modId, records]) => [modId, records.filter((record) => enabledReferenceIds.has(record.id)).map((record) => record.name)] as const
+      )
+      .filter(([, names]) => names.length > 0)
+  );
 }

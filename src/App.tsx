@@ -150,15 +150,19 @@ export function App() {
     setLoading,
     setScan
   });
-  const filters = useModFilters({
-    enabledMapDraft: profileDraft.enabledMapDraft,
-    enabledModDraft: profileDraft.enabledModDraft,
-    scan
-  });
   const dependencyReferences = useMemo(
     () => findDependencyReferencesByModId([...scan.maps, ...scan.otherMods], scan.otherMods),
     [scan.maps, scan.otherMods]
   );
+  const referencedModIds = useMemo(() => new Set(dependencyReferences.requiredReferencesByModId.keys()), [dependencyReferences]);
+  const optionalReferencedModIds = useMemo(() => new Set(dependencyReferences.optionalReferencesByModId.keys()), [dependencyReferences]);
+  const filters = useModFilters({
+    enabledMapDraft: profileDraft.enabledMapDraft,
+    enabledModDraft: profileDraft.enabledModDraft,
+    optionalReferencedModIds,
+    referencedModIds,
+    scan
+  });
   const allRecords = useMemo(() => [...scan.maps, ...scan.otherMods], [scan.maps, scan.otherMods]);
   const workspaceView = useWorkspaceView({
     enabledMapDraft: profileDraft.enabledMapDraft,
@@ -182,6 +186,7 @@ export function App() {
     filteredMaps: filters.filteredMaps,
     filteredMods: filters.filteredMods,
     notifier,
+    requiredReferencesByModId: dependencyReferences.requiredReferencesByModId,
     scan,
     setEnabledExplicitModDraft: profileDraft.setEnabledExplicitModDraft,
     setEnabledMapDraft: profileDraft.setEnabledMapDraft,

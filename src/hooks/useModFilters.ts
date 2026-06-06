@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 import type { ModRecord, ScanResult } from "../types";
-import { findDependencyReferencesByModId } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
 
 type ModFiltersOptions = {
   enabledMapDraft: Set<string>;
   enabledModDraft: Set<string>;
+  optionalReferencedModIds: Set<string>;
+  referencedModIds: Set<string>;
   scan: ScanResult;
 };
 
-export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFiltersOptions) {
+export function useModFilters({ enabledMapDraft, enabledModDraft, optionalReferencedModIds, referencedModIds, scan }: ModFiltersOptions) {
   const [query, setQuery] = useState("");
   const [mapEnabledFilter, setMapEnabledFilter] = useState<EnabledFilter>("all");
   const [mapProgressFilter, setMapProgressFilter] = useState<ProgressFilter>("all");
@@ -25,7 +26,6 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
     () => (showHelperMaps ? [...scan.maps, ...helperMapMods] : scan.maps),
     [helperMapMods, scan.maps, showHelperMaps]
   );
-  const { optionalReferencedModIds, referencedModIds } = useMemo(() => findReferencedModIds(scan), [scan]);
 
   const filteredMaps = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -110,17 +110,6 @@ export function useModFilters({ enabledMapDraft, enabledModDraft, scan }: ModFil
 
 function strawberrySortValue(record: { stats: { strawberries: number; strawberriesKnown: boolean } | null }) {
   return record.stats?.strawberriesKnown ? record.stats.strawberries : -1;
-}
-
-function findReferencedModIds(scan: ScanResult) {
-  const { optionalReferencesByModId, requiredReferencesByModId } = findDependencyReferencesByModId(
-    [...scan.maps, ...scan.otherMods],
-    scan.otherMods
-  );
-  return {
-    optionalReferencedModIds: new Set(optionalReferencesByModId.keys()),
-    referencedModIds: new Set(requiredReferencesByModId.keys())
-  };
 }
 
 function mapSearchText(map: ModRecord) {

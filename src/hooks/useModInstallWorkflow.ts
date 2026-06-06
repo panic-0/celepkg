@@ -41,7 +41,7 @@ import {
 } from "../utils/appDependencyResolution";
 import { dedupeDependencyActions, dedupeDependencyIssues, dependencyActionKey } from "../utils/dependencyUpdateDedupe";
 import type { DependencyTreeNode, DependencyTreeNodeKind } from "../utils/dependencyTree";
-import type { DownloadTask } from "../utils/downloadTask";
+import { defaultDownloadConcurrencyLimit, type DownloadTask } from "../utils/downloadTask";
 import type { ExecutableDownloadTaskItem } from "../utils/downloadTaskRunner";
 import { normalizeDependencyName } from "../utils/dependencies";
 import { createEverestInstallTaskDescriptor } from "../utils/everestTask";
@@ -95,6 +95,7 @@ type PreviewDependencyResolution = {
 
 type DependencyResolutionContext = {
   catalogEntriesByDependencyKey: Map<string, ModCatalogEntry | null>;
+  catalogEntryPromisesByDependencyKey: Map<string, Promise<ModCatalogEntry | null>>;
   plannedKeys: Set<string>;
 };
 
@@ -419,7 +420,11 @@ export function useModInstallWorkflow({
   }
 
   async function buildDependencyPreviewPlan(targetName: string, metadata: ModMetadata): Promise<DependencyPreviewPlan> {
-    const context: DependencyResolutionContext = { catalogEntriesByDependencyKey: new Map(), plannedKeys: new Set<string>() };
+    const context: DependencyResolutionContext = {
+      catalogEntriesByDependencyKey: new Map(),
+      catalogEntryPromisesByDependencyKey: new Map(),
+      plannedKeys: new Set<string>()
+    };
     const root: DependencyTreeNode = {
       id: `target:${normalizeDependencyName(targetName)}`,
       name: targetName,
@@ -467,8 +472,10 @@ export function useModInstallWorkflow({
     const staged: StagedDownload[] = [];
     let unavailableCount = 0;
 
-    for (const dependency of dependencies) {
-      const resolved = await resolvePreviewDependency(dependency, kind, optionalAncestorIds, path, context);
+    const resolvedDependencies = await mapWithConcurrency(dependencies, defaultDownloadConcurrencyLimit, (dependency) =>
+      resolvePreviewDependency(dependency, kind, optionalAncestorIds, path, context)
+    );
+    for (const resolved of resolvedDependencies) {
       nodes.push(resolved.node);
       actionIds.push(...resolved.actionIds);
       actions.push(...resolved.actions);
@@ -531,7 +538,7 @@ export function useModInstallWorkflow({
       optional: kind === "optional",
       reason: installed ? "tooLow" : "missing"
     };
-    const action = await resolveDependencyAction(issue, context.catalogEntriesByDependencyKey);
+    const action = await resolveDependencyAction(issue, context);
     if (!action) {
       return {
         ...emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "unavailable", formatDependencyIssue(issue))),
@@ -930,12 +937,12 @@ export function useModInstallWorkflow({
 
   async function resolveDependencyAction(
     issue: DependencyIssue,
-    catalogEntriesByDependencyKey?: Map<string, ModCatalogEntry | null>
+    context?: DependencyResolutionContext
   ): Promise<DependencyUpdateAction | null> {
     const installedAction = resolveInstalledDependencyAction(issue);
     if (installedAction) return installedAction;
     if (isBuiltinDependencyName(issue.dependency.name)) return null;
-    const entry = await findCatalogEntryForDependency(issue.dependency, catalogEntriesByDependencyKey);
+    const entry = await findCatalogEntryForDependency(issue.dependency, context);
     if (!entry) return null;
     if (issue.installed) {
       return {
@@ -949,16 +956,21 @@ export function useModInstallWorkflow({
 
   async function findCatalogEntryForDependency(
     dependency: Dependency,
-    catalogEntriesByDependencyKey?: Map<string, ModCatalogEntry | null>
+    context?: DependencyResolutionContext
   ): Promise<ModCatalogEntry | null> {
     const key = dependencyResolutionKey(dependency);
-    if (catalogEntriesByDependencyKey?.has(key)) return catalogEntriesByDependencyKey.get(key) ?? null;
+    if (context?.catalogEntriesByDependencyKey.has(key)) return context.catalogEntriesByDependencyKey.get(key) ?? null;
+    const pendingEntry = context?.catalogEntryPromisesByDependencyKey.get(key);
+    if (pendingEntry) return await pendingEntry;
     try {
-      const entries = await findCatalogEntriesForDependencies([dependency]);
-      const entry = entries.get(key) ?? null;
-      catalogEntriesByDependencyKey?.set(key, entry);
+      const entryPromise = findCatalogEntriesForDependencies([dependency]).then((entries) => entries.get(key) ?? null);
+      context?.catalogEntryPromisesByDependencyKey.set(key, entryPromise);
+      const entry = await entryPromise;
+      context?.catalogEntriesByDependencyKey.set(key, entry);
+      context?.catalogEntryPromisesByDependencyKey.delete(key);
       return entry;
     } catch (error) {
+      context?.catalogEntryPromisesByDependencyKey.delete(key);
       notifyWarning(notifier, error);
       return null;
     }
@@ -979,6 +991,23 @@ export function useModInstallWorkflow({
 
   function dependencyResolutionKey(dependency: Dependency) {
     return `${normalizeDependencyName(dependency.name)}:${dependency.version}`;
+  }
+
+  async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(Math.max(1, limit), items.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        for (;;) {
+          const index = nextIndex;
+          nextIndex += 1;
+          if (index >= items.length) return;
+          results[index] = await task(items[index]);
+        }
+      })
+    );
+    return results;
   }
 
   async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {

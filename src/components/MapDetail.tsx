@@ -50,7 +50,7 @@ export function MapDetail({
 }: MapDetailProps) {
   const mapId = map?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:${activeTab}:panel`, scrollMemory);
-  const dependencyTree = map ? buildLocalDependencyTree(map, allRecords) : null;
+  const dependencyTree = activeTab === "dependencies" && map ? buildLocalDependencyTree(map, allRecords) : null;
   const subMapTableRef = useScrollMemory<HTMLDivElement>(`map:${mapId}:submaps:table`, scrollMemory);
   const {
     effectiveSubMapPath,

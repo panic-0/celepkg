@@ -34,7 +34,7 @@ export function ModDetail({
 }: ModDetailProps) {
   const modId = modItem?.id ?? "empty";
   const detailPanelRef = useScrollMemory<HTMLDivElement>(`mod:${modId}:${activeTab}:panel`, scrollMemory);
-  const dependencyTree = modItem ? buildLocalDependencyTree(modItem, allRecords) : null;
+  const dependencyTree = activeTab === "dependencies" && modItem ? buildLocalDependencyTree(modItem, allRecords) : null;
 
   if (!modItem) {
     return (
