@@ -3,8 +3,8 @@ name = "celepkg"
 version = "0.5.1"
 description = "A Celeste map manager"
 authors = ["celepkg"]
-license = ""
-repository = ""
+repository = "https://github.com/panic-0/celepkg"
+publish = false
 edition = "2021"
 
 [lib]

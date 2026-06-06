@@ -78,6 +78,9 @@ jobs:
       - name: Test release scripts
         run: npm run test:scripts
 
+      - name: Check release metadata
+        run: npm run check:release
+
       - name: Build frontend
         run: npm run build:web
 

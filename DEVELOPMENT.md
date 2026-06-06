@@ -90,6 +90,7 @@ npm run lint
 npm run lint:css
 npm run test
 npm run test:scripts
+npm run check:release
 npm run build:web
 npm run test:layout
 ```
@@ -129,6 +130,7 @@ npm run lint
 npm run lint:css
 npm run test
 npm run test:scripts
+npm run check:release
 npm run build:web
 npm run test:layout
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
