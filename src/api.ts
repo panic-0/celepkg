@@ -84,6 +84,11 @@ export async function setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStart
   return invokeChecked("set_auto_check_mod_updates_on_startup", validateConfigResponse, { autoCheckModUpdatesOnStartup });
 }
 
+export async function setAutoCheckAppUpdatesOnStartup(autoCheckAppUpdatesOnStartup: boolean): Promise<ConfigResponse> {
+  if (isMockMode()) return mockApi.setAutoCheckAppUpdatesOnStartup(autoCheckAppUpdatesOnStartup);
+  return invokeChecked("set_auto_check_app_updates_on_startup", validateConfigResponse, { autoCheckAppUpdatesOnStartup });
+}
+
 export async function setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup: boolean): Promise<ConfigResponse> {
   if (isMockMode()) return mockApi.setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup);
   return invokeChecked("set_auto_refresh_mod_catalog_cache_on_startup", validateConfigResponse, { autoRefreshModCatalogCacheOnStartup });

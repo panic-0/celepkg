@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { mockApi } from "./mockApi";
 
 describe("mock staged downloads", () => {
+  it("persists the app update startup setting in mock config", async () => {
+    const disabled = await mockApi.setAutoCheckAppUpdatesOnStartup(false);
+    expect(disabled.autoCheckAppUpdatesOnStartup).toBe(false);
+
+    const enabled = await mockApi.setAutoCheckAppUpdatesOnStartup(true);
+    expect(enabled.autoCheckAppUpdatesOnStartup).toBe(true);
+  });
+
   it("downloads and installs a staged mod once", async () => {
     const result = await mockApi.searchModCatalog("Aqua Shrine", ["wegfan"]);
     const entry = result.entries.find((item) => item.name === "Aqua Shrine");

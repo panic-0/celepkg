@@ -85,6 +85,16 @@ pub fn set_auto_check_mod_updates_on_startup(
 }
 
 #[tauri::command]
+pub fn set_auto_check_app_updates_on_startup(
+    auto_check_app_updates_on_startup: bool,
+) -> Result<ConfigResponse, String> {
+    update_state(|state| {
+        state.auto_check_app_updates_on_startup = auto_check_app_updates_on_startup;
+        Ok(config_response(state, vec![]))
+    })
+}
+
+#[tauri::command]
 pub fn set_auto_refresh_mod_catalog_cache_on_startup(
     auto_refresh_mod_catalog_cache_on_startup: bool,
 ) -> Result<ConfigResponse, String> {
@@ -128,6 +138,7 @@ fn config_response(state: &crate::storage::AppState, warnings: Vec<String>) -> C
         mod_catalog_source_order: state.mod_catalog_source_order.clone(),
         mod_catalog_source_enabled_count: state.mod_catalog_source_enabled_count,
         auto_check_mod_updates_on_startup: state.auto_check_mod_updates_on_startup,
+        auto_check_app_updates_on_startup: state.auto_check_app_updates_on_startup,
         auto_refresh_mod_catalog_cache_on_startup: state.auto_refresh_mod_catalog_cache_on_startup,
         selected_save_files: state.selected_save_files.clone(),
         profiles: state.profiles_state(),

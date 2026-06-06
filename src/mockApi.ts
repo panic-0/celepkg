@@ -35,6 +35,7 @@ let autoBackupRetentionCount = 20;
 let modCatalogSourceOrder: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
 let modCatalogSourceEnabledCount = 2;
 let autoCheckModUpdatesOnStartup = true;
+let autoCheckAppUpdatesOnStartup = true;
 let autoRefreshModCatalogCacheOnStartup = true;
 let selectedSaveFiles = ["0.celeste", "1.celeste"];
 let backupSequence = 4;
@@ -110,6 +111,11 @@ export const mockApi = {
 
   async setAutoCheckModUpdatesOnStartup(enabled: boolean): Promise<ConfigResponse> {
     autoCheckModUpdatesOnStartup = enabled;
+    return clone(config());
+  },
+
+  async setAutoCheckAppUpdatesOnStartup(enabled: boolean): Promise<ConfigResponse> {
+    autoCheckAppUpdatesOnStartup = enabled;
     return clone(config());
   },
 
@@ -443,6 +449,7 @@ function config(): ConfigResponse {
     modCatalogSourceOrder,
     modCatalogSourceEnabledCount,
     autoCheckModUpdatesOnStartup,
+    autoCheckAppUpdatesOnStartup,
     autoRefreshModCatalogCacheOnStartup,
     selectedSaveFiles,
     profiles,

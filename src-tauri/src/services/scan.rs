@@ -3,7 +3,7 @@ use crate::domain::{
     ScanResult, ScanTiming, SubMapInfo,
 };
 use crate::parsers::dialog::{dialog_title_for_key, dialog_title_for_sid, read_dialog_titles};
-use crate::parsers::everest::{is_builtin_dependency, parse_metadata};
+use crate::parsers::everest::{is_builtin_dependency, parse_metadata, parse_metadata_checked};
 use crate::parsers::map_bin::{read_map_summary, StrawberryCounts};
 use crate::parsers::save_stats::{
     is_selectable_save_file, list_save_files, normalize_selected_save_files, read_save_stats,
@@ -21,7 +21,7 @@ use std::time::{Instant, UNIX_EPOCH};
 use walkdir::WalkDir;
 use zip::ZipArchive;
 
-const SCAN_CACHE_VERSION: u32 = 15;
+const SCAN_CACHE_VERSION: u32 = 16;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1233,22 +1233,52 @@ fn read_directory_mod(dir_path: &Path, mods_path: &Path) -> Option<ModRecord> {
 }
 
 fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
-    let file = File::open(zip_path).ok()?;
-    let mut archive = ZipArchive::new(file).ok()?;
+    let file = match File::open(zip_path) {
+        Ok(file) => file,
+        Err(error) => {
+            return Some(unreadable_zip_record(
+                zip_path,
+                mods_path,
+                format!("压缩包无法读取：{error}"),
+            ));
+        }
+    };
+    let mut archive = match ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(error) => {
+            return Some(unreadable_zip_record(
+                zip_path,
+                mods_path,
+                format!("压缩包无法打开或已损坏：{error}"),
+            ));
+        }
+    };
     let mut map_ids = vec![];
     let mut has_code = false;
     let mut yaml_text = String::new();
     let mut dialog_texts = vec![];
     let mut strawberry_counts = HashMap::new();
     let mut map_difficulties = HashMap::new();
+    let mut warnings = vec![];
     for index in 0..archive.len() {
-        let mut file = archive.by_index(index).ok()?;
+        let mut file = match archive.by_index(index) {
+            Ok(file) => file,
+            Err(error) => {
+                warnings.push(format!("压缩包条目 #{index} 无法读取：{error}"));
+                continue;
+            }
+        };
         let name = normalize_slash(file.name());
+        let bytes = if file.is_dir() {
+            None
+        } else if is_zip_entry_read_needed(&name) {
+            read_zip_entry_bytes(&mut file, &name, &mut warnings)
+        } else {
+            None
+        };
         if let Some(sid) = map_sid_from_entry(&name) {
             map_ids.push(sid.clone());
-            let mut bytes = Vec::with_capacity(file.size() as usize);
-            let _ = file.read_to_end(&mut bytes);
-            if let Some(summary) = read_map_summary(&bytes) {
+            if let Some(summary) = bytes.as_deref().and_then(read_map_summary) {
                 strawberry_counts.insert(sid.clone(), summary.strawberry_counts);
                 if let Some(difficulty) = summary
                     .map_icon
@@ -1259,18 +1289,19 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             }
         }
         if is_everest_yaml_entry(&name) {
-            let mut text = String::new();
-            let _ = file.read_to_string(&mut text);
-            yaml_text = text;
+            if let Some(bytes) = bytes.as_deref() {
+                yaml_text = String::from_utf8_lossy(bytes).into_owned();
+            }
         } else if is_dialog_entry(&name) {
-            let mut text = String::new();
-            let _ = file.read_to_string(&mut text);
-            dialog_texts.push((name.clone(), text));
+            if let Some(bytes) = bytes.as_deref() {
+                dialog_texts.push((name.clone(), String::from_utf8_lossy(bytes).into_owned()));
+            }
         } else if let Some(sid) = map_meta_sid_from_entry(&name) {
-            let mut text = String::new();
-            let _ = file.read_to_string(&mut text);
-            if let Some(difficulty) =
-                read_meta_yaml_icon(&text).and_then(|icon| difficulty_from_map_icon(&icon))
+            if let Some(difficulty) = bytes
+                .as_deref()
+                .map(String::from_utf8_lossy)
+                .and_then(|text| read_meta_yaml_icon(&text))
+                .and_then(|icon| difficulty_from_map_icon(&icon))
             {
                 map_difficulties.insert(sid, difficulty);
             }
@@ -1279,19 +1310,69 @@ fn read_zip_mod(zip_path: &Path, mods_path: &Path) -> Option<ModRecord> {
             has_code = true;
         }
     }
-    Some(create_mod_record(
+    let metadata = if yaml_text.trim().is_empty() {
+        ModMetadata::default()
+    } else {
+        parse_metadata_checked(&yaml_text).unwrap_or_else(|error| {
+            warnings.push(format!("everest.yaml 解析失败：{error}"));
+            ModMetadata::default()
+        })
+    };
+    let mut record = create_mod_record(
         zip_path,
         mods_path,
         true,
         ScannedModData {
             map_ids,
             has_code,
-            metadata: parse_metadata(&yaml_text),
+            metadata,
             dialog_titles: read_dialog_titles(dialog_texts),
             strawberry_counts,
             map_difficulties,
         },
-    ))
+    );
+    record.warnings.extend(warnings);
+    Some(record)
+}
+
+fn unreadable_zip_record(zip_path: &Path, mods_path: &Path, warning: String) -> ModRecord {
+    let mut record = create_mod_record(
+        zip_path,
+        mods_path,
+        true,
+        ScannedModData {
+            map_ids: vec![],
+            has_code: false,
+            metadata: ModMetadata::default(),
+            dialog_titles: HashMap::new(),
+            strawberry_counts: HashMap::new(),
+            map_difficulties: HashMap::new(),
+        },
+    );
+    record.warnings.push(warning);
+    record
+}
+
+fn is_zip_entry_read_needed(name: &str) -> bool {
+    map_sid_from_entry(name).is_some()
+        || is_everest_yaml_entry(name)
+        || is_dialog_entry(name)
+        || map_meta_sid_from_entry(name).is_some()
+}
+
+fn read_zip_entry_bytes(
+    entry: &mut impl Read,
+    name: &str,
+    warnings: &mut Vec<String>,
+) -> Option<Vec<u8>> {
+    let mut bytes = vec![];
+    match entry.read_to_end(&mut bytes) {
+        Ok(_) => Some(bytes),
+        Err(error) => {
+            warnings.push(format!("压缩包条目 {name} 无法完整读取：{error}"));
+            None
+        }
+    }
 }
 
 struct ScannedModData {
@@ -2335,6 +2416,62 @@ CompleteScreen:
     }
 
     #[test]
+    fn unreadable_zip_is_kept_as_visible_warning_record() {
+        let root = temp_celeste_root("bad-zip-visible");
+        let mods_path = root.join("Mods");
+        fs::create_dir_all(&mods_path).expect("mods dir");
+        fs::write(mods_path.join("BrokenZip.zip"), b"not a zip").expect("bad zip");
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let scan = full_scan_fresh(&root, empty_profiles(), &[], &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        let broken = scan
+            .other_mods
+            .iter()
+            .find(|mod_item| mod_item.file_name == "BrokenZip.zip")
+            .expect("broken zip record");
+        assert_eq!(broken.name, "BrokenZip");
+        assert!(broken.is_archive);
+        assert!(broken
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("压缩包无法打开或已损坏")));
+    }
+
+    #[test]
+    fn zip_with_invalid_everest_yaml_is_kept_with_warning() {
+        let root = temp_celeste_root("bad-zip-yaml-visible");
+        let mods_path = root.join("Mods");
+        fs::create_dir_all(&mods_path).expect("mods dir");
+        write_zip_entries(
+            &mods_path.join("BadYaml.zip"),
+            &[("everest.yaml", "Name: [")],
+        );
+        let cache_file = scan_cache_path(&root);
+        let _ = fs::remove_file(&cache_file);
+
+        let scan = full_scan_fresh(&root, empty_profiles(), &[], &[]);
+
+        let _ = fs::remove_file(cache_file);
+        let _ = fs::remove_dir_all(root);
+
+        let bad_yaml = scan
+            .other_mods
+            .iter()
+            .find(|mod_item| mod_item.file_name == "BadYaml.zip")
+            .expect("bad yaml record");
+        assert_eq!(bad_yaml.name, "BadYaml");
+        assert!(bad_yaml
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("everest.yaml 解析失败")));
+    }
+
+    #[test]
     fn selected_save_files_control_scanned_stats() {
         let root = temp_celeste_root("selected-save");
         write_dir_map(&root, "SaveMap", "maps/selected/save");
@@ -2570,6 +2707,18 @@ CompleteScreen:
         )
         .expect("everest yaml");
         fs::write(mod_path.join(format!("Maps/{sid}.bin")), "").expect("map bin");
+    }
+
+    fn write_zip_entries(path: &Path, entries: &[(&str, &str)]) {
+        let file = File::create(path).expect("zip file");
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, text) in entries {
+            zip.start_file(*name, options).expect("zip entry");
+            zip.write_all(text.as_bytes()).expect("write zip entry");
+        }
+        zip.finish().expect("finish zip");
     }
 
     fn write_dir_mod_with_dependencies(root: &Path, name: &str, dependencies: &[Dependency]) {

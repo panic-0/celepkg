@@ -1,6 +1,19 @@
-import { Archive, CircleDot, Columns3, PackageSearch, RefreshCw, Save, SearchCheck, ToggleLeft, ToggleRight } from "lucide-react";
+import {
+  Archive,
+  BadgeCheck,
+  CircleDot,
+  Columns3,
+  Download,
+  PackageSearch,
+  RefreshCw,
+  RotateCw,
+  Save,
+  SearchCheck,
+  ToggleLeft,
+  ToggleRight
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ModCatalogSourceKind, SaveFileInfo } from "../types";
+import type { AppUpdateState, ModCatalogSourceKind, SaveFileInfo } from "../types";
 import { formatUnixNanoseconds } from "../utils/time";
 import type { StrawberryDenominator } from "../viewTypes";
 import { ModSourcePicker } from "./ModSourcePicker";
@@ -9,8 +22,10 @@ type SettingsManagerProps = {
   autoBackupCleanupEnabled: boolean;
   autoBackupEnabled: boolean;
   autoBackupRetentionCount: number;
+  autoCheckAppUpdatesOnStartup: boolean;
   autoCheckModUpdatesOnStartup: boolean;
   autoRefreshModCatalogCacheOnStartup: boolean;
+  appUpdateState: AppUpdateState;
   catalogCacheRefreshing: boolean;
   loading: boolean;
   modCatalogSourceEnabledCount: number;
@@ -19,6 +34,10 @@ type SettingsManagerProps = {
   selectedSaveFiles: string[];
   showWarningColumn: boolean;
   strawberryDenominator: StrawberryDenominator;
+  onAppUpdateCheck: () => void;
+  onAppUpdateDownloadAndInstall: () => void;
+  onAppUpdateRelaunch: () => void;
+  onAutoCheckAppUpdatesOnStartupChange: (value: boolean) => void;
   onAutoBackupCleanupEnabledChange: (value: boolean) => void;
   onAutoBackupEnabledChange: (value: boolean) => void;
   onAutoBackupRetentionCountChange: (value: number) => void;
@@ -35,8 +54,10 @@ export function SettingsManager({
   autoBackupCleanupEnabled,
   autoBackupEnabled,
   autoBackupRetentionCount,
+  autoCheckAppUpdatesOnStartup,
   autoCheckModUpdatesOnStartup,
   autoRefreshModCatalogCacheOnStartup,
+  appUpdateState,
   catalogCacheRefreshing,
   loading,
   modCatalogSourceEnabledCount,
@@ -45,6 +66,10 @@ export function SettingsManager({
   selectedSaveFiles,
   showWarningColumn,
   strawberryDenominator,
+  onAppUpdateCheck,
+  onAppUpdateDownloadAndInstall,
+  onAppUpdateRelaunch,
+  onAutoCheckAppUpdatesOnStartupChange,
   onAutoBackupCleanupEnabledChange,
   onAutoBackupEnabledChange,
   onAutoBackupRetentionCountChange,
@@ -231,6 +256,73 @@ export function SettingsManager({
 
         <section className="settings-group">
           <div className="settings-group-heading">
+            <h3>应用更新</h3>
+          </div>
+          <div className="settings-group-grid">
+            <section className="settings-section app-update-settings-section">
+              <div className="settings-section-heading">
+                <BadgeCheck size={18} />
+                <h3>CelePkg</h3>
+                <small>{formatAppUpdateStatus(appUpdateState)}</small>
+              </div>
+              <div className="app-update-summary">
+                <span>当前版本</span>
+                <strong>{appUpdateState.currentVersion || "读取中"}</strong>
+                <span>最新版本</span>
+                <strong>{appUpdateState.latestVersion ?? (appUpdateState.status === "idle" ? "未发现更新" : "未检查")}</strong>
+              </div>
+              {appUpdateState.status === "downloading" && (
+                <div className="app-update-progress">
+                  <span style={{ width: `${formatAppUpdatePercent(appUpdateState)}%` }} />
+                </div>
+              )}
+              {appUpdateState.error && <p className="app-update-error">{appUpdateState.error}</p>}
+              {appUpdateState.notes && <p className="app-update-notes">{appUpdateState.notes}</p>}
+              <button
+                className={autoCheckAppUpdatesOnStartup ? "inline-toggle active" : "inline-toggle"}
+                disabled={loading}
+                onClick={() => onAutoCheckAppUpdatesOnStartupChange(!autoCheckAppUpdatesOnStartup)}
+                title="应用启动后在后台检查 CelePkg 新版本"
+              >
+                {autoCheckAppUpdatesOnStartup ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                <SearchCheck size={16} />
+                启动时检查应用更新
+              </button>
+              <div className="app-update-actions">
+                <button
+                  className="inline-toggle"
+                  disabled={appUpdateState.status === "checking" || appUpdateState.status === "downloading"}
+                  onClick={onAppUpdateCheck}
+                  title="立即检查 CelePkg 新版本"
+                >
+                  <RefreshCw size={16} className={appUpdateState.status === "checking" ? "spin-icon" : ""} />
+                  检查更新
+                </button>
+                <button
+                  className="inline-toggle"
+                  disabled={appUpdateState.status !== "available"}
+                  onClick={onAppUpdateDownloadAndInstall}
+                  title="下载并安装已发现的 CelePkg 更新"
+                >
+                  <Download size={16} className={appUpdateState.status === "downloading" ? "spin-icon" : ""} />
+                  下载并安装
+                </button>
+                <button
+                  className="inline-toggle"
+                  disabled={appUpdateState.status !== "ready"}
+                  onClick={onAppUpdateRelaunch}
+                  title="重启 CelePkg 以启用已安装更新"
+                >
+                  <RotateCw size={16} />
+                  重启应用
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section className="settings-group">
+          <div className="settings-group-heading">
             <h3>备份</h3>
           </div>
           <div className="settings-group-grid">
@@ -285,4 +377,18 @@ export function SettingsManager({
       </div>
     </section>
   );
+}
+
+function formatAppUpdateStatus(state: AppUpdateState) {
+  if (state.status === "checking") return "检查中";
+  if (state.status === "available") return "可更新";
+  if (state.status === "downloading") return `${formatAppUpdatePercent(state)}%`;
+  if (state.status === "ready") return "等待重启";
+  if (state.status === "error") return "检查失败";
+  return state.latestVersion ? "可更新" : "最新";
+}
+
+function formatAppUpdatePercent(state: AppUpdateState) {
+  if (!state.total || state.total <= 0) return state.downloaded > 0 ? 50 : 0;
+  return Math.max(0, Math.min(100, Math.round((state.downloaded / state.total) * 100)));
 }

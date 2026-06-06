@@ -177,6 +177,7 @@
     "modCatalogSourceOrder": ["wegfan", "everestMirror", "everest"],
     "modCatalogSourceEnabledCount": 2,
     "autoCheckModUpdatesOnStartup": true,
+    "autoCheckAppUpdatesOnStartup": true,
     "autoRefreshModCatalogCacheOnStartup": true,
     "selectedSaveFiles": ["0.celeste"],
     "profiles": {

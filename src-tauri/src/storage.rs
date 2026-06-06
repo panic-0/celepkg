@@ -29,6 +29,8 @@ pub struct AppState {
     pub mod_catalog_source_enabled_count: usize,
     #[serde(default = "default_auto_check_mod_updates_on_startup")]
     pub auto_check_mod_updates_on_startup: bool,
+    #[serde(default = "default_auto_check_app_updates_on_startup")]
+    pub auto_check_app_updates_on_startup: bool,
     #[serde(default = "default_auto_refresh_mod_catalog_cache_on_startup")]
     pub auto_refresh_mod_catalog_cache_on_startup: bool,
     #[serde(default = "default_selected_save_files")]
@@ -184,6 +186,7 @@ fn default_state() -> AppState {
         mod_catalog_source_order: default_mod_catalog_source_order(),
         mod_catalog_source_enabled_count: default_mod_catalog_source_enabled_count(),
         auto_check_mod_updates_on_startup: default_auto_check_mod_updates_on_startup(),
+        auto_check_app_updates_on_startup: default_auto_check_app_updates_on_startup(),
         auto_refresh_mod_catalog_cache_on_startup:
             default_auto_refresh_mod_catalog_cache_on_startup(),
         selected_save_files: default_selected_save_files(),
@@ -367,6 +370,10 @@ fn default_auto_check_mod_updates_on_startup() -> bool {
     true
 }
 
+fn default_auto_check_app_updates_on_startup() -> bool {
+    true
+}
+
 fn default_auto_refresh_mod_catalog_cache_on_startup() -> bool {
     true
 }
@@ -484,6 +491,7 @@ mod tests {
         );
         assert_eq!(state.mod_catalog_source_enabled_count, 2);
         assert!(state.auto_check_mod_updates_on_startup);
+        assert!(state.auto_check_app_updates_on_startup);
         assert!(state.auto_refresh_mod_catalog_cache_on_startup);
         assert_eq!(state.selected_save_files, vec!["0.celeste".to_string()]);
         assert!(state.protected_record_ids.is_empty());
@@ -663,6 +671,22 @@ mod tests {
         assert_eq!(state.active_map_profile_id, "default-maps");
         assert_eq!(state.active_mod_profile_id, "default-mods");
         assert_eq!(state.profiles.len(), 2);
+        assert_eq!(text, original);
+    }
+
+    #[test]
+    fn old_state_without_app_update_setting_uses_enabled_default() {
+        let root = temp_dir("old-state-app-update");
+        fs::create_dir_all(&root).expect("state dir");
+        let file = root.join("state.json");
+        let original = r#"{"celestePath":"C:\\Games\\Celeste","profiles":[]}"#;
+        fs::write(&file, original).expect("write old state");
+
+        let state = load_state_from_path(&file).expect("old state should migrate");
+        let text = fs::read_to_string(&file).expect("read state");
+        let _ = fs::remove_dir_all(root);
+
+        assert!(state.auto_check_app_updates_on_startup);
         assert_eq!(text, original);
     }
 

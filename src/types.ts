@@ -105,6 +105,19 @@ export type AppNotifier = {
   showWarning: (text: string) => void;
 };
 
+export type AppUpdateStatus = "idle" | "checking" | "available" | "downloading" | "ready" | "error";
+
+export type AppUpdateState = {
+  status: AppUpdateStatus;
+  currentVersion: string;
+  latestVersion: string | null;
+  notes: string | null;
+  date: string | null;
+  downloaded: number;
+  total: number | null;
+  error: string | null;
+};
+
 export type ConfigResponse = {
   celestePath: string;
   autoBackupEnabled: boolean;
@@ -113,6 +126,7 @@ export type ConfigResponse = {
   modCatalogSourceOrder: ModCatalogSourceKind[];
   modCatalogSourceEnabledCount: number;
   autoCheckModUpdatesOnStartup: boolean;
+  autoCheckAppUpdatesOnStartup: boolean;
   autoRefreshModCatalogCacheOnStartup: boolean;
   selectedSaveFiles: string[];
   profiles: ProfilesState;

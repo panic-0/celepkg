@@ -15,6 +15,7 @@ import { WorkspaceLoadingOverlay } from "./components/WorkspaceLoadingOverlay";
 import { openModLocation } from "./api";
 import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
+import { useAppUpdate } from "./hooks/useAppUpdate";
 import { useDownloadTaskControls } from "./hooks/useDownloadTaskControls";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
 import { useModDownloadProgressListener } from "./hooks/useModDownloadProgressListener";
@@ -35,11 +36,13 @@ export function App() {
     autoBackupCleanupEnabled,
     autoBackupEnabled,
     autoBackupRetentionCount,
+    autoCheckAppUpdatesOnStartup,
     autoCheckModUpdatesOnStartup,
     autoRefreshModCatalogCacheOnStartup,
     catalogCacheRefreshing,
     celestePath,
     clearNotice,
+    configLoaded,
     configWarnings,
     loading,
     loadingMessage,
@@ -61,11 +64,17 @@ export function App() {
     updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
+    updateAutoCheckAppUpdatesOnStartup,
     updateAutoCheckModUpdatesOnStartup,
     updateAutoRefreshModCatalogCacheOnStartup,
     updateModCatalogSources,
     updateSelectedSaveFiles
   } = useCelePkgData();
+  const { appUpdateState, checkForAppUpdate, downloadAndInstallAppUpdate, relaunchApp } = useAppUpdate({
+    autoCheckOnStartup: autoCheckAppUpdatesOnStartup,
+    configLoaded,
+    notifier
+  });
   const [issuesOpen, setIssuesOpen] = useState(false);
   const mapDetailMemory = useRef<Record<string, MapDetailMemoryState>>({});
   const scrollMemory = useRef<Record<string, ScrollPosition>>({});
@@ -279,8 +288,10 @@ export function App() {
             autoBackupCleanupEnabled={autoBackupCleanupEnabled}
             autoBackupEnabled={autoBackupEnabled}
             autoBackupRetentionCount={autoBackupRetentionCount}
+            autoCheckAppUpdatesOnStartup={autoCheckAppUpdatesOnStartup}
             autoCheckModUpdatesOnStartup={autoCheckModUpdatesOnStartup}
             autoRefreshModCatalogCacheOnStartup={autoRefreshModCatalogCacheOnStartup}
+            appUpdateState={appUpdateState}
             catalogCacheRefreshing={catalogCacheRefreshing}
             loading={loading}
             modCatalogSourceEnabledCount={modCatalogSourceEnabledCount}
@@ -289,6 +300,10 @@ export function App() {
             selectedSaveFiles={scan.selectedSaveFiles}
             showWarningColumn={uiLayout.showWarningColumn}
             strawberryDenominator={uiLayout.strawberryDenominator}
+            onAppUpdateCheck={checkForAppUpdate}
+            onAppUpdateDownloadAndInstall={downloadAndInstallAppUpdate}
+            onAppUpdateRelaunch={relaunchApp}
+            onAutoCheckAppUpdatesOnStartupChange={updateAutoCheckAppUpdatesOnStartup}
             onAutoBackupCleanupEnabledChange={updateAutoBackupCleanupEnabled}
             onAutoBackupEnabledChange={updateAutoBackupEnabled}
             onAutoBackupRetentionCountChange={updateAutoBackupRetentionCount}

@@ -7,6 +7,8 @@ mod utils;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::config::get_config,
             commands::config::set_celeste_path,
@@ -15,6 +17,7 @@ pub fn run() {
             commands::config::set_auto_backup_retention_count,
             commands::config::set_mod_catalog_sources,
             commands::config::set_auto_check_mod_updates_on_startup,
+            commands::config::set_auto_check_app_updates_on_startup,
             commands::config::set_auto_refresh_mod_catalog_cache_on_startup,
             commands::config::set_selected_save_files,
             commands::config::select_celeste_directory,

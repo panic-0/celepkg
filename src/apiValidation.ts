@@ -40,6 +40,7 @@ export function validateConfigResponse(value: unknown): ConfigResponse {
     ),
     modCatalogSourceEnabledCount: numberAt(object.modCatalogSourceEnabledCount, "config.modCatalogSourceEnabledCount"),
     autoCheckModUpdatesOnStartup: booleanAt(object.autoCheckModUpdatesOnStartup, "config.autoCheckModUpdatesOnStartup"),
+    autoCheckAppUpdatesOnStartup: booleanAt(object.autoCheckAppUpdatesOnStartup, "config.autoCheckAppUpdatesOnStartup"),
     autoRefreshModCatalogCacheOnStartup: booleanAt(
       object.autoRefreshModCatalogCacheOnStartup,
       "config.autoRefreshModCatalogCacheOnStartup"

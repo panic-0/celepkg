@@ -5,6 +5,7 @@ import {
   rescanCeleste,
   scanCeleste,
   setAutoBackupCleanupEnabled,
+  setAutoCheckAppUpdatesOnStartup,
   setAutoCheckModUpdatesOnStartup,
   setAutoRefreshModCatalogCacheOnStartup,
   selectCelesteDirectory,
@@ -47,9 +48,11 @@ export function useCelePkgData() {
     [modCatalogSourceEnabledCount, modCatalogSourceOrder]
   );
   const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(true);
+  const [autoCheckAppUpdatesOnStartup, setAutoCheckAppUpdatesOnStartupState] = useState(true);
   const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(true);
   const [autoRefreshModCatalogCacheOnStartup, setAutoRefreshModCatalogCacheOnStartupState] = useState(true);
   const [catalogCacheRefreshing, setCatalogCacheRefreshing] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
   const [loadingState, setLoadingState] = useState(emptyLoadingState);
   const [notice, setNotice] = useState<AppNotice | null>(null);
@@ -142,8 +145,10 @@ export function useCelePkgData() {
     setModCatalogSourceOrderState(config.modCatalogSourceOrder);
     setModCatalogSourceEnabledCountState(config.modCatalogSourceEnabledCount);
     setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
+    setAutoCheckAppUpdatesOnStartupState(config.autoCheckAppUpdatesOnStartup);
     setStartupAutoCheckModUpdatesOnStartup(config.autoCheckModUpdatesOnStartup);
     setAutoRefreshModCatalogCacheOnStartupState(config.autoRefreshModCatalogCacheOnStartup);
+    setConfigLoaded(true);
     if (config.autoRefreshModCatalogCacheOnStartup && !startupCatalogCacheRefreshRef.current) {
       startupCatalogCacheRefreshRef.current = true;
       const sources = activeModCatalogSources(config.modCatalogSourceOrder, config.modCatalogSourceEnabledCount);
@@ -249,6 +254,25 @@ export function useCelePkgData() {
         setAutoCheckModUpdatesOnStartupState(config.autoCheckModUpdatesOnStartup);
         setScan((current) => ({ ...current, profiles: config.profiles }));
         showNotice("success", config.autoCheckModUpdatesOnStartup ? "已开启启动时自动检查 Mod 更新。" : "已关闭启动时自动检查 Mod 更新。");
+      } catch (error) {
+        notifyError(notifier, error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearNotice, notifier, setLoading, showNotice]
+  );
+
+  const updateAutoCheckAppUpdatesOnStartup = useCallback(
+    async (enabled: boolean) => {
+      configRequestTrackerRef.current.invalidate();
+      setLoading(true, "正在更新应用设置...");
+      clearNotice();
+      try {
+        const config = await setAutoCheckAppUpdatesOnStartup(enabled);
+        setAutoCheckAppUpdatesOnStartupState(config.autoCheckAppUpdatesOnStartup);
+        setScan((current) => ({ ...current, profiles: config.profiles }));
+        showNotice("success", config.autoCheckAppUpdatesOnStartup ? "已开启启动时检查应用更新。" : "已关闭启动时检查应用更新。");
       } catch (error) {
         notifyError(notifier, error);
       } finally {
@@ -396,11 +420,13 @@ export function useCelePkgData() {
     autoBackupCleanupEnabled,
     autoBackupEnabled,
     autoBackupRetentionCount,
+    autoCheckAppUpdatesOnStartup,
     autoCheckModUpdatesOnStartup,
     autoRefreshModCatalogCacheOnStartup,
     catalogCacheRefreshing,
     celestePath,
     clearNotice,
+    configLoaded,
     configWarnings,
     loading: loadingState.loading,
     loadingMessage: loadingState.message,
@@ -423,6 +449,7 @@ export function useCelePkgData() {
     updateAutoBackupCleanupEnabled,
     updateAutoBackupEnabled,
     updateAutoBackupRetentionCount,
+    updateAutoCheckAppUpdatesOnStartup,
     updateAutoCheckModUpdatesOnStartup,
     updateAutoRefreshModCatalogCacheOnStartup,
     updateModCatalogSources,
