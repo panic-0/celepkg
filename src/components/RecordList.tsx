@@ -687,6 +687,7 @@ function ToggleButton({
   return (
     <button
       className={`${enabled ? "record-toggle enabled" : "record-toggle disabled"}${blocked ? " blocked" : ""}`}
+      disabled={blocked}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
