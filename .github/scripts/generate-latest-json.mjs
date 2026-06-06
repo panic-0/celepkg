@@ -1,40 +1,55 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const options = parseArgs(process.argv.slice(2));
-const assetsDir = requiredOption(options, "--assets");
-const notesFile = requiredOption(options, "--notes");
-const repo = requiredOption(options, "--repo");
-const tag = requiredOption(options, "--tag");
-const outFile = requiredOption(options, "--out");
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await main(process.argv.slice(2));
+}
 
-const files = await listFiles(assetsDir);
-const notes = await readFile(notesFile, "utf8").catch(() => "");
-const platforms = {};
+export async function main(args) {
+  const options = parseArgs(args);
+  const assetsDir = requiredOption(options, "--assets");
+  const notesFile = requiredOption(options, "--notes");
+  const repo = requiredOption(options, "--repo");
+  const tag = requiredOption(options, "--tag");
+  const outFile = requiredOption(options, "--out");
 
-for (const sigFile of files.filter((file) => file.endsWith(".sig"))) {
-  const assetFile = sigFile.slice(0, -4);
-  if (!files.includes(assetFile)) continue;
-  const signature = (await readFile(assetFile + ".sig", "utf8")).trim();
-  const url = releaseAssetUrl(repo, tag, path.basename(assetFile));
-  for (const target of targetsForAsset(assetFile)) {
-    platforms[target] = { signature, url };
+  const files = await listFiles(assetsDir);
+  const notes = await readFile(notesFile, "utf8").catch(() => "");
+  const manifest = await generateLatestManifest({ files, notes, repo, tag });
+
+  await writeFile(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
+  console.log(`Wrote ${outFile} with ${Object.keys(manifest.platforms).length} platform entries.`);
+}
+
+export async function generateLatestManifest({ files, notes, repo, tag }) {
+  assertUniqueReleaseAssetNames(files);
+
+  const platforms = {};
+  const fileSet = new Set(files);
+
+  for (const sigFile of files.filter((file) => file.endsWith(".sig"))) {
+    const assetFile = sigFile.slice(0, -4);
+    if (!fileSet.has(assetFile)) continue;
+    const signature = (await readFile(assetFile + ".sig", "utf8")).trim();
+    const targets = targetsForAsset(assetFile);
+    const url = releaseAssetUrl(repo, tag, path.basename(assetFile));
+    for (const target of targets) {
+      platforms[target] = { signature, url };
+    }
   }
+
+  if (!Object.keys(platforms).length) {
+    throw new Error("No signed updater assets were found.");
+  }
+
+  return {
+    version: tag.replace(/^v/, ""),
+    notes: notes.trim(),
+    pub_date: new Date().toISOString(),
+    platforms
+  };
 }
-
-if (!Object.keys(platforms).length) {
-  throw new Error("No signed updater assets were found.");
-}
-
-const manifest = {
-  version: tag.replace(/^v/, ""),
-  notes: notes.trim(),
-  pub_date: new Date().toISOString(),
-  platforms
-};
-
-await writeFile(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`Wrote ${outFile} with ${Object.keys(platforms).length} platform entries.`);
 
 function parseArgs(args) {
   const parsed = new Map();
@@ -64,13 +79,13 @@ async function listFiles(root) {
   return results;
 }
 
-function releaseAssetUrl(repoName, releaseTag, fileName) {
+export function releaseAssetUrl(repoName, releaseTag, fileName) {
   return `https://github.com/${repoName}/releases/download/${encodeURIComponent(releaseTag)}/${encodeURIComponent(fileName)}`;
 }
 
-function targetsForAsset(file) {
+export function targetsForAsset(file) {
   const normalized = file.replaceAll("\\", "/").toLowerCase();
-  const arch = normalized.includes("aarch64") || normalized.includes("arm64") || normalized.includes("macos-latest") ? "aarch64" : "x86_64";
+  const arch = archForAsset(normalized);
   const ext = assetExtension(normalized);
 
   if (normalized.includes("windows")) {
@@ -91,8 +106,41 @@ function targetsForAsset(file) {
   return [];
 }
 
-function assetExtension(file) {
+export function archForAsset(normalizedFile) {
+  if (/(^|[^a-z0-9])(aarch64|arm64)([^a-z0-9]|$)/.test(normalizedFile)) return "aarch64";
+  if (/(^|[^a-z0-9])(x86_64|amd64|x64)([^a-z0-9]|$)/.test(normalizedFile)) return "x86_64";
+
+  const ext = assetExtension(normalizedFile);
+  if (
+    normalizedFile.includes("windows") ||
+    normalizedFile.includes("linux") ||
+    normalizedFile.includes("ubuntu") ||
+    normalizedFile.includes("macos") ||
+    normalizedFile.includes("darwin") ||
+    ext === "deb" ||
+    ext === "rpm" ||
+    ext === "dmg"
+  ) {
+    throw new Error(`Cannot infer updater architecture from asset path: ${normalizedFile}`);
+  }
+
+  return "x86_64";
+}
+
+export function assetExtension(file) {
   if (file.endsWith(".appimage")) return "appimage";
   if (file.endsWith(".tar.gz")) return "tar.gz";
   return path.extname(file).slice(1);
+}
+
+export function assertUniqueReleaseAssetNames(files) {
+  const seen = new Map();
+  for (const file of files) {
+    const name = path.basename(file);
+    const previous = seen.get(name);
+    if (previous) {
+      throw new Error(`Release asset names must be unique: ${name} appears in ${previous} and ${file}`);
+    }
+    seen.set(name, file);
+  }
 }
