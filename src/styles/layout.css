@@ -145,44 +145,85 @@
 
 .nav-summary {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   padding: 8px;
   border: 1px solid #d8e0e8;
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--color-panel);
+}
+
+.nav-summary-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  color: #536273;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .nav-summary-item {
   display: grid;
-  gap: 3px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
   min-width: 0;
   min-height: 0;
-  padding: 4px 5px 6px;
-  border-bottom: 1px solid #edf1f4;
-  border-top: 0;
-  border-right: 0;
-  border-left: 0;
-  border-radius: 4px;
-  background: transparent;
+  padding: 8px;
+  border: 1px solid #e2e9f0;
+  border-radius: 6px;
+  background: #fbfcfd;
   color: inherit;
   text-align: left;
 }
 
 .nav-summary-item:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
+  padding-bottom: 8px;
 }
 
 .nav-summary-item:hover,
 .nav-summary-item:focus-visible {
-  background: var(--color-panel-subtle);
+  border-color: #b7cad8;
+  background: #f6f9fb;
 }
 
 .nav-summary-item.active {
+  border-color: #9bc7d8;
   background: var(--color-primary-surface);
 }
 
-.nav-summary span,
+.nav-summary-icon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-height: 28px;
+  border: 1px solid #d7e4ec;
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-info);
+}
+
+.map-profile-icon {
+  border-color: #b9d9c7;
+  background: #f0fbf4;
+  color: #187146;
+}
+
+.mod-profile-icon {
+  border-color: #bdd2ea;
+  background: #f3f8ff;
+  color: #1e5f9f;
+}
+
+.nav-summary-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.nav-summary-label,
 .nav-summary small {
   color: #667484;
   font-size: 12px;
@@ -194,6 +235,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+}
+
+.nav-summary-badge {
+  align-self: start;
+  min-width: 52px;
+  border: 1px solid #d5dee7;
+  border-radius: 999px;
+  background: var(--color-panel);
+  color: #4f6172;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.4;
+  padding: 1px 7px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.nav-summary-item small {
+  grid-column: 2 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
 }
 
 .filter-dock {

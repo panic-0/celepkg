@@ -4,7 +4,9 @@ import {
   Archive,
   Download,
   Gamepad2,
+  Map,
   Mountain,
+  Package,
   PackageSearch,
   Settings2,
   SlidersHorizontal,
@@ -97,15 +99,25 @@ export function WorkspaceNav({
       </section>
 
       <section className="nav-summary">
+        <div className="nav-summary-heading">
+          <UserRound size={15} />
+          <span>当前 Profile</span>
+        </div>
         <button
           className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
           onClick={() => onActiveViewChange("profiles")}
           title="打开 Profile 管理"
           type="button"
         >
-          <span>地图 Profile</span>
-          <strong title={mapProfileName || "未选择"}>{mapProfileName || "未选择"}</strong>
-          <small>{`${enabledMapCount}/${totalMapCount} 地图`}</small>
+          <span className="nav-summary-icon map-profile-icon">
+            <Map size={15} />
+          </span>
+          <span className="nav-summary-copy">
+            <span className="nav-summary-label">地图 Profile</span>
+            <strong title={mapProfileName || "未选择"}>{mapProfileName || "未选择"}</strong>
+          </span>
+          <span className="nav-summary-badge">{`${enabledMapCount}/${totalMapCount}`}</span>
+          <small>地图</small>
         </button>
         <button
           className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
@@ -113,9 +125,15 @@ export function WorkspaceNav({
           title="打开 Profile 管理"
           type="button"
         >
-          <span>Mod Profile</span>
-          <strong title={modProfileName || "未选择"}>{modProfileName || "未选择"}</strong>
-          <small>{`${enabledModCount}/${totalModCount} Mod，${dependencyModCount} 依赖`}</small>
+          <span className="nav-summary-icon mod-profile-icon">
+            <Package size={15} />
+          </span>
+          <span className="nav-summary-copy">
+            <span className="nav-summary-label">Mod Profile</span>
+            <strong title={modProfileName || "未选择"}>{modProfileName || "未选择"}</strong>
+          </span>
+          <span className="nav-summary-badge">{`${enabledModCount}/${totalModCount}`}</span>
+          <small>{`${dependencyModCount} 依赖`}</small>
         </button>
       </section>
 
