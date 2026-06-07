@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import type { MapDetailTab } from "../hooks/useUiLayout";
+import type { DownloadTask } from "../utils/downloadTask";
+import { summarizeDownloadTaskProgress } from "../utils/downloadTask";
 import type { SubMapSortKey } from "../utils/subMapSorting";
 import type { ActiveView } from "../viewTypes";
 import { SearchBox, Select } from "./common";
@@ -23,6 +25,7 @@ import { SearchBox, Select } from "./common";
 type WorkspaceNavProps = {
   activeView: ActiveView;
   dependencyModCount: number;
+  downloadTask: DownloadTask | null;
   enabledMapCount: number;
   enabledModCount: number;
   mapProfileName: string;
@@ -38,6 +41,7 @@ type WorkspaceNavProps = {
 export function WorkspaceNav({
   activeView,
   dependencyModCount,
+  downloadTask,
   enabledMapCount,
   enabledModCount,
   mapProfileName,
@@ -50,6 +54,7 @@ export function WorkspaceNav({
   onActiveViewChange
 }: WorkspaceNavProps) {
   const showsSubMapFilters = activeView === "maps" && mainMode === "detail" && mapDetailTab === "submaps";
+  const downloadProgress = summarizeDownloadTaskProgress(downloadTask);
   const filterCount =
     Number(mapDetailControls.subMapQuery.trim().length > 0) +
     Number(mapDetailControls.subMapSortKey !== "file") +
@@ -67,9 +72,9 @@ export function WorkspaceNav({
           <span>本地内容</span>
           <strong
             className="nav-count"
-            title={`${enabledMapCount}/${totalMapCount} 地图启用，${enabledModCount}/${totalModCount} Mod 启用`}
+            title={`${enabledMapCount} / ${totalMapCount} 地图启用，${enabledModCount} / ${totalModCount} Mod 启用`}
           >
-            {enabledMapCount + enabledModCount}/{totalMapCount + totalModCount}
+            {enabledMapCount + enabledModCount} / {totalMapCount + totalModCount}
           </strong>
         </button>
         <button className={activeView === "everest" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("everest")}>
@@ -80,9 +85,19 @@ export function WorkspaceNav({
           <PackageSearch size={18} />
           <span>下载 Mod</span>
         </button>
-        <button className={activeView === "downloads" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("downloads")}>
+        <button
+          aria-label="下载管理"
+          className={activeView === "downloads" ? "nav-item active" : "nav-item"}
+          onClick={() => onActiveViewChange("downloads")}
+          title={downloadProgress?.detail}
+        >
           <Download size={18} />
           <span>下载管理</span>
+          {downloadProgress && (
+            <strong className={`nav-task-badge ${downloadProgress.tone}`} title={downloadProgress.detail}>
+              {downloadProgress.badge}
+            </strong>
+          )}
         </button>
         <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
           <UserRound size={18} />
@@ -116,7 +131,7 @@ export function WorkspaceNav({
             <span className="nav-summary-label">地图 Profile</span>
             <strong title={mapProfileName || "未选择"}>{mapProfileName || "未选择"}</strong>
           </span>
-          <span className="nav-summary-badge">{`${enabledMapCount}/${totalMapCount}`}</span>
+          <span className="nav-summary-badge">{`${enabledMapCount} / ${totalMapCount}`}</span>
           <small>地图</small>
         </button>
         <button
@@ -132,7 +147,7 @@ export function WorkspaceNav({
             <span className="nav-summary-label">Mod Profile</span>
             <strong title={modProfileName || "未选择"}>{modProfileName || "未选择"}</strong>
           </span>
-          <span className="nav-summary-badge">{`${enabledModCount}/${totalModCount}`}</span>
+          <span className="nav-summary-badge">{`${enabledModCount} / ${totalModCount}`}</span>
           <small>{`${dependencyModCount} 依赖`}</small>
         </button>
       </section>

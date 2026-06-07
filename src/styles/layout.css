@@ -127,7 +127,7 @@
 }
 
 .nav-item .nav-count {
-  min-width: 48px;
+  min-width: 72px;
   border: 1px solid #d5dee7;
   border-radius: 999px;
   background: var(--color-panel);
@@ -141,6 +141,31 @@
   border-color: #9bc7d8;
   background: var(--color-panel);
   color: var(--color-info);
+}
+
+.nav-task-badge {
+  min-width: 78px;
+  border: 1px solid #b8d2de;
+  border-radius: 999px;
+  background: #eaf6fb;
+  color: var(--color-info);
+  font-weight: 900;
+  line-height: 1.4;
+  padding: 1px 7px;
+  text-align: center;
+}
+
+.nav-task-badge.done {
+  border-color: #acd5be;
+  background: #edf9f2;
+  color: #187146;
+}
+
+.nav-task-badge.failed,
+.nav-task-badge.cancelled {
+  border-color: #efc6a9;
+  background: #fff5ec;
+  color: #a24c17;
 }
 
 .nav-summary {
@@ -239,7 +264,7 @@
 
 .nav-summary-badge {
   align-self: start;
-  min-width: 52px;
+  min-width: 72px;
   border: 1px solid #d5dee7;
   border-radius: 999px;
   background: var(--color-panel);

@@ -160,6 +160,9 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   await expect(updateDialog).toBeVisible();
   await updateDialog.getByRole("button", { name: "更新全部" }).click();
 
+  const downloadsNav = page.locator(".workspace-nav").getByRole("button", { name: "下载管理", exact: true });
+  await expect(downloadsNav.locator(".nav-task-badge")).toContainText(/\d+ \/ \d+ \/ \d+/);
+
   await openNav(page, "下载管理");
   await expect(page.getByRole("heading", { name: "下载管理" })).toBeVisible();
   await expect(page.locator(".download-task-panel")).toContainText(/下载中 [1-9]/);

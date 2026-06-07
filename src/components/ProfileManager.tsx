@@ -83,7 +83,7 @@ export function ProfileManager({
       <div className="list-header">
         <div>
           <h2>Profile</h2>
-          <p>{`启用 ${enabledMapCount}/${totalMapCount} 图，${enabledModCount}/${totalModCount} Mod，其中 ${dependencyModCount} 个由依赖推导`}</p>
+          <p>{`启用 ${enabledMapCount} / ${totalMapCount} 图，${enabledModCount} / ${totalModCount} Mod，其中 ${dependencyModCount} 个由依赖推导`}</p>
         </div>
         <div className="profile-header-actions">
           <button onClick={onApplyProfile} disabled={loading || !selectedMapProfile || !selectedModProfile}>
@@ -96,8 +96,8 @@ export function ProfileManager({
       <div className="profile-combo-bar">
         <SummaryItem label="地图 Profile" value={selectedMapProfile?.name || "未选择"} />
         <SummaryItem label="Mod Profile" value={selectedModProfile?.name || "未选择"} />
-        <SummaryItem label="启用地图" value={`${enabledMapCount}/${totalMapCount}`} />
-        <SummaryItem label="有效 Mod" value={`${enabledModCount}/${totalModCount}，${dependencyModCount} 依赖`} />
+        <SummaryItem label="启用地图" value={`${enabledMapCount} / ${totalMapCount}`} />
+        <SummaryItem label="有效 Mod" value={`${enabledModCount} / ${totalModCount}，${dependencyModCount} 依赖`} />
         <label className="profile-launch-field">
           <span>启动参数</span>
           <input value={launchArgs} onChange={(event) => onLaunchArgsChange(event.target.value)} placeholder="-debug" />
