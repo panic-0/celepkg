@@ -1,24 +1,7 @@
-import {
-  ArrowDownAZ,
-  ArrowUpAZ,
-  Archive,
-  Download,
-  Gamepad2,
-  Mountain,
-  PackageSearch,
-  Settings2,
-  SlidersHorizontal,
-  ToggleLeft,
-  ToggleRight,
-  UserRound
-} from "lucide-react";
-import type { MapDetailControls } from "../hooks/useMapDetailControls";
-import type { MapDetailTab } from "../hooks/useUiLayout";
+import { Archive, Download, Gamepad2, Mountain, PackageSearch, Settings2, UserRound } from "lucide-react";
 import type { DownloadTask } from "../utils/downloadTask";
 import { summarizeDownloadTaskProgress } from "../utils/downloadTask";
-import type { SubMapSortKey } from "../utils/subMapSorting";
 import type { ActiveView } from "../viewTypes";
-import { SearchBox, Select } from "./common";
 
 type WorkspaceNavProps = {
   activeView: ActiveView;
@@ -29,9 +12,6 @@ type WorkspaceNavProps = {
   mapDependencyModCount: number;
   mapProfileName: string;
   modProfileName: string;
-  mainMode: "list" | "detail";
-  mapDetailControls: MapDetailControls;
-  mapDetailTab: MapDetailTab;
   totalMapCount: number;
   totalModCount: number;
   onActiveViewChange: (view: ActiveView) => void;
@@ -46,20 +26,11 @@ export function WorkspaceNav({
   mapDependencyModCount,
   mapProfileName,
   modProfileName,
-  mainMode,
-  mapDetailControls,
-  mapDetailTab,
   totalMapCount,
   totalModCount,
   onActiveViewChange
 }: WorkspaceNavProps) {
-  const showsSubMapFilters = activeView === "maps" && mainMode === "detail" && mapDetailTab === "submaps";
   const downloadProgress = summarizeDownloadTaskProgress(downloadTask);
-  const filterCount =
-    Number(mapDetailControls.subMapQuery.trim().length > 0) +
-    Number(mapDetailControls.subMapSortKey !== "file") +
-    Number(mapDetailControls.subMapSortDescending) +
-    Number(!mapDetailControls.groupSubMapsByDifficulty);
 
   return (
     <aside className="workspace-nav">
@@ -155,49 +126,6 @@ export function WorkspaceNav({
           <span>设置</span>
         </button>
       </section>
-
-      {showsSubMapFilters && (
-        <section className="nav-section filter-dock">
-          <div className="filter-heading">
-            <SlidersHorizontal size={17} />
-            <span>小图筛选</span>
-            {filterCount > 0 && <small>{filterCount}</small>}
-          </div>
-          <SubMapFilters controls={mapDetailControls} />
-        </section>
-      )}
     </aside>
-  );
-}
-
-function SubMapFilters({ controls }: { controls: MapDetailControls }) {
-  return (
-    <div className="filter-content">
-      <SearchBox value={controls.subMapQuery} onChange={controls.updateSubMapQuery} placeholder="搜索小图名称、SID" />
-      <Select label="排序" value={controls.subMapSortKey} onChange={(value) => controls.updateSubMapSortKey(value as SubMapSortKey)}>
-        <option value="file">文件顺序</option>
-        <option value="name">名称</option>
-        <option value="completion">完成</option>
-        <option value="deaths">死亡</option>
-        <option value="time">用时</option>
-        <option value="strawberries">草莓</option>
-      </Select>
-      <button
-        className={controls.subMapSortDescending ? "inline-toggle active" : "inline-toggle"}
-        onClick={() => controls.updateSubMapSortDescending(!controls.subMapSortDescending)}
-        title="反转当前排序关键字的组内顺序"
-      >
-        {controls.subMapSortDescending ? <ArrowDownAZ size={18} /> : <ArrowUpAZ size={18} />}
-        倒序
-      </button>
-      <button
-        className={controls.groupSubMapsByDifficulty ? "inline-toggle active" : "inline-toggle"}
-        onClick={() => controls.updateGroupSubMapsByDifficulty(!controls.groupSubMapsByDifficulty)}
-        title="先按 Easy、Medium、Hard、高难组分组，再按排序关键字排列"
-      >
-        {controls.groupSubMapsByDifficulty ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
-        按难度分组
-      </button>
-    </div>
   );
 }

@@ -239,9 +239,6 @@ export function App() {
           enabledModCount={workspaceView.enabledModCount}
           mapProfileName={workspaceView.mapProfileName}
           modProfileName={workspaceView.modProfileName}
-          mainMode={workspaceView.mainMode}
-          mapDetailTab={uiLayout.mapDetailTab}
-          mapDetailControls={mapDetailControls}
           totalMapCount={scan.maps.length}
           totalModCount={scan.otherMods.length}
           onActiveViewChange={workspaceView.changeActiveView}

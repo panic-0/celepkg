@@ -214,20 +214,55 @@ test("map detail opens the local map location from the header", async ({ page })
   await expect(page.getByText("已打开本地内容位置。")).toBeVisible();
 });
 
-test("sub-map filters stay scoped to the map detail sub-map tab", async ({ page }) => {
+test("sub-map filters stay above the map detail sub-map list", async ({ page }) => {
   await openMock(page);
   await expect(page.locator(".filter-dock")).toHaveCount(0);
+  await expect(page.locator(".sub-map-filter-panel")).toHaveCount(0);
 
   await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Strawberry Jam");
   const mapRow = page.locator("tbody tr", { hasText: "Strawberry Jam Collab" });
   await expect(mapRow).toHaveCount(1);
   await mapRow.click();
 
-  await expect(page.locator(".filter-dock")).toHaveCount(0);
+  await expect(page.locator(".sub-map-filter-panel")).toHaveCount(0);
   await page.locator(".detail-tabs button", { hasText: "小图" }).click();
-  await expect(page.locator(".filter-dock")).toContainText("小图筛选");
-  await openNav(page, "Profile");
   await expect(page.locator(".filter-dock")).toHaveCount(0);
+  await expect(page.locator(".sub-map-filter-panel")).toBeVisible();
+  await expect(page.locator(".sub-map-filter-options")).toContainText("排序");
+  await expect(page.locator(".sub-map-filter-options")).toContainText("方向");
+  await expect(page.locator(".sub-map-filter-options")).toContainText("分组");
+  await expect(page.locator(".sub-map-filter-options")).toContainText("范围");
+
+  const filterPlacement = await page.locator(".sub-map-tab-panel").evaluate((panel) => {
+    const filters = panel.querySelector(".sub-map-filter-panel")?.getBoundingClientRect();
+    const breadcrumbs = panel.querySelector(".sub-map-breadcrumbs")?.getBoundingClientRect();
+    const table = panel.querySelector(".sub-map-table-wrap")?.getBoundingClientRect();
+    if (!filters || !breadcrumbs || !table) throw new Error("Sub-map filter placement targets are missing");
+    return { breadcrumbsBottom: breadcrumbs.bottom, breadcrumbsTop: breadcrumbs.top, filtersBottom: filters.bottom, tableTop: table.top };
+  });
+  expect(filterPlacement.filtersBottom).toBeLessThanOrEqual(filterPlacement.breadcrumbsTop + 1);
+  expect(filterPlacement.breadcrumbsBottom).toBeLessThanOrEqual(filterPlacement.tableTop + 1);
+  const optionPlacement = await page.locator(".sub-map-filter-options").evaluate((options) => {
+    const labels = Array.from(options.querySelectorAll(":scope > .field > span, :scope > .sub-map-filter-control > span"));
+    const rangeLabel = labels.find((label) => label.textContent?.trim() === "范围");
+    if (!rangeLabel) throw new Error("Range filter label is missing");
+    return {
+      labelCount: labels.length,
+      rangeRight: rangeLabel.getBoundingClientRect().right,
+      optionsRight: options.getBoundingClientRect().right
+    };
+  });
+  expect(optionPlacement.labelCount).toBe(4);
+  expect(optionPlacement.rangeRight).toBeGreaterThan(optionPlacement.optionsRight - 190);
+
+  await page.locator(".sub-map-filter-panel").getByPlaceholder("搜索小图名称、SID").fill("Squeeze");
+  await expect(page.locator(".sub-map-table tbody tr", { hasText: "Squeeze" })).toHaveCount(1);
+
+  await page.locator(".sub-map-filter-panel").getByRole("button", { name: "仅搜索当前层级" }).click();
+  await expect(page.locator(".sub-map-table tbody tr", { hasText: "Squeeze" })).toHaveCount(0);
+
+  await openNav(page, "Profile");
+  await expect(page.locator(".sub-map-filter-panel")).toHaveCount(0);
 });
 
 test("settings save-file and catalog-cache actions show persistent feedback", async ({ page }) => {

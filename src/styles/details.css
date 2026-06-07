@@ -467,7 +467,7 @@
 }
 
 .sub-map-tab-panel {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -514,6 +514,47 @@
   background: var(--color-primary-surface);
   color: var(--color-info);
   font-weight: 800;
+}
+
+.sub-map-filter-panel {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.catalog-actions.sub-map-search-actions {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.sub-map-filter-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sub-map-filter-options .field,
+.sub-map-filter-control .inline-toggle {
+  margin: 0;
+}
+
+.sub-map-filter-options .field,
+.sub-map-filter-control {
+  display: grid;
+  gap: 4px;
+}
+
+.sub-map-filter-control span {
+  color: #627080;
+  font-size: 12px;
+}
+
+.sub-map-filter-options .field select,
+.sub-map-filter-control .inline-toggle {
+  min-height: 32px;
+  padding: 6px 8px;
 }
 
 .sub-map-table-wrap {

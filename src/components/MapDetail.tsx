@@ -1,12 +1,24 @@
-import { ArrowLeft, Clock, CircleDot, Folder, FolderOpen, Heart, Skull } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import {
+  ArrowDownAZ,
+  ArrowLeft,
+  ArrowUpAZ,
+  Clock,
+  CircleDot,
+  Folder,
+  FolderOpen,
+  Heart,
+  Skull,
+  ToggleLeft,
+  ToggleRight
+} from "lucide-react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import type { MapDetailControls } from "../hooks/useMapDetailControls";
 import { useScrollMemory, type ScrollMemory } from "../hooks/useScrollMemory";
 import type { ModRecord, SubMapInfo } from "../types";
 import { buildLocalDependencyTree } from "../utils/dependencyTree";
 import { formatCompletionStatus, formatHeartCassette, formatStrawberries, formatTime, strawberryCollected } from "../utils/format";
 import { createSearchMatcher, matchSearchFields, rangesForField, type SearchField, type SearchMatch } from "../utils/search";
-import { sortSubMaps } from "../utils/subMapSorting";
+import { sortSubMaps, type SubMapSortKey } from "../utils/subMapSorting";
 import type { StrawberryDenominator } from "../viewTypes";
 import {
   ALL_SUB_MAP_FOLDER,
@@ -16,7 +28,7 @@ import {
   subMapMatchesFolder
 } from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
-import { DetailStat, HighlightedText, Info } from "./common";
+import { DetailStat, HighlightedText, Info, SearchBox, Select } from "./common";
 import { DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
 import type { DependencyReference } from "../utils/dependencies";
 
@@ -59,6 +71,7 @@ export function MapDetail({
     selectedSubMapId,
     subMapQuery,
     subMapRootPath,
+    subMapSearchCurrentLevelOnly,
     subMapSortDescending,
     subMapSortKey,
     selectSubMap,
@@ -77,7 +90,9 @@ export function MapDetail({
     if (!map) return [];
     const matchingSubMaps = map.subMaps.filter((subMap) => {
       if (!subMapMatchesFolder(subMap, effectiveSubMapPath)) return false;
-      if (!subMapSearchMatcher.active && subMapFolderOptions.length > 0 && !subMapIsDirectChildOfFolder(subMap, effectiveSubMapPath)) {
+      const shouldLimitToCurrentLevel =
+        (subMapSearchMatcher.active && subMapSearchCurrentLevelOnly) || (!subMapSearchMatcher.active && subMapFolderOptions.length > 0);
+      if (shouldLimitToCurrentLevel && !subMapIsDirectChildOfFolder(subMap, effectiveSubMapPath)) {
         return false;
       }
       return matchSearchFields(searchFieldsForSubMap(subMap), subMapSearchMatcher).matched;
@@ -93,6 +108,7 @@ export function MapDetail({
     groupSubMapsByDifficulty,
     map,
     subMapSearchMatcher,
+    subMapSearchCurrentLevelOnly,
     strawberryDenominator,
     subMapFolderOptions.length,
     subMapSortDescending,
@@ -201,6 +217,7 @@ export function MapDetail({
         <div className="detail-tab-panel sub-map-tab-panel" ref={detailPanelRef}>
           {map.subMaps.length ? (
             <>
+              <SubMapFilters controls={mapDetailControls} />
               <nav className="sub-map-breadcrumbs">
                 {subMapBreadcrumbs.map((crumb, index) => (
                   <span key={`${crumb.path}-${index}`} className="breadcrumb-part">
@@ -393,6 +410,70 @@ export function MapDetail({
         </div>
       )}
     </section>
+  );
+}
+
+function SubMapFilters({ controls }: { controls: MapDetailControls }) {
+  return (
+    <div className="sub-map-filter-panel">
+      <div className="catalog-actions sub-map-search-actions">
+        <SearchBox
+          className="catalog-search"
+          value={controls.subMapQuery}
+          onChange={controls.updateSubMapQuery}
+          placeholder="搜索小图名称、SID"
+        />
+      </div>
+      <div className="sub-map-filter-options">
+        <Select label="排序" value={controls.subMapSortKey} onChange={(value) => controls.updateSubMapSortKey(value as SubMapSortKey)}>
+          <option value="file">文件顺序</option>
+          <option value="name">名称</option>
+          <option value="completion">完成</option>
+          <option value="deaths">死亡</option>
+          <option value="time">用时</option>
+          <option value="strawberries">草莓</option>
+        </Select>
+        <LabeledFilterControl label="方向">
+          <button
+            className={controls.subMapSortDescending ? "inline-toggle active" : "inline-toggle"}
+            onClick={() => controls.updateSubMapSortDescending(!controls.subMapSortDescending)}
+            title="反转当前排序关键字的组内顺序"
+          >
+            {controls.subMapSortDescending ? <ArrowDownAZ size={18} /> : <ArrowUpAZ size={18} />}
+            倒序
+          </button>
+        </LabeledFilterControl>
+        <LabeledFilterControl label="分组">
+          <button
+            className={controls.groupSubMapsByDifficulty ? "inline-toggle active" : "inline-toggle"}
+            onClick={() => controls.updateGroupSubMapsByDifficulty(!controls.groupSubMapsByDifficulty)}
+            title="先按 Easy、Medium、Hard、高难组分组，再按排序关键字排列"
+          >
+            {controls.groupSubMapsByDifficulty ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+            按难度分组
+          </button>
+        </LabeledFilterControl>
+        <LabeledFilterControl label="范围">
+          <button
+            className={controls.subMapSearchCurrentLevelOnly ? "inline-toggle active" : "inline-toggle"}
+            onClick={() => controls.updateSubMapSearchCurrentLevelOnly(!controls.subMapSearchCurrentLevelOnly)}
+            title="搜索时只匹配当前小图层级，不进入子文件夹"
+          >
+            {controls.subMapSearchCurrentLevelOnly ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+            仅搜索当前层级
+          </button>
+        </LabeledFilterControl>
+      </div>
+    </div>
+  );
+}
+
+function LabeledFilterControl({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <div className="sub-map-filter-control">
+      <span>{label}</span>
+      {children}
+    </div>
   );
 }
 

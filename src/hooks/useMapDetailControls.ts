@@ -8,6 +8,7 @@ export type MapDetailMemoryState = {
   selectedSubMapId: string;
   subMapPath: string;
   subMapQuery: string;
+  subMapSearchCurrentLevelOnly: boolean;
   subMapSortDescending: boolean;
   subMapSortKey: SubMapSortKey;
 };
@@ -19,12 +20,14 @@ export type MapDetailControls = {
   subMapPath: string;
   subMapQuery: string;
   subMapRootPath: string;
+  subMapSearchCurrentLevelOnly: boolean;
   subMapSortDescending: boolean;
   subMapSortKey: SubMapSortKey;
   selectSubMap: (id: string) => void;
   updateGroupSubMapsByDifficulty: (value: boolean) => void;
   updateSubMapPath: (value: string) => void;
   updateSubMapQuery: (value: string) => void;
+  updateSubMapSearchCurrentLevelOnly: (value: boolean) => void;
   updateSubMapSortDescending: (value: boolean) => void;
   updateSubMapSortKey: (value: SubMapSortKey) => void;
 };
@@ -34,6 +37,7 @@ export function useMapDetailControls(map: ModRecord | undefined, mapDetailMemory
   const [groupSubMapsByDifficulty, setGroupSubMapsByDifficulty] = useState(true);
   const [subMapPath, setSubMapPath] = useState(ALL_SUB_MAP_FOLDER);
   const [subMapQuery, setSubMapQuery] = useState("");
+  const [subMapSearchCurrentLevelOnly, setSubMapSearchCurrentLevelOnly] = useState(false);
   const [subMapSortDescending, setSubMapSortDescending] = useState(false);
   const [subMapSortKey, setSubMapSortKey] = useState<SubMapSortKey>("file");
   const mapId = map?.id ?? "empty";
@@ -47,6 +51,7 @@ export function useMapDetailControls(map: ModRecord | undefined, mapDetailMemory
     setSelectedSubMapId(saved?.selectedSubMapId ?? "");
     setSubMapPath(savedPath ?? ALL_SUB_MAP_FOLDER);
     setSubMapQuery(saved?.subMapQuery ?? "");
+    setSubMapSearchCurrentLevelOnly(saved?.subMapSearchCurrentLevelOnly ?? false);
     setSubMapSortDescending(saved?.subMapSortDescending ?? false);
     setSubMapSortKey(saved?.subMapSortKey ?? "file");
   }, [mapId, mapDetailMemory, subMapRootPath]);
@@ -63,6 +68,11 @@ export function useMapDetailControls(map: ModRecord | undefined, mapDetailMemory
   function updateSubMapQuery(value: string) {
     setSubMapQuery(value);
     updateMapDetailMemory({ subMapQuery: value });
+  }
+
+  function updateSubMapSearchCurrentLevelOnly(value: boolean) {
+    setSubMapSearchCurrentLevelOnly(value);
+    updateMapDetailMemory({ subMapSearchCurrentLevelOnly: value });
   }
 
   function updateSubMapPath(value: string) {
@@ -98,12 +108,14 @@ export function useMapDetailControls(map: ModRecord | undefined, mapDetailMemory
     subMapPath,
     subMapQuery,
     subMapRootPath,
+    subMapSearchCurrentLevelOnly,
     subMapSortDescending,
     subMapSortKey,
     selectSubMap,
     updateGroupSubMapsByDifficulty,
     updateSubMapPath,
     updateSubMapQuery,
+    updateSubMapSearchCurrentLevelOnly,
     updateSubMapSortDescending,
     updateSubMapSortKey
   };
@@ -115,6 +127,7 @@ function defaultMemoryState(): MapDetailMemoryState {
     selectedSubMapId: "",
     subMapPath: ALL_SUB_MAP_FOLDER,
     subMapQuery: "",
+    subMapSearchCurrentLevelOnly: false,
     subMapSortDescending: false,
     subMapSortKey: "file"
   };
