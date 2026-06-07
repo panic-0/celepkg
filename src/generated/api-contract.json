@@ -1325,6 +1325,28 @@
       "title": "EverestReleaseList",
       "type": "object"
     },
+    "GameStatus": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "executable": {
+          "type": "string"
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "required": ["running", "stopped", "executable", "pid"],
+      "title": "GameStatus",
+      "type": "object"
+    },
     "InstallStagedEverestPayload": {
       "$defs": {
         "EverestRelease": {
@@ -4891,6 +4913,10 @@
       "payload": null,
       "response": "ConfigResponse"
     },
+    "get_game_status": {
+      "payload": "CelestePathPayload",
+      "response": "GameStatus"
+    },
     "install_staged_everest": {
       "payload": "InstallStagedEverestPayload",
       "response": "EverestInstallResult"
@@ -5014,6 +5040,10 @@
     "stage_mod_preview": {
       "payload": "StageModPreviewPayload",
       "response": "ModPreviewStaging"
+    },
+    "stop_game": {
+      "payload": "CelestePathPayload",
+      "response": "GameStatus"
     }
   },
   "events": {
@@ -6345,6 +6375,28 @@
       },
       "required": ["releases", "warnings"],
       "title": "EverestReleaseList",
+      "type": "object"
+    },
+    "GameStatus": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "executable": {
+          "type": "string"
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "required": ["running", "stopped", "executable", "pid"],
+      "title": "GameStatus",
       "type": "object"
     },
     "InstallStagedEverestPayload": {

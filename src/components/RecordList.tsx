@@ -50,6 +50,7 @@ type RecordListProps = {
   recordSearchMatches: Map<string, SearchMatch>;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
   visibleMapCount: number;
+  writeActionsDisabled: boolean;
   modCount: number;
   onDisableAll: () => void;
   onEnableAll: () => void;
@@ -97,6 +98,7 @@ export function RecordList({
   recordSearchMatches,
   requiredReferencesByModId,
   visibleMapCount,
+  writeActionsDisabled,
   modCount,
   onDisableAll,
   onEnableAll,
@@ -153,23 +155,41 @@ export function RecordList({
             </button>
           </div>
         </div>
-        <button onClick={onEnableAll} disabled={!hasRecords} title="只启用当前筛选结果中的条目">
+        <button
+          onClick={onEnableAll}
+          disabled={!hasRecords || writeActionsDisabled}
+          title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再修改启用状态" : "只启用当前筛选结果中的条目"}
+        >
           <ToggleRight size={16} />
           启用当前结果
         </button>
-        <button onClick={onDisableAll} disabled={!hasRecords} title="只禁用当前筛选结果中的条目">
+        <button
+          onClick={onDisableAll}
+          disabled={!hasRecords || writeActionsDisabled}
+          title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再修改启用状态" : "只禁用当前筛选结果中的条目"}
+        >
           <ToggleLeft size={16} />
           禁用当前结果
         </button>
-        <button onClick={onCheckModUpdates} disabled={modUpdateChecking} title="检查本地 zip Mod 是否有更新">
+        <button
+          onClick={onCheckModUpdates}
+          disabled={modUpdateChecking || writeActionsDisabled}
+          title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再检查更新" : "检查本地 zip Mod 是否有更新"}
+        >
           {modUpdateChecking ? <LoaderCircle className="spin-icon" size={16} /> : <SearchCheck size={16} />}
           检查更新
         </button>
         <button
           className="primary-button update-all-button"
           onClick={onUpdateAllMods}
-          disabled={loading || modUpdateCount === 0}
-          title={modUpdateCount ? `更新全部 ${modUpdateCount} 个 Mod` : "先检查更新"}
+          disabled={loading || writeActionsDisabled || modUpdateCount === 0}
+          title={
+            writeActionsDisabled
+              ? "Celeste 运行中，停止游戏后再更新 Mod"
+              : modUpdateCount
+                ? `更新全部 ${modUpdateCount} 个 Mod`
+                : "先检查更新"
+          }
         >
           <Download size={16} />
           <span>{formatUpdateAllLabel(modUpdateCount)}</span>
@@ -208,6 +228,7 @@ export function RecordList({
             onToggle={onMapToggle}
             onFavoriteToggle={onFavoriteToggle}
             onProtectedToggle={onProtectedToggle}
+            writeActionsDisabled={writeActionsDisabled}
             showWarningColumn={showWarningColumn}
             strawberryDenominator={strawberryDenominator}
             isEnabled={isMapEnabled}
@@ -223,6 +244,7 @@ export function RecordList({
             onToggle={onModToggle}
             onFavoriteToggle={onFavoriteToggle}
             onProtectedToggle={onProtectedToggle}
+            writeActionsDisabled={writeActionsDisabled}
             showWarningColumn={showWarningColumn}
             isEnabled={isModEnabled}
             updatesByRecordId={modUpdatesByRecordId}
@@ -359,6 +381,7 @@ function MapTable({
   onToggle,
   onFavoriteToggle,
   onProtectedToggle,
+  writeActionsDisabled,
   showWarningColumn,
   strawberryDenominator,
   isEnabled,
@@ -372,6 +395,7 @@ function MapTable({
   onToggle: (record: ModRecord) => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
+  writeActionsDisabled: boolean;
   showWarningColumn: boolean;
   strawberryDenominator: StrawberryDenominator;
   isEnabled: (record: ModRecord) => boolean;
@@ -425,9 +449,16 @@ function MapTable({
                 toggleLabel="地图"
                 onFavoriteToggle={onFavoriteToggle}
                 onProtectedToggle={onProtectedToggle}
+                writeActionsDisabled={writeActionsDisabled}
                 onToggle={onToggle}
               />
-              <RecordNameCell record={map} searchMatch={searchMatch} updateCandidate={updateCandidate} onUpdate={onUpdate}>
+              <RecordNameCell
+                record={map}
+                searchMatch={searchMatch}
+                updateCandidate={updateCandidate}
+                writeActionsDisabled={writeActionsDisabled}
+                onUpdate={onUpdate}
+              >
                 <div className="inline-pills">
                   {map.readOnly && <span>官图</span>}
                   {map.kind === "mod" && <span className="helper-map-pill">测试图</span>}
@@ -461,6 +492,7 @@ function ModTable({
   onToggle,
   onFavoriteToggle,
   onProtectedToggle,
+  writeActionsDisabled,
   showWarningColumn,
   isEnabled,
   updatesByRecordId,
@@ -474,6 +506,7 @@ function ModTable({
   onToggle: (record: ModRecord) => void;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
+  writeActionsDisabled: boolean;
   showWarningColumn: boolean;
   isEnabled: (id: string) => boolean;
   updatesByRecordId: Map<string, ModUpdateCandidate>;
@@ -517,9 +550,16 @@ function ModTable({
                 toggleLabel="Mod"
                 onFavoriteToggle={onFavoriteToggle}
                 onProtectedToggle={onProtectedToggle}
+                writeActionsDisabled={writeActionsDisabled}
                 onToggle={onToggle}
               />
-              <RecordNameCell record={modItem} searchMatch={searchMatch} updateCandidate={updateCandidate} onUpdate={onUpdate} />
+              <RecordNameCell
+                record={modItem}
+                searchMatch={searchMatch}
+                updateCandidate={updateCandidate}
+                writeActionsDisabled={writeActionsDisabled}
+                onUpdate={onUpdate}
+              />
               <td>{modItem.isArchive ? "zip" : "文件夹"}</td>
               <td className="num">{modItem.dependencies.length}</td>
               <td className="num" title={formatDependencyReferenceTitle(requiredReferences)}>
@@ -546,6 +586,7 @@ function RecordActionCell({
   enabled,
   record,
   toggleLabel,
+  writeActionsDisabled,
   onFavoriteToggle,
   onProtectedToggle,
   onToggle
@@ -553,6 +594,7 @@ function RecordActionCell({
   enabled: boolean;
   record: ModRecord;
   toggleLabel: string;
+  writeActionsDisabled: boolean;
   onFavoriteToggle: (record: ModRecord) => void;
   onProtectedToggle: (record: ModRecord) => void;
   onToggle: (record: ModRecord) => void;
@@ -564,11 +606,13 @@ function RecordActionCell({
           blockedReason={record.readOnly ? `${record.name} 是内置项目，不能通过 Profile 启用或禁用。` : undefined}
           enabled={enabled}
           label={toggleLabel}
+          writeActionsDisabled={writeActionsDisabled}
           onClick={() => onToggle(record)}
         />
         <div className="record-flag-actions">
           <FlagButton
             active={record.favorite}
+            disabled={writeActionsDisabled}
             icon={<Star size={16} />}
             label="收藏"
             variant="favorite"
@@ -576,7 +620,7 @@ function RecordActionCell({
           />
           <FlagButton
             active={record.protected}
-            disabled={record.readOnly}
+            disabled={record.readOnly || writeActionsDisabled}
             icon={record.protected ? <Lock size={16} /> : <Shield size={16} />}
             label="始终启用"
             variant="protected"
@@ -593,12 +637,14 @@ function RecordNameCell({
   record,
   searchMatch,
   updateCandidate,
+  writeActionsDisabled,
   onUpdate
 }: {
   children?: React.ReactNode;
   record: ModRecord;
   searchMatch?: SearchMatch;
   updateCandidate?: ModUpdateCandidate;
+  writeActionsDisabled: boolean;
   onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
@@ -617,25 +663,41 @@ function RecordNameCell({
             {formatModUpdateVersionChange(updateCandidate)}
           </span>
         )}
-        {updateCandidate && <InlineUpdateButton candidate={updateCandidate} onUpdate={onUpdate} />}
+        {updateCandidate && (
+          <InlineUpdateButton candidate={updateCandidate} writeActionsDisabled={writeActionsDisabled} onUpdate={onUpdate} />
+        )}
       </div>
       {children}
     </td>
   );
 }
 
-function InlineUpdateButton({ candidate, onUpdate }: { candidate: ModUpdateCandidate; onUpdate: (candidate: ModUpdateCandidate) => void }) {
+function InlineUpdateButton({
+  candidate,
+  writeActionsDisabled,
+  onUpdate
+}: {
+  candidate: ModUpdateCandidate;
+  writeActionsDisabled: boolean;
+  onUpdate: (candidate: ModUpdateCandidate) => void;
+}) {
   const hasDownloadUrl = candidate.entry.downloadUrl.trim().length > 0;
   return (
     <button
       className="record-update-button"
-      disabled={!hasDownloadUrl}
+      disabled={!hasDownloadUrl || writeActionsDisabled}
       onClick={(event) => {
         event.stopPropagation();
-        if (!hasDownloadUrl) return;
+        if (!hasDownloadUrl || writeActionsDisabled) return;
         onUpdate(candidate);
       }}
-      title={hasDownloadUrl ? `更新 ${formatModUpdateVersionChange(candidate)}` : "该目录条目没有下载地址"}
+      title={
+        writeActionsDisabled
+          ? "Celeste 运行中，停止游戏后再更新 Mod"
+          : hasDownloadUrl
+            ? `更新 ${formatModUpdateVersionChange(candidate)}`
+            : "该目录条目没有下载地址"
+      }
     >
       <Download size={13} />
       更新
@@ -678,14 +740,19 @@ function ToggleButton({
   blockedReason,
   enabled,
   label,
+  writeActionsDisabled,
   onClick
 }: {
   blockedReason?: string;
   enabled: boolean;
   label: string;
+  writeActionsDisabled: boolean;
   onClick: () => void;
 }) {
-  const blocked = Boolean(blockedReason);
+  const blocked = Boolean(blockedReason) || writeActionsDisabled;
+  const title = writeActionsDisabled
+    ? "Celeste 运行中，停止游戏后再修改启用状态"
+    : (blockedReason ?? (enabled ? `禁用${label}` : `启用${label}`));
   return (
     <button
       className={`${enabled ? "record-toggle enabled" : "record-toggle disabled"}${blocked ? " blocked" : ""}`}
@@ -694,7 +761,7 @@ function ToggleButton({
         event.stopPropagation();
         onClick();
       }}
-      title={blockedReason ?? (enabled ? `禁用${label}` : `启用${label}`)}
+      title={title}
     >
       {enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
     </button>

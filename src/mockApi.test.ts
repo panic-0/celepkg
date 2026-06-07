@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mockApi } from "./mockApi";
+import { delayNextMockGameLaunchStatusChecks, mockApi, setMockGameRunningForTests } from "./mockApi";
 import { buildLocalDependencyTree } from "./utils/dependencyTree";
 
 describe("mock staged downloads", () => {
@@ -9,6 +9,27 @@ describe("mock staged downloads", () => {
 
     const enabled = await mockApi.setAutoCheckAppUpdatesOnStartup(true);
     expect(enabled.autoCheckAppUpdatesOnStartup).toBe(true);
+  });
+
+  it("tracks mock game running status across launch and stop", async () => {
+    await mockApi.stopGame("D:\\Games\\Celeste");
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ running: false, stopped: false });
+
+    await mockApi.launchGame("D:\\Games\\Celeste", "-debug");
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ running: true, stopped: false, pid: 1234 });
+
+    await expect(mockApi.stopGame("D:\\Games\\Celeste")).resolves.toMatchObject({ running: false, stopped: true, pid: null });
+  });
+
+  it("can delay mock game running status after launch", async () => {
+    setMockGameRunningForTests(false);
+    delayNextMockGameLaunchStatusChecks(2);
+
+    await mockApi.launchGame("D:\\Games\\Celeste", "-debug");
+
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ running: false, pid: null });
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ running: false, pid: null });
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ running: true, pid: 1234 });
   });
 
   it("downloads and installs a staged mod once", async () => {

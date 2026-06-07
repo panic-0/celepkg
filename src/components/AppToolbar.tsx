@@ -1,9 +1,11 @@
-import { AlertTriangle, CheckCircle2, DatabaseZap, FolderOpen, Play, RefreshCcw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, DatabaseZap, FolderOpen, Play, RefreshCcw, Square } from "lucide-react";
 import type { ScanResult } from "../types";
 
 type AppToolbarProps = {
   canLaunch: boolean;
   celestePath: string;
+  gameLaunchPending: boolean;
+  gameRunning: boolean;
   issueCount: number;
   loading: boolean;
   loadingMessage: string;
@@ -20,6 +22,8 @@ type AppToolbarProps = {
 export function AppToolbar({
   canLaunch,
   celestePath,
+  gameLaunchPending,
+  gameRunning,
   issueCount,
   loading,
   loadingMessage,
@@ -33,7 +37,15 @@ export function AppToolbar({
   onRescan
 }: AppToolbarProps) {
   const completedCount = scan.maps.filter((map) => map.completionStatus === "completed").length;
-  const statusText = loading ? loadingMessage || "正在处理" : scan.modsPath ? "已连接 Celeste" : "等待目录";
+  const statusText = loading
+    ? loadingMessage || "正在处理"
+    : gameLaunchPending
+      ? "等待 Celeste 启动"
+      : gameRunning
+        ? "Celeste 正在运行"
+        : scan.modsPath
+          ? "已连接 Celeste"
+          : "等待目录";
 
   return (
     <header className="app-toolbar">
@@ -73,13 +85,28 @@ export function AppToolbar({
           <DatabaseZap size={17} />
           重扫缓存
         </button>
-        <button className="primary-button" onClick={onApplyAndLaunch} disabled={loading || !canLaunch} title="应用当前 Profile 并启动">
+        <button
+          className="primary-button"
+          onClick={onApplyAndLaunch}
+          disabled={loading || !canLaunch || gameRunning || gameLaunchPending}
+          title={
+            gameRunning
+              ? "Celeste 运行中，停止游戏后再应用 Profile"
+              : gameLaunchPending
+                ? "正在等待 Celeste 启动"
+                : "应用当前 Profile 并启动"
+          }
+        >
           <Play size={18} />
           应用并启动
         </button>
-        <button onClick={onDirectLaunch} disabled={loading || !canLaunch} title="不应用 Profile，直接启动 Celeste">
-          <Play size={18} />
-          直接启动
+        <button
+          onClick={onDirectLaunch}
+          disabled={loading || gameLaunchPending || (!canLaunch && !gameRunning)}
+          title={gameRunning ? "停止当前 Celeste 进程" : gameLaunchPending ? "正在等待 Celeste 启动" : "不应用 Profile，直接启动 Celeste"}
+        >
+          {gameRunning ? <Square size={18} /> : <Play size={18} />}
+          {gameRunning ? "停止游戏" : "直接启动"}
         </button>
       </div>
     </header>

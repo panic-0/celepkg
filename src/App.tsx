@@ -17,6 +17,7 @@ import { useBackups } from "./hooks/useBackups";
 import { useCelePkgData } from "./hooks/useCelePkgData";
 import { useAppUpdate } from "./hooks/useAppUpdate";
 import { useDownloadTaskControls } from "./hooks/useDownloadTaskControls";
+import { useGameStatus } from "./hooks/useGameStatus";
 import { useMapDetailControls, type MapDetailMemoryState } from "./hooks/useMapDetailControls";
 import { useModDownloadProgressListener } from "./hooks/useModDownloadProgressListener";
 import { useModInstallWorkflow } from "./hooks/useModInstallWorkflow";
@@ -28,6 +29,7 @@ import { useUiLayout } from "./hooks/useUiLayout";
 import { useWorkspaceView } from "./hooks/useWorkspaceView";
 import { findDependencyReferencesByModId } from "./utils/dependencies";
 import { isDraftEnabled, readError } from "./utils/format";
+import { shouldWatchGameLaunch } from "./utils/gameStatusWatcher";
 import type { ModRecord } from "./types";
 import type { ActiveView } from "./viewTypes";
 
@@ -121,9 +123,17 @@ export function App() {
     installEverestRelease,
     modUpdateChecking,
     modUpdatesByRecordId,
+    requestAppConfirm,
     updateAllMods,
     updateSingleMod
   } = modInstallWorkflow;
+  const gameStatus = useGameStatus({
+    celestePath,
+    configLoaded,
+    notifier,
+    requestAppConfirm,
+    setLoading
+  });
   const itemWarnings = useMemo(
     () => [...scan.maps, ...scan.otherMods].filter((record) => record.warnings.length),
     [scan.maps, scan.otherMods]
@@ -206,6 +216,7 @@ export function App() {
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
   const showingModRecords = workspaceView.activeView === "mods";
+  const writeActionsDisabled = gameStatus.gameRunning;
   const activeUpdateRecordIds = useMemo(
     () => new Set((showingModRecords ? filters.filteredMods : filters.filteredMaps).map((record) => record.id)),
     [filters.filteredMaps, filters.filteredMods, showingModRecords]
@@ -224,6 +235,20 @@ export function App() {
     }
   }
 
+  async function launchSelectedProfiles() {
+    const result = await profileDraft.launchSelectedProfiles();
+    if (shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch();
+  }
+
+  async function launchOrStopGame() {
+    if (gameStatus.gameRunning) {
+      await gameStatus.stopGameWithConfirm();
+      return;
+    }
+    const result = await profileDraft.launchCurrentGame();
+    if (shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch();
+  }
+
   return (
     <main className="app-shell">
       <AppToolbar
@@ -231,10 +256,12 @@ export function App() {
         loading={loading}
         loadingMessage={loadingMessage}
         canLaunch={Boolean(scan.gameExecutable)}
+        gameLaunchPending={gameStatus.gameLaunchPending}
+        gameRunning={gameStatus.gameRunning}
         issueCount={issueCount}
         scan={scan}
-        onApplyAndLaunch={profileDraft.launchSelectedProfiles}
-        onDirectLaunch={profileDraft.launchCurrentGame}
+        onApplyAndLaunch={launchSelectedProfiles}
+        onDirectLaunch={launchOrStopGame}
         onIssuesOpen={() => setIssuesOpen(true)}
         onPathBrowse={selectPathAndRefresh}
         onPathChange={setPathInput}
@@ -264,6 +291,7 @@ export function App() {
             dependencyModCount={profileDraft.dependencyModDraft.size}
             launchArgs={profileDraft.launchArgs}
             loading={loading}
+            writeActionsDisabled={writeActionsDisabled}
             mapProfileName={profileDraft.mapProfileName}
             mapProfiles={profileDraft.mapProfiles}
             modProfileName={profileDraft.modProfileName}
@@ -331,6 +359,7 @@ export function App() {
             backupsRefreshing={backups.backupsRefreshing}
             celestePath={celestePath}
             loading={loading}
+            writeActionsDisabled={writeActionsDisabled}
             onBackupCreate={backups.createManualBackup}
             onBackupDelete={backups.deleteSelectedBackup}
             onBackupFolderOpen={backups.openCurrentBackupFolder}
@@ -359,11 +388,18 @@ export function App() {
             notifier={notifier}
             scan={scan}
             sources={modCatalogSources}
+            writeActionsDisabled={writeActionsDisabled}
             onInstall={installCatalogEntry}
             onRetryFailed={retryFailedDownloadTask}
           />
         ) : workspaceView.activeView === "everest" ? (
-          <EverestManager loading={loading} mods={scan.otherMods} notifier={notifier} onInstall={installEverestRelease} />
+          <EverestManager
+            loading={loading}
+            mods={scan.otherMods}
+            notifier={notifier}
+            writeActionsDisabled={writeActionsDisabled}
+            onInstall={installEverestRelease}
+          />
         ) : workspaceView.mainMode === "detail" && workspaceView.activeView === "maps" ? (
           <MapDetail
             activeTab={uiLayout.mapDetailTab}
@@ -426,6 +462,7 @@ export function App() {
             modUpdatesByRecordId={modUpdatesByRecordId}
             recordSearchMatches={filters.recordSearchMatches}
             requiredReferencesByModId={dependencyReferences.requiredReferencesByModId}
+            writeActionsDisabled={writeActionsDisabled}
             onDisableAll={recordActions.disableAllInCurrentView}
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}

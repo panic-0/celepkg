@@ -9,6 +9,8 @@ import type {
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
+  GameStatus,
+  LaunchResult,
   ModCatalogEntry,
   ModCatalogDependencyResolutionResult,
   ModCatalogSearchResult,
@@ -248,11 +250,7 @@ export async function applyProfile(celestePath: string, mapProfileId: string, mo
   });
 }
 
-export async function launchProfile(
-  celestePath: string,
-  mapProfileId: string,
-  modProfileId: string
-): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+export async function launchProfile(celestePath: string, mapProfileId: string, modProfileId: string): Promise<LaunchResult> {
   return callApi(() => mockApi.launchProfile(celestePath, mapProfileId, modProfileId), "launch_profile", {
     celestePath,
     mapProfileId,
@@ -260,11 +258,16 @@ export async function launchProfile(
   });
 }
 
-export async function launchGame(
-  celestePath: string,
-  launchArgs: string
-): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+export async function launchGame(celestePath: string, launchArgs: string): Promise<LaunchResult> {
   return callApi(() => mockApi.launchGame(celestePath, launchArgs), "launch_game", { celestePath, launchArgs });
+}
+
+export async function getGameStatus(celestePath: string): Promise<GameStatus> {
+  return callApi(() => mockApi.getGameStatus(celestePath), "get_game_status", { celestePath });
+}
+
+export async function stopGame(celestePath: string): Promise<GameStatus> {
+  return callApi(() => mockApi.stopGame(celestePath), "stop_game", { celestePath });
 }
 
 export async function setRecordFavorite(celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {

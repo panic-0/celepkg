@@ -6,6 +6,7 @@ import type {
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
+  GameStatus,
   ModCatalogDependencyResolutionResult,
   ModCatalogEntry,
   ModCatalogSearchResult,
@@ -75,6 +76,8 @@ const stagedDownloadMetadata = new Map<string, ModMetadata>();
 const consumedMockDownloadFailures = new Set<string>();
 const mockDownloadFailureMessage = "下载 Mod 失败：网络连接已中断，无法继续读取远端文件。";
 const mockInstallFailureMessage = "暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)";
+let mockGameRunning = false;
+let pendingMockGameLaunchStatusMisses = 0;
 let backups: BackupInfo[] = [
   backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770048600000000000-auto", true, true),
   backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770045000000000000-auto", true, false),
@@ -84,6 +87,15 @@ let backups: BackupInfo[] = [
 export function isMockMode() {
   if (typeof window === "undefined") return false;
   return import.meta.env.DEV && (window.location.pathname === "/mock" || new URLSearchParams(window.location.search).has("mock"));
+}
+
+export function delayNextMockGameLaunchStatusChecks(misses: number) {
+  pendingMockGameLaunchStatusMisses = Math.max(0, Math.trunc(misses));
+}
+
+export function setMockGameRunningForTests(running: boolean) {
+  mockGameRunning = running;
+  pendingMockGameLaunchStatusMisses = 0;
 }
 
 export const mockApi = {
@@ -443,6 +455,7 @@ export const mockApi = {
     mapProfileId: string,
     modProfileId: string
   ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
+    mockGameRunning = pendingMockGameLaunchStatusMisses === 0;
     scan = applyProfileState({ ...scan, celestePath }, mapProfileId, modProfileId);
     return { launched: true, executable: `${celestePath}\\Celeste.exe`, mapProfileId, modProfileId };
   },
@@ -452,12 +465,39 @@ export const mockApi = {
     launchArgs: string
   ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
     void launchArgs;
+    mockGameRunning = pendingMockGameLaunchStatusMisses === 0;
     return {
       launched: true,
       executable: `${celestePath}\\Celeste.exe`,
       mapProfileId: profiles.activeMapProfileId,
       modProfileId: profiles.activeModProfileId
     };
+  },
+
+  async getGameStatus(celestePath: string): Promise<GameStatus> {
+    const running = mockGameRunning;
+    if (!mockGameRunning && pendingMockGameLaunchStatusMisses > 0) {
+      pendingMockGameLaunchStatusMisses -= 1;
+      if (pendingMockGameLaunchStatusMisses === 0) mockGameRunning = true;
+    }
+    return clone({
+      running,
+      stopped: false,
+      executable: `${celestePath}\\Celeste.exe`,
+      pid: running ? 1234 : null
+    });
+  },
+
+  async stopGame(celestePath: string): Promise<GameStatus> {
+    const wasRunning = mockGameRunning;
+    mockGameRunning = false;
+    pendingMockGameLaunchStatusMisses = 0;
+    return clone({
+      running: false,
+      stopped: wasRunning,
+      executable: `${celestePath}\\Celeste.exe`,
+      pid: null
+    });
   },
 
   async setRecordFavorite(_celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {

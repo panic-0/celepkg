@@ -10,6 +10,7 @@ type BackupManagerProps = {
   backupsRefreshing: boolean;
   celestePath: string;
   loading: boolean;
+  writeActionsDisabled: boolean;
   onBackupCreate: () => void;
   onBackupDelete: (backupId: string) => void;
   onBackupFolderOpen: () => void;
@@ -25,6 +26,7 @@ export function BackupManager({
   backupsRefreshing,
   celestePath,
   loading,
+  writeActionsDisabled,
   onBackupCreate,
   onBackupDelete,
   onBackupFolderOpen,
@@ -58,13 +60,23 @@ export function BackupManager({
         <div className="backup-header-actions">
           <button
             onClick={onBackupsCleanup}
-            disabled={loading || !autoBackupCleanupEnabled}
-            title={autoBackupCleanupEnabled ? "清理超过保留数量的旧自动备份" : "当前已关闭自动清理"}
+            disabled={loading || writeActionsDisabled || !autoBackupCleanupEnabled}
+            title={
+              writeActionsDisabled
+                ? "Celeste 运行中，停止游戏后再清理备份"
+                : autoBackupCleanupEnabled
+                  ? "清理超过保留数量的旧自动备份"
+                  : "当前已关闭自动清理"
+            }
           >
             <Trash2 size={16} />
             清理旧自动备份
           </button>
-          <button onClick={onBackupCreate} disabled={loading}>
+          <button
+            onClick={onBackupCreate}
+            disabled={loading || writeActionsDisabled}
+            title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再备份" : "创建备份"}
+          >
             <Archive size={16} />
             备份
           </button>
@@ -86,6 +98,7 @@ export function BackupManager({
                 backup={backup}
                 key={backup.id}
                 loading={loading}
+                writeActionsDisabled={writeActionsDisabled}
                 onLocationOpen={onBackupLocationOpen}
                 onDelete={setDeleteTarget}
                 onRestore={setRestoreTarget}
@@ -97,7 +110,7 @@ export function BackupManager({
             <Archive size={28} />
             <p>暂无备份。</p>
             <div className="empty-actions">
-              <button onClick={onBackupCreate} disabled={loading}>
+              <button onClick={onBackupCreate} disabled={loading || writeActionsDisabled}>
                 <Archive size={16} />
                 立即备份
               </button>
@@ -122,12 +135,14 @@ export function BackupManager({
 function BackupItem({
   backup,
   loading,
+  writeActionsDisabled,
   onLocationOpen,
   onDelete,
   onRestore
 }: {
   backup: BackupInfo;
   loading: boolean;
+  writeActionsDisabled: boolean;
   onLocationOpen: (backupPath: string) => void;
   onDelete: (backup: BackupInfo) => void;
   onRestore: (backup: BackupInfo) => void;
@@ -148,11 +163,20 @@ function BackupItem({
           <FolderOpen size={16} />
           位置
         </button>
-        <button onClick={() => onRestore(backup)} disabled={loading}>
+        <button
+          onClick={() => onRestore(backup)}
+          disabled={loading || writeActionsDisabled}
+          title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再还原" : "还原启用状态"}
+        >
           <RotateCcw size={16} />
           还原启用状态
         </button>
-        <button className="danger-action-button" onClick={() => onDelete(backup)} disabled={loading} title="删除此备份">
+        <button
+          className="danger-action-button"
+          onClick={() => onDelete(backup)}
+          disabled={loading || writeActionsDisabled}
+          title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再删除备份" : "删除此备份"}
+        >
           <Trash2 size={16} />
           删除
         </button>

@@ -47,6 +47,8 @@ pub fn run() {
             commands::profiles::apply_profile,
             commands::profiles::launch_profile,
             commands::profiles::launch_game,
+            commands::profiles::get_game_status,
+            commands::profiles::stop_game,
             commands::backups::create_backup,
             commands::backups::list_backups,
             commands::backups::restore_backup,

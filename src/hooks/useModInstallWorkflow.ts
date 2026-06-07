@@ -393,6 +393,7 @@ export function useModInstallWorkflow({
     modUpdateChecking,
     modUpdateResult,
     modUpdatesByRecordId,
+    requestAppConfirm,
     updateAllMods,
     updateSingleMod
   };

@@ -89,6 +89,7 @@ export interface ApiTypes {
   EverestInstallResult: EverestInstallResult;
   EverestRelease: EverestRelease;
   EverestReleaseList: EverestReleaseList;
+  GameStatus: GameStatus;
   InstallStagedEverestPayload: InstallStagedEverestPayload;
   InstallStagedModPayload: InstallStagedModPayload;
   InstalledModMatch: InstalledModMatch;
@@ -482,6 +483,16 @@ export interface EverestReleaseList {
 }
 /**
  * This interface was referenced by `ApiTypes`'s JSON-Schema
+ * via the `definition` "GameStatus".
+ */
+export interface GameStatus {
+  executable: string;
+  pid: number | null;
+  running: boolean;
+  stopped: boolean;
+}
+/**
+ * This interface was referenced by `ApiTypes`'s JSON-Schema
  * via the `definition` "InstallStagedEverestPayload".
  */
 export interface InstallStagedEverestPayload {
@@ -822,6 +833,7 @@ export type ApiCommandName =
   | "download_everest_to_staging"
   | "download_mod_to_staging"
   | "get_config"
+  | "get_game_status"
   | "install_staged_everest"
   | "install_staged_mod"
   | "launch_game"
@@ -852,7 +864,8 @@ export type ApiCommandName =
   | "set_record_favorite"
   | "set_record_protected"
   | "set_selected_save_files"
-  | "stage_mod_preview";
+  | "stage_mod_preview"
+  | "stop_game";
 export type ApiEventName = "mod-download-progress";
 
 export interface ApiCommandPayloads {
@@ -867,6 +880,7 @@ export interface ApiCommandPayloads {
   download_everest_to_staging: DownloadEverestToStagingPayload;
   download_mod_to_staging: DownloadModToStagingPayload;
   get_config: undefined;
+  get_game_status: CelestePathPayload;
   install_staged_everest: InstallStagedEverestPayload;
   install_staged_mod: InstallStagedModPayload;
   launch_game: LaunchGamePayload;
@@ -898,6 +912,7 @@ export interface ApiCommandPayloads {
   set_record_protected: SetRecordProtectedPayload;
   set_selected_save_files: SetSelectedSaveFilesPayload;
   stage_mod_preview: StageModPreviewPayload;
+  stop_game: CelestePathPayload;
 }
 
 export interface ApiCommandResponses {
@@ -912,6 +927,7 @@ export interface ApiCommandResponses {
   download_everest_to_staging: StagedDownload;
   download_mod_to_staging: StagedDownload;
   get_config: ConfigResponse;
+  get_game_status: GameStatus;
   install_staged_everest: EverestInstallResult;
   install_staged_mod: ModInstallResult;
   launch_game: LaunchResult;
@@ -943,6 +959,7 @@ export interface ApiCommandResponses {
   set_record_protected: ScanResult;
   set_selected_save_files: ConfigResponse;
   stage_mod_preview: ModPreviewStaging;
+  stop_game: GameStatus;
 }
 
 export interface ApiEventPayloads {

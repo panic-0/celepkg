@@ -12,6 +12,7 @@ type ProfileManagerProps = {
   enabledModCount: number;
   launchArgs: string;
   loading: boolean;
+  writeActionsDisabled: boolean;
   mapProfileName: string;
   mapProfiles: Profile[];
   modProfileName: string;
@@ -47,6 +48,7 @@ export function ProfileManager({
   enabledModCount,
   launchArgs,
   loading,
+  writeActionsDisabled,
   mapProfileName,
   mapProfiles,
   modProfileName,
@@ -86,7 +88,11 @@ export function ProfileManager({
           <p>{`启用 ${enabledMapCount} / ${totalMapCount} 图，${enabledModCount} / ${totalModCount} Mod，其中 ${dependencyModCount} 个由依赖推导`}</p>
         </div>
         <div className="profile-header-actions">
-          <button onClick={onApplyProfile} disabled={loading || !selectedMapProfile || !selectedModProfile}>
+          <button
+            onClick={onApplyProfile}
+            disabled={loading || writeActionsDisabled || !selectedMapProfile || !selectedModProfile}
+            title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再应用 Profile" : "应用当前 Profile"}
+          >
             <ToggleRight size={16} />
             应用当前
           </button>

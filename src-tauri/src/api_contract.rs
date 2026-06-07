@@ -1,12 +1,12 @@
 use crate::domain::{
     AppConfig, BackupFileCategory, BackupFileEntry, BackupInfo, BackupKind, BackupModEntry,
     CompletionStatus, ConfigResponse, Dependency, EverestInstallResult, EverestRelease,
-    EverestReleaseList, InstalledModMatch, LaunchResult, MapStats, ModCatalogDependencyResolution,
-    ModCatalogDependencyResolutionResult, ModCatalogEntry, ModCatalogSearchResult,
-    ModCatalogSourceKind, ModDownloadPhase, ModDownloadProgress, ModInstallResult, ModKind,
-    ModMetadata, ModPreviewStaging, ModRecord, ModUpdateCandidate, ModUpdateCheckResult, Profile,
-    ProfileInput, ProfileType, ProfilesState, RestoreScope, SaveFileInfo, ScanResult, ScanTiming,
-    StagedDownload, StagedDownloadKind, SubMapInfo,
+    EverestReleaseList, GameStatus, InstalledModMatch, LaunchResult, MapStats,
+    ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult, ModCatalogEntry,
+    ModCatalogSearchResult, ModCatalogSourceKind, ModDownloadPhase, ModDownloadProgress,
+    ModInstallResult, ModKind, ModMetadata, ModPreviewStaging, ModRecord, ModUpdateCandidate,
+    ModUpdateCheckResult, Profile, ProfileInput, ProfileType, ProfilesState, RestoreScope,
+    SaveFileInfo, ScanResult, ScanTiming, StagedDownload, StagedDownloadKind, SubMapInfo,
 };
 use schemars::{
     generate::{SchemaGenerator, SchemaSettings},
@@ -311,6 +311,8 @@ pub const REGISTERED_COMMANDS: &[&str] = &[
     "apply_profile",
     "launch_profile",
     "launch_game",
+    "get_game_status",
+    "stop_game",
     "create_backup",
     "list_backups",
     "restore_backup",
@@ -485,6 +487,8 @@ pub fn commands() -> Map<String, Value> {
         Some("LaunchProfilePayload"),
     );
     command::<LaunchResult>(&mut commands, "launch_game", Some("LaunchGamePayload"));
+    command::<GameStatus>(&mut commands, "get_game_status", Some("CelestePathPayload"));
+    command::<GameStatus>(&mut commands, "stop_game", Some("CelestePathPayload"));
     command::<BackupInfo>(&mut commands, "create_backup", Some("CreateBackupPayload"));
     command::<Vec<BackupInfo>>(&mut commands, "list_backups", None);
     command::<BackupInfo>(
@@ -596,6 +600,7 @@ fn schemas() -> Map<String, Value> {
     response_schema::<EverestInstallResult>(&mut schemas, "EverestInstallResult");
     response_schema::<EverestRelease>(&mut schemas, "EverestRelease");
     response_schema::<EverestReleaseList>(&mut schemas, "EverestReleaseList");
+    response_schema::<GameStatus>(&mut schemas, "GameStatus");
     response_schema::<InstalledModMatch>(&mut schemas, "InstalledModMatch");
     response_schema::<LaunchResult>(&mut schemas, "LaunchResult");
     response_schema::<MapStats>(&mut schemas, "MapStats");

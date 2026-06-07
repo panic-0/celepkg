@@ -8,6 +8,7 @@ type EverestManagerProps = {
   loading: boolean;
   mods: ModRecord[];
   notifier: AppNotifier;
+  writeActionsDisabled: boolean;
   onInstall: (release: EverestRelease) => void;
 };
 
@@ -20,7 +21,7 @@ const channels = [
 let everestReleaseCache: EverestReleaseList | null = null;
 let everestReleaseRequest: Promise<EverestReleaseList> | null = null;
 
-export function EverestManager({ loading, mods, notifier, onInstall }: EverestManagerProps) {
+export function EverestManager({ loading, mods, notifier, writeActionsDisabled, onInstall }: EverestManagerProps) {
   const [releaseList, setReleaseList] = useState<EverestReleaseList>(everestReleaseCache ?? { releases: [], warnings: [] });
   const [activeChannel, setActiveChannel] = useState("stable");
   const [loadingReleases, setLoadingReleases] = useState(false);
@@ -116,9 +117,11 @@ export function EverestManager({ loading, mods, notifier, onInstall }: EverestMa
                     </div>
                     <button
                       className={isCurrent ? "everest-reinstall-button" : isOlder ? "everest-light-button" : "primary-button"}
-                      disabled={loading}
+                      disabled={loading || writeActionsDisabled}
                       onClick={() => onInstall(release)}
-                      title={`安装 ${formatEverestVersion(release.version)}`}
+                      title={
+                        writeActionsDisabled ? "Celeste 运行中，停止游戏后再安装 Everest" : `安装 ${formatEverestVersion(release.version)}`
+                      }
                     >
                       <Download size={15} />
                       {isCurrent ? "重装" : "安装"}

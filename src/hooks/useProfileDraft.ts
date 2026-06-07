@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { applyProfile, deleteProfile, launchGame, saveProfile } from "../api";
-import type { AppNotifier, Profile, ProfilesState, ScanResult } from "../types";
+import type { AppNotifier, LaunchResult, Profile, ProfilesState, ScanResult } from "../types";
 import { notifyError } from "../utils/notify";
 import {
   inferDependencyMods,
@@ -479,20 +479,22 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   }
 
   async function launchSelectedProfiles() {
-    await runProfileTask(async () => {
+    return await runProfileTask<LaunchResult>(async () => {
       const mapId = mapDirty ? await persistProfile(mapDraftController) : selectedMapProfileId;
       const modId = modDirty ? await persistProfile(modDraftController) : selectedModProfileId;
       const applied = await enqueueProfileSave(() => applyProfile(celestePath, mapId, modId));
       setScan(applied);
       const result = await launchGame(celestePath, launchArgs);
       notifier.showSuccess(`已启动：${result.executable}`);
+      return result;
     });
   }
 
   async function launchCurrentGame() {
-    await runProfileTask(async () => {
+    return await runProfileTask<LaunchResult>(async () => {
       const result = await launchGame(celestePath, launchArgs);
       notifier.showSuccess(`已启动：${result.executable}`);
+      return result;
     });
   }
 
@@ -572,13 +574,14 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     notifier.showSuccess(successMessage);
   }
 
-  async function runProfileTask(task: () => Promise<void>) {
+  async function runProfileTask<T>(task: () => Promise<T>): Promise<T | null> {
     setLoading(true);
     notifier.clearNotice();
     try {
-      await task();
+      return await task();
     } catch (error) {
       notifyError(notifier, error);
+      return null;
     } finally {
       setLoading(false);
     }

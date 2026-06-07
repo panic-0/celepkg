@@ -26,6 +26,7 @@ type ModCatalogManagerProps = {
   notifier: AppNotifier;
   scan: ScanResult;
   sources: ModCatalogSourceKind[];
+  writeActionsDisabled: boolean;
   onInstall: (entry: ModCatalogEntry) => void;
   onRetryFailed?: () => void;
 };
@@ -39,7 +40,16 @@ const defaultFilters: CatalogFilters = {
   downloadableOnly: false
 };
 
-export function ModCatalogManager({ downloadTask, loading, notifier, scan, sources, onInstall, onRetryFailed }: ModCatalogManagerProps) {
+export function ModCatalogManager({
+  downloadTask,
+  loading,
+  notifier,
+  scan,
+  sources,
+  writeActionsDisabled,
+  onInstall,
+  onRetryFailed
+}: ModCatalogManagerProps) {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<ModCatalogSearchResult>({ sources: [], entries: [], warnings: [] });
   const [detailEntry, setDetailEntry] = useState<ModCatalogEntry | null>(null);
@@ -143,6 +153,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
                 key={`${view.entry.source}:${view.entry.id}`}
                 view={view}
                 loading={loading}
+                writeActionsDisabled={writeActionsDisabled}
                 onInstall={() => onInstall(view.entry)}
                 onOpenDetail={() => setDetailEntry(view.entry)}
                 onRetryFailed={onRetryFailed}
@@ -157,6 +168,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
         <CatalogEntryDetailDialog
           view={detailView}
           loading={loading}
+          writeActionsDisabled={writeActionsDisabled}
           onClose={() => setDetailEntry(null)}
           onInstall={() => onInstall(detailEntry)}
           onRetryFailed={onRetryFailed}
@@ -229,18 +241,20 @@ function CatalogFilterBar({
 function CatalogEntryRow({
   view,
   loading,
+  writeActionsDisabled,
   onInstall,
   onOpenDetail,
   onRetryFailed
 }: {
   view: CatalogEntryView;
   loading: boolean;
+  writeActionsDisabled: boolean;
   onInstall: () => void;
   onOpenDetail: () => void;
   onRetryFailed?: () => void;
 }) {
   const entry = view.entry;
-  const installDisabled = loading || view.installed || view.queued || !view.downloadable;
+  const installDisabled = loading || writeActionsDisabled || view.installed || view.queued || !view.downloadable;
   return (
     <article
       className={`catalog-row catalog-row-clickable ${view.queued ? "queued-row" : ""} ${view.failed ? "failed-row" : ""}`}
@@ -272,7 +286,11 @@ function CatalogEntryRow({
           </a>
         )}
         {view.failed && onRetryFailed ? (
-          <button onClick={stopAndRun(onRetryFailed)} disabled={loading}>
+          <button
+            onClick={stopAndRun(onRetryFailed)}
+            disabled={loading || writeActionsDisabled}
+            title={writeActionsDisabled ? "Celeste 运行中，停止游戏后再重试" : "重试"}
+          >
             <RotateCcw size={15} />
             重试
           </button>
@@ -290,12 +308,14 @@ function CatalogEntryRow({
 function CatalogEntryDetailDialog({
   view,
   loading,
+  writeActionsDisabled,
   onClose,
   onInstall,
   onRetryFailed
 }: {
   view: CatalogEntryView;
   loading: boolean;
+  writeActionsDisabled: boolean;
   onClose: () => void;
   onInstall: () => void;
   onRetryFailed?: () => void;
@@ -314,7 +334,7 @@ function CatalogEntryDetailDialog({
             </>
           ),
           onClick: action,
-          disabled: loading || view.installed || view.queued || (!view.failed && !entry.downloadUrl),
+          disabled: loading || writeActionsDisabled || view.installed || view.queued || (!view.failed && !entry.downloadUrl),
           variant: "primary"
         }
       ]}

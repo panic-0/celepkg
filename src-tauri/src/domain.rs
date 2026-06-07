@@ -286,6 +286,15 @@ pub struct LaunchResult {
     pub mod_profile_id: String,
 }
 
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GameStatus {
+    pub running: bool,
+    pub stopped: bool,
+    pub executable: String,
+    pub pid: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupFileEntry {
