@@ -1,6 +1,11 @@
 import type { Dependency, ModRecord } from "../types";
-import { formatDependencyIssue, isBuiltinDependencyName, type DependencyIssue } from "./appDependencyResolution";
-import { buildInstalledDependencyIndex, versionTooLow } from "./appDependencyResolution";
+import {
+  buildInstalledDependencyIndex,
+  dependencyIssueForInstalledDependency,
+  formatDependencyIssue,
+  isBuiltinDependencyName,
+  type DependencyIssue
+} from "./appDependencyResolution";
 import { normalizeDependencyName } from "./dependencies";
 import { isEverestDependencyName } from "./everestDependency";
 
@@ -92,9 +97,10 @@ function buildLocalDependencyNodes(
         detail: "循环依赖"
       };
     }
-    if (dependency.version.trim() && versionTooLow(installed.metadata.version, dependency.version)) {
+    const issue = dependencyIssueForInstalledDependency(dependency, installedIndex, kind === "optional");
+    if (issue?.reason === "tooLow") {
       return {
-        ...baseNode(dependency, kind, "tooLow", `需要 ${dependency.version}，本地 ${installed.metadata.version || "未知版本"}`),
+        ...baseNode(dependency, kind, "tooLow", formatDependencyIssue(issue)),
         children: []
       };
     }

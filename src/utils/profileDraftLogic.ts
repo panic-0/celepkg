@@ -1,5 +1,5 @@
 import type { Profile, ScanResult } from "../types";
-import { buildModAliasMap, normalizeDependencyName } from "./dependencies";
+import { collectTransitiveRequiredDependencyModIds } from "./appDependencyResolution";
 
 export function toggleSetValue(current: Set<string>, id: string) {
   const next = new Set(current);
@@ -37,28 +37,12 @@ export function profileNameExists(profiles: Profile[], name: string, currentProf
 }
 
 export function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {
-  const aliasToModId = buildModAliasMap(scan.otherMods);
-  const modById = new Map(scan.otherMods.map((modItem) => [modItem.id, modItem]));
-  const baseSeedModIds = new Set([...baseModIds, ...scan.otherMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id)]);
-  const inferred = new Set<string>();
-  const queue: string[] = [];
-  const addDependency = (name: string) => {
-    const id = aliasToModId.get(normalizeDependencyName(name));
-    if (id && !baseSeedModIds.has(id) && !inferred.has(id)) {
-      inferred.add(id);
-      queue.push(id);
-    }
-  };
-
-  for (const map of scan.maps) {
-    if (map.protected || enabledMapIds.has(map.id)) map.dependencies.forEach((dependency) => addDependency(dependency.name));
-  }
-  for (const id of baseSeedModIds) queue.push(id);
-  while (queue.length) {
-    const modItem = modById.get(queue.shift() ?? "");
-    modItem?.dependencies.forEach((dependency) => addDependency(dependency.name));
-  }
-  return inferred;
+  return collectTransitiveRequiredDependencyModIds({
+    baseModIds,
+    isSourceEnabled: (record) => record.protected || enabledMapIds.has(record.id),
+    sourceRecords: scan.maps,
+    targetMods: scan.otherMods
+  });
 }
 
 function nextAvailableProfileName(base: string, profiles: Profile[]) {

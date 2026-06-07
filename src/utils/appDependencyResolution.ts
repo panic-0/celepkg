@@ -1,6 +1,6 @@
 import type { Dependency, EverestRelease, ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
 import { isEverestDependencyName } from "./everestDependency";
-import { dependencyAliasesForRecord, normalizeDependencyName } from "./dependencies";
+import { buildModAliasMap, dependencyAliasesForRecord, normalizeDependencyName } from "./dependencies";
 
 export type DependencyUpdateChoice = "none" | "required" | "all";
 export type DependencyActionLabel = "安装" | "更新";
@@ -34,6 +34,54 @@ export function buildInstalledDependencyIndex(records: ModRecord[]) {
     }
   }
   return index;
+}
+
+export function dependencyIssueForInstalledDependency(
+  dependency: Dependency,
+  installedIndex: Map<string, ModRecord>,
+  optional: boolean
+): DependencyIssue | null {
+  const installed = installedIndex.get(normalizeDependencyName(dependency.name));
+  if (!installed) return { dependency, optional, reason: "missing" };
+  if (dependency.version.trim() && versionTooLow(installed.metadata.version, dependency.version)) {
+    return { dependency, installed, optional, reason: "tooLow" };
+  }
+  return null;
+}
+
+export function collectTransitiveRequiredDependencyModIds({
+  baseModIds,
+  isSourceEnabled,
+  sourceRecords,
+  targetMods
+}: {
+  baseModIds: Set<string>;
+  isSourceEnabled: (record: ModRecord) => boolean;
+  sourceRecords: ModRecord[];
+  targetMods: ModRecord[];
+}) {
+  const aliasToModId = buildModAliasMap(targetMods);
+  const modById = new Map(targetMods.map((modItem) => [modItem.id, modItem]));
+  const seedModIds = new Set([...baseModIds, ...targetMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id)]);
+  const inferred = new Set<string>();
+  const queue: string[] = [];
+  const addDependency = (name: string) => {
+    const id = aliasToModId.get(normalizeDependencyName(name));
+    if (id && !seedModIds.has(id) && !inferred.has(id)) {
+      inferred.add(id);
+      queue.push(id);
+    }
+  };
+
+  for (const record of sourceRecords) {
+    if (isSourceEnabled(record)) record.dependencies.forEach((dependency) => addDependency(dependency.name));
+  }
+  for (const id of seedModIds) queue.push(id);
+  while (queue.length) {
+    const modItem = modById.get(queue.shift() ?? "");
+    modItem?.dependencies.forEach((dependency) => addDependency(dependency.name));
+  }
+  return inferred;
 }
 
 export function updateCandidateFromRecord(entry: ModCatalogEntry, record: ModRecord): ModUpdateCandidate {

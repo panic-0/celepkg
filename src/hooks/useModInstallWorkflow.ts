@@ -30,10 +30,10 @@ import type {
 import {
   buildInstalledDependencyIndex,
   dependencyEntrySatisfies,
+  dependencyIssueForInstalledDependency,
   formatDependencyIssue,
   isBuiltinDependencyName,
   updateCandidateFromRecord,
-  versionTooLow,
   type DependencyActionLabel,
   type DependencyIssue,
   type DependencyUpdateAction,
@@ -512,7 +512,8 @@ export function useModInstallWorkflow({
     }
 
     const installed = installedIndex.get(normalized);
-    if (installed && !versionTooLow(installed.metadata.version, dependency.version)) {
+    const issue = dependencyIssueForInstalledDependency(dependency, installedIndex, kind === "optional");
+    if (installed && !issue) {
       const nextPath = new Set(path);
       nextPath.add(normalized);
       const required = await resolvePreviewDependencies(installed.dependencies, "required", nextOptionalAncestorIds, nextPath, context);
@@ -536,12 +537,7 @@ export function useModInstallWorkflow({
       };
     }
 
-    const issue: DependencyIssue = {
-      dependency,
-      installed,
-      optional: kind === "optional",
-      reason: installed ? "tooLow" : "missing"
-    };
+    if (!issue) return emptyPreviewNode(basePreviewNode(dependency, kind, nodeId, "unavailable", "依赖状态未知"));
     const action = await resolveDependencyAction(issue, context);
     if (!action) {
       return {
@@ -889,14 +885,8 @@ export function useModInstallWorkflow({
   function dependencyIssuesForMetadata(dependencies: Dependency[], optional: boolean): DependencyIssue[] {
     const issues: DependencyIssue[] = [];
     for (const dependency of dependencies) {
-      const installed = installedIndex.get(normalizeDependencyName(dependency.name));
-      if (!installed) {
-        issues.push({ dependency, optional, reason: "missing" });
-        continue;
-      }
-      if (dependency.version.trim() && versionTooLow(installed.metadata.version, dependency.version)) {
-        issues.push({ dependency, installed, optional, reason: "tooLow" });
-      }
+      const issue = dependencyIssueForInstalledDependency(dependency, installedIndex, optional);
+      if (issue) issues.push(issue);
     }
     return issues;
   }
