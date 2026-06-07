@@ -368,4 +368,9 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
 
   await page.getByRole("button", { name: "重试失败" }).click();
   await expect(page.locator(".download-task-panel")).toContainText(/下载中 [1-9]|成功 [1-9]/, { timeout: 5000 });
+  const installedGroup = page.locator(".download-task-group", { has: page.getByRole("heading", { name: /安装成功/ }) });
+  await expect(installedGroup).toContainText("Mock Download Failure", { timeout: 5000 });
+  await expect(page.locator(".download-task-group", { has: page.getByRole("heading", { name: /下载失败/ }) })).not.toContainText(
+    "Mock Download Failure"
+  );
 });

@@ -45,6 +45,10 @@ describe("mock staged downloads", () => {
     await expect(mockApi.downloadModToStaging("D:\\Games\\Celeste", entry!, "mock-download-failure")).rejects.toThrow(
       "下载 Mod 失败：网络连接已中断，无法继续读取远端文件。"
     );
+    await expect(mockApi.downloadModToStaging("D:\\Games\\Celeste", entry!, "mock-download-failure-retry")).resolves.toMatchObject({
+      kind: "mod",
+      name: "Mock Download Failure"
+    });
   });
 
   it("downloads and installs a staged everest release once", async () => {

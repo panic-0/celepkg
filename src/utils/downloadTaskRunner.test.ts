@@ -619,4 +619,47 @@ describe("download task runner", () => {
       ["flaky", "installed"]
     ]);
   });
+
+  it("retries when the task only contains a failed download item", async () => {
+    let downloadAttempts = 0;
+    const installed: string[] = [];
+    const runner = new DownloadTaskRunner(
+      "task",
+      [
+        baseItem("flaky", {
+          download: async () => {
+            downloadAttempts += 1;
+            if (downloadAttempts === 1) throw new Error("network failed");
+            return staged("flaky");
+          },
+          install: async () => {
+            installed.push("flaky");
+          }
+        })
+      ],
+      { concurrencyLimit: 2, createOperationId: (item) => `op-${item.id}`, cancelOperation: async () => undefined }
+    );
+
+    const failed = await runner.start();
+    expect(failed.status).toBe("failed");
+    expect(failed.items).toEqual([
+      expect.objectContaining({
+        id: "flaky",
+        status: "downloadFailed",
+        error: "network failed"
+      })
+    ]);
+
+    const retried = await runner.retryFailed();
+
+    expect(retried.status).toBe("done");
+    expect(downloadAttempts).toBe(2);
+    expect(installed).toEqual(["flaky"]);
+    expect(retried.items).toEqual([
+      expect.objectContaining({
+        id: "flaky",
+        status: "installed"
+      })
+    ]);
+  });
 });

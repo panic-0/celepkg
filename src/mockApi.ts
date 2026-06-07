@@ -72,6 +72,7 @@ let scan = createMockScan(profiles, selectedSaveFiles);
 const catalogEntries = createMockCatalog();
 const stagedDownloads = new Map<string, StagedDownload>();
 const stagedDownloadMetadata = new Map<string, ModMetadata>();
+const consumedMockDownloadFailures = new Set<string>();
 const mockDownloadFailureMessage = "下载 Mod 失败：网络连接已中断，无法继续读取远端文件。";
 const mockInstallFailureMessage = "暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)";
 let backups: BackupInfo[] = [
@@ -327,7 +328,10 @@ export const mockApi = {
     void _taskIndex;
     void _taskTotal;
     await delay(300);
-    if (entry.name === "Mock Download Failure") throw new Error(mockDownloadFailureMessage);
+    if (entry.name === "Mock Download Failure" && !consumedMockDownloadFailures.has(entry.id)) {
+      consumedMockDownloadFailures.add(entry.id);
+      throw new Error(mockDownloadFailureMessage);
+    }
     const staged = stagedDownload(`mod-${entry.id || entry.name}-${operationId}`, entry.name, "mod", entry.size, entry.xxHash[0] ?? null);
     stagedDownloads.set(staged.stagedId, staged);
     stagedDownloadMetadata.set(staged.stagedId, mockUpdateMetadata(entry));
