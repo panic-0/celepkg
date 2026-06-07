@@ -65,3 +65,19 @@ export function formatCompletionStatus(status?: CompletionStatus | null) {
       return "未知";
   }
 }
+
+export function formatFileSize(size: number | null) {
+  if (!size) return "未知大小";
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KiB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+export function formatUnixSeconds(value: number | null) {
+  if (!value) return "未知";
+  return new Date(value * 1000).toLocaleString();
+}
+
+export function formatByteProgress(downloaded: number, total: number | null) {
+  if (!total || total <= 0) return formatFileSize(downloaded);
+  return `${Math.round((downloaded / total) * 100)}%`;
+}

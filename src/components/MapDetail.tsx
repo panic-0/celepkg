@@ -29,7 +29,7 @@ import {
 } from "../utils/subMapFolders";
 import type { MapDetailTab } from "../hooks/useUiLayout";
 import { DetailStat, HighlightedText, Info, SearchBox, Select } from "./common";
-import { DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
+import { DependencyChipList, DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
 import type { DependencyReference } from "../utils/dependencies";
 
 type MapDetailProps = {
@@ -365,22 +365,7 @@ export function MapDetail({
           </section>
           <section className="detail-section">
             <h3>直接依赖</h3>
-            {map.dependencies.length ? (
-              <div className="dependency-list">
-                {map.dependencies.map((dependency) => (
-                  <span
-                    className="ui-chip"
-                    key={`${dependency.name}-${dependency.version}`}
-                    title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
-                  >
-                    {dependency.name}
-                    {dependency.version && <small>{dependency.version}</small>}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">没有声明必需依赖。</p>
-            )}
+            <DependencyChipList dependencies={map.dependencies} emptyText="没有声明必需依赖。" />
             {map.warnings.map((warning) => (
               <p className="warning-text" key={warning}>
                 {warning}

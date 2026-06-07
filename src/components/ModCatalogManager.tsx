@@ -15,6 +15,7 @@ import {
   type CatalogPage,
   type CatalogSortKey
 } from "../utils/catalogView";
+import { formatByteProgress, formatFileSize, formatUnixSeconds } from "../utils/format";
 import { rangesForField } from "../utils/search";
 import { DialogFacts, DialogShell, HighlightedText, SearchBox, Select } from "./common";
 import { Pagination } from "./Pagination";
@@ -257,9 +258,9 @@ function CatalogEntryRow({
           <HighlightedText ranges={rangesForField(view.searchMatch, "version")} text={entry.version || "无版本号"} />
         </small>
         <small>{catalogTypeLabel(view)}</small>
-        <small>{formatSize(entry.size)}</small>
-        <small>{formatCatalogTime(entry.lastUpdate)}</small>
-        {view.taskItem?.progress && <small>{formatProgress(view.taskItem.progress.downloaded, view.taskItem.progress.total)}</small>}
+        <small>{formatFileSize(entry.size)}</small>
+        <small>{formatUnixSeconds(entry.lastUpdate)}</small>
+        {view.taskItem?.progress && <small>{formatByteProgress(view.taskItem.progress.downloaded, view.taskItem.progress.total)}</small>}
       </div>
       <div className="catalog-row-actions">
         <button className="ui-icon-button icon-button catalog-detail-button" onClick={stopAndRun(onOpenDetail)} title="查看详情">
@@ -331,8 +332,8 @@ function CatalogEntryDetailDialog({
           { label: "来源", value: sourceLabel(entry.source) },
           { label: "状态", value: catalogStateLabel(view) },
           { label: "类型", value: catalogTypeLabel(view) },
-          { label: "大小", value: formatSize(entry.size) },
-          { label: "更新", value: formatCatalogTime(entry.lastUpdate) },
+          { label: "大小", value: formatFileSize(entry.size) },
+          { label: "更新", value: formatUnixSeconds(entry.lastUpdate) },
           { label: "GameBanana", value: formatGameBananaInfo(entry) },
           { label: "任务", value: view.taskItem?.error ?? formatTaskDetail(view) },
           { label: "下载地址", value: entry.downloadUrl || "无下载地址" },
@@ -440,22 +441,6 @@ function sourceLabel(source: ModCatalogSourceKind) {
   if (source === "everest") return "Everest 官方";
   if (source === "everestMirror") return "Everest 镜像";
   return "WEGFan";
-}
-
-function formatSize(size: number | null) {
-  if (!size) return "未知大小";
-  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KiB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MiB`;
-}
-
-function formatCatalogTime(value: number | null) {
-  if (!value) return "未知";
-  return new Date(value * 1000).toLocaleString();
-}
-
-function formatProgress(downloaded: number, total: number | null) {
-  if (!total || total <= 0) return formatSize(downloaded);
-  return `${Math.round((downloaded / total) * 100)}%`;
 }
 
 function catalogTypeOptions(views: CatalogEntryView[]) {

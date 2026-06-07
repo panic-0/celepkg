@@ -1,6 +1,25 @@
 import type { ReactNode } from "react";
+import type { Dependency } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
 import type { DependencyTreeNode } from "../utils/dependencyTree";
+
+export function DependencyChipList({ dependencies, emptyText }: { dependencies: Dependency[]; emptyText: string }) {
+  if (!dependencies.length) return <p className="muted">{emptyText}</p>;
+  return (
+    <div className="dependency-list">
+      {dependencies.map((dependency) => (
+        <span
+          className="ui-chip"
+          key={`${dependency.name}-${dependency.version}`}
+          title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
+        >
+          {dependency.name}
+          {dependency.version && <small>{dependency.version}</small>}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function DependencyReferenceList({ emptyText, references }: { emptyText: string; references: DependencyReference[] }) {
   if (!references.length) return <p className="muted">{emptyText}</p>;

@@ -5,7 +5,7 @@ import type { DependencyReference } from "../utils/dependencies";
 import { buildLocalDependencyTree } from "../utils/dependencyTree";
 import type { ModDetailTab } from "../hooks/useUiLayout";
 import { Info } from "./common";
-import { DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
+import { DependencyChipList, DependencyReferenceList, DependencyTreeView, LongValue, TabButton } from "./detailCommon";
 
 type ModDetailProps = {
   activeTab: ModDetailTab;
@@ -121,42 +121,12 @@ export function ModDetail({
 
           <section className="detail-section">
             <h3>直接依赖</h3>
-            {modItem.dependencies.length ? (
-              <div className="dependency-list">
-                {modItem.dependencies.map((dependency) => (
-                  <span
-                    className="ui-chip"
-                    key={`${dependency.name}-${dependency.version}`}
-                    title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
-                  >
-                    {dependency.name}
-                    {dependency.version && <small>{dependency.version}</small>}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">没有声明必需依赖。</p>
-            )}
+            <DependencyChipList dependencies={modItem.dependencies} emptyText="没有声明必需依赖。" />
           </section>
 
           <section className="detail-section">
             <h3>可选依赖</h3>
-            {modItem.optionalDependencies.length ? (
-              <div className="dependency-list">
-                {modItem.optionalDependencies.map((dependency) => (
-                  <span
-                    className="ui-chip"
-                    key={`${dependency.name}-${dependency.version}`}
-                    title={`${dependency.name}${dependency.version ? ` ${dependency.version}` : ""}`}
-                  >
-                    {dependency.name}
-                    {dependency.version && <small>{dependency.version}</small>}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">没有声明可选依赖。</p>
-            )}
+            <DependencyChipList dependencies={modItem.optionalDependencies} emptyText="没有声明可选依赖。" />
           </section>
 
           <section className="detail-section">
