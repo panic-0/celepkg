@@ -59,7 +59,13 @@ export function ModDetail({
             <ArrowLeft size={17} />
             返回列表
           </button>
-          <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
+          <div className="detail-topline-actions">
+            <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
+            <button className="detail-action-button" onClick={() => onLocationOpen(modItem)} type="button">
+              <FolderOpen size={15} />
+              打开所在位置
+            </button>
+          </div>
         </div>
         <div className="detail-title-row">
           <h2 title={modItem.name}>{modItem.name}</h2>

@@ -20,6 +20,15 @@
   gap: 8px;
 }
 
+.detail-topline-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .back-button {
   width: fit-content;
   min-width: 0;

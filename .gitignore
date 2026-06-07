@@ -24,3 +24,6 @@ src-tauri/gen/schemas/
 Thumbs.db
 .idea/
 .vscode/
+
+# Local analysis artifacts
+.understand-anything/

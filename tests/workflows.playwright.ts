@@ -83,6 +83,31 @@ test("mock dependency tree update opens the tree preview", async ({ page }) => {
   await previewDialog.getByRole("button", { name: "取消" }).click();
 });
 
+test("mod detail opens the local mod location from the header", async ({ page }) => {
+  await openMock(page);
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("SpeedrunTool");
+
+  const modRow = page.locator("tbody tr", { hasText: "SpeedrunTool" });
+  await expect(modRow).toHaveCount(1);
+  await modRow.click();
+
+  await page.locator(".detail-heading").getByRole("button", { name: "打开所在位置" }).click();
+  await expect(page.getByText("已打开本地内容位置。")).toBeVisible();
+});
+
+test("map detail opens the local map location from the header", async ({ page }) => {
+  await openMock(page);
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Strawberry Jam");
+
+  const mapRow = page.locator("tbody tr", { hasText: "Strawberry Jam Collab" });
+  await expect(mapRow).toHaveCount(1);
+  await mapRow.click();
+
+  await page.locator(".detail-heading").getByRole("button", { name: "打开所在位置" }).click();
+  await expect(page.getByText("已打开本地内容位置。")).toBeVisible();
+});
+
 test("settings save-file and catalog-cache actions show persistent feedback", async ({ page }) => {
   await openMock(page);
   await openNav(page, "设置");

@@ -134,7 +134,13 @@ export function MapDetail({
             <ArrowLeft size={17} />
             返回列表
           </button>
-          <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
+          <div className="detail-topline-actions">
+            <span className={draftEnabled ? "state enabled" : "state disabled"}>{draftEnabled ? "启用" : "禁用"}</span>
+            <button className="detail-action-button" onClick={() => onLocationOpen(map)} type="button">
+              <FolderOpen size={15} />
+              打开所在位置
+            </button>
+          </div>
         </div>
         <h2 title={map.name}>{map.name}</h2>
         <p title={map.metadata.description || map.fileName}>{map.metadata.description || map.fileName}</p>
