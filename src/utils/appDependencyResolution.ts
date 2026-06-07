@@ -1,6 +1,14 @@
 import type { Dependency, EverestRelease, ModCatalogEntry, ModRecord, ModUpdateCandidate } from "../types";
-import { isEverestDependencyName } from "./everestDependency";
-import { buildModAliasMap, dependencyAliasesForRecord, normalizeDependencyName } from "./dependencies";
+import { dependencyAliasesForRecord, normalizeDependencyName, versionTooLow } from "./dependencyRules";
+
+export {
+  collectRequiredDependencyClosureModIds,
+  collectTransitiveRequiredDependencyModIds,
+  compareNumericVersions,
+  isBuiltinDependencyName,
+  parseNumericVersion,
+  versionTooLow
+} from "./dependencyRules";
 
 export type DependencyUpdateChoice = "none" | "required" | "all";
 export type DependencyActionLabel = "安装" | "更新";
@@ -49,41 +57,6 @@ export function dependencyIssueForInstalledDependency(
   return null;
 }
 
-export function collectTransitiveRequiredDependencyModIds({
-  baseModIds,
-  isSourceEnabled,
-  sourceRecords,
-  targetMods
-}: {
-  baseModIds: Set<string>;
-  isSourceEnabled: (record: ModRecord) => boolean;
-  sourceRecords: ModRecord[];
-  targetMods: ModRecord[];
-}) {
-  const aliasToModId = buildModAliasMap(targetMods);
-  const modById = new Map(targetMods.map((modItem) => [modItem.id, modItem]));
-  const seedModIds = new Set([...baseModIds, ...targetMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id)]);
-  const inferred = new Set<string>();
-  const queue: string[] = [];
-  const addDependency = (name: string) => {
-    const id = aliasToModId.get(normalizeDependencyName(name));
-    if (id && !seedModIds.has(id) && !inferred.has(id)) {
-      inferred.add(id);
-      queue.push(id);
-    }
-  };
-
-  for (const record of sourceRecords) {
-    if (isSourceEnabled(record)) record.dependencies.forEach((dependency) => addDependency(dependency.name));
-  }
-  for (const id of seedModIds) queue.push(id);
-  while (queue.length) {
-    const modItem = modById.get(queue.shift() ?? "");
-    modItem?.dependencies.forEach((dependency) => addDependency(dependency.name));
-  }
-  return inferred;
-}
-
 export function updateCandidateFromRecord(entry: ModCatalogEntry, record: ModRecord): ModUpdateCandidate {
   return {
     entry,
@@ -109,37 +82,4 @@ export function formatDependencyIssue(issue: DependencyIssue) {
   const requiredVersion = issue.dependency.version.trim() || "未指定版本";
   if (issue.reason === "missing") return `缺少 ${requiredVersion}`;
   return `需要 ${requiredVersion}，本地 ${issue.installed?.metadata.version || "未知版本"}`;
-}
-
-export function versionTooLow(installedVersion: string, requiredVersion: string) {
-  const installed = parseNumericVersion(installedVersion);
-  const required = parseNumericVersion(requiredVersion);
-  if (!installed || !required) return false;
-  return compareNumericVersions(installed, required) < 0;
-}
-
-export function parseNumericVersion(value: string) {
-  const matches = value.match(/\d+/g);
-  return matches?.map((part) => Number.parseInt(part, 10)).filter((part) => Number.isFinite(part)) ?? null;
-}
-
-export function compareNumericVersions(left: number[], right: number[]) {
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    const diff = (left[index] ?? 0) - (right[index] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
-
-export function isBuiltinDependencyName(name: string) {
-  const normalized = name.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return (
-    isEverestDependencyName(name) ||
-    normalized === "celeste" ||
-    normalized === "monocle" ||
-    normalized === "fna" ||
-    normalized === "dotnet" ||
-    normalized === "netframework" ||
-    normalized === "microsoftnetframework"
-  );
 }

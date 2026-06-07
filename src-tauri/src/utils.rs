@@ -1,3 +1,5 @@
+pub use crate::dependency_rules::normalize_dependency_name;
+
 pub fn now_string() -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -21,19 +23,6 @@ pub fn normalize_slash(value: &str) -> String {
         .trim_start_matches('/')
         .trim()
         .to_string()
-}
-
-pub fn normalize_dependency_name(value: &str) -> String {
-    let mut normalized = value.replace('\\', "/").replace(['_', '-'], " ");
-    normalized = normalized.trim().to_string();
-    if normalized.to_ascii_lowercase().ends_with(".zip") {
-        normalized.truncate(normalized.len() - 4);
-    }
-    normalized
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
 }
 
 #[cfg(test)]

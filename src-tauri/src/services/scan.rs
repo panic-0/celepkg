@@ -1,3 +1,4 @@
+use crate::dependency_rules::{compare_numeric_versions, parse_numeric_version, version_too_low};
 use crate::domain::{
     CompletionStatus, Dependency, ModKind, ModMetadata, ModRecord, ProfilesState, SaveFileInfo,
     ScanResult, ScanTiming, SubMapInfo,
@@ -381,7 +382,7 @@ fn builtin_dependency_version_warning(
     let Some(installed_numeric_version) = parse_numeric_version(installed_version) else {
         return BuiltinDependencyVersionWarning::None;
     };
-    if compare_numeric_version_parts(&installed_numeric_version, &required_version)
+    if compare_numeric_versions(&installed_numeric_version, &required_version)
         == std::cmp::Ordering::Less
     {
         BuiltinDependencyVersionWarning::TooLow(format!(
@@ -394,42 +395,7 @@ fn builtin_dependency_version_warning(
 }
 
 fn dependency_version_too_low(installed_version: &str, required_version: &str) -> bool {
-    let Some(installed) = parse_numeric_version(installed_version) else {
-        return false;
-    };
-    let Some(required) = parse_numeric_version(required_version) else {
-        return false;
-    };
-    compare_numeric_version_parts(&installed, &required) == std::cmp::Ordering::Less
-}
-
-fn parse_numeric_version(value: &str) -> Option<Vec<u64>> {
-    let mut parts = vec![];
-    let mut current = String::new();
-    for ch in value.chars() {
-        if ch.is_ascii_digit() {
-            current.push(ch);
-        } else if !current.is_empty() {
-            parts.push(current.parse().ok()?);
-            current.clear();
-        }
-    }
-    if !current.is_empty() {
-        parts.push(current.parse().ok()?);
-    }
-    (!parts.is_empty()).then_some(parts)
-}
-
-fn compare_numeric_version_parts(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
-    for index in 0..left.len().max(right.len()) {
-        let left_part = left.get(index).copied().unwrap_or_default();
-        let right_part = right.get(index).copied().unwrap_or_default();
-        match left_part.cmp(&right_part) {
-            std::cmp::Ordering::Equal => {}
-            order => return order,
-        }
-    }
-    std::cmp::Ordering::Equal
+    version_too_low(installed_version, required_version)
 }
 
 fn dependency_label(dependency: &Dependency) -> String {

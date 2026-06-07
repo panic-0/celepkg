@@ -1,5 +1,5 @@
 import type { Profile, ScanResult } from "../types";
-import { collectTransitiveRequiredDependencyModIds } from "./appDependencyResolution";
+import { collectTransitiveRequiredDependencyModIds } from "./dependencyRules";
 
 export function toggleSetValue(current: Set<string>, id: string) {
   const next = new Set(current);

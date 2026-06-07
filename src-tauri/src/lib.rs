@@ -1,4 +1,5 @@
 mod commands;
+mod dependency_rules;
 mod domain;
 mod parsers;
 mod services;

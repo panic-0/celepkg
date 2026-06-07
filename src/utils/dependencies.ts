@@ -1,4 +1,7 @@
 import type { ModRecord } from "../types";
+import { buildModAliasMap, catalogAliasesForRecord, normalizeDependencyName } from "./dependencyRules";
+
+export { buildModAliasMap, catalogAliasesForRecord, dependencyAliasesForRecord, normalizeDependencyName } from "./dependencyRules";
 
 export type DependencyReference = {
   id: string;
@@ -6,28 +9,6 @@ export type DependencyReference = {
   kind: ModRecord["kind"];
   fileName: string;
 };
-
-export function normalizeDependencyName(value: string) {
-  return value
-    .replace(/\\/g, "/")
-    .replace(/[_-]/g, " ")
-    .trim()
-    .replace(/\.zip$/i, "")
-    .split(/\s+/)
-    .join(" ")
-    .toLowerCase();
-}
-
-export function buildModAliasMap(mods: ModRecord[]) {
-  const aliases = new Map<string, string>();
-  for (const modItem of mods) {
-    for (const alias of dependencyAliasesForRecord(modItem)) {
-      const normalized = normalizeDependencyName(alias);
-      if (normalized) aliases.set(normalized, modItem.id);
-    }
-  }
-  return aliases;
-}
 
 export function buildInstalledCatalogAliasSet(records: ModRecord[]) {
   const aliases = new Set<string>();
@@ -60,14 +41,6 @@ export function findDependencyReferencesByModId(sourceRecords: ModRecord[], targ
     optionalReferencesByModId: sortReferenceMap(optionalReferences),
     requiredReferencesByModId: sortReferenceMap(requiredReferences)
   };
-}
-
-export function dependencyAliasesForRecord(record: ModRecord) {
-  return [record.id, ...catalogAliasesForRecord(record)];
-}
-
-export function catalogAliasesForRecord(record: ModRecord) {
-  return [record.name, record.metadata.name, record.fileName, record.fileName.replace(/\.zip$/i, ""), record.relativePath];
 }
 
 function addReferences(

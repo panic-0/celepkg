@@ -1,3 +1,4 @@
+use crate::dependency_rules::collect_required_dependency_closure_mod_ids;
 use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult};
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
@@ -5,8 +6,7 @@ use crate::storage::{
     load_state, load_state_from_path, resolve_required_celeste_path_from_state, state_path,
     update_state, update_state_at,
 };
-use crate::utils::{normalize_dependency_name, now_string, stable_id};
-use std::collections::{HashMap, HashSet, VecDeque};
+use crate::utils::{now_string, stable_id};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -249,81 +249,9 @@ fn resolve_required_mod_ids(
     enabled_map_ids: &[String],
     base_mod_ids: &[String],
 ) -> Vec<String> {
-    let mod_by_id: HashMap<String, _> = scan
-        .other_mods
-        .iter()
-        .map(|mod_item| (mod_item.id.clone(), mod_item))
-        .collect();
-    let alias_to_mod_id = mod_alias_map(scan);
-    let protected_mod_ids = scan
-        .other_mods
-        .iter()
-        .filter(|mod_item| mod_item.protected)
-        .map(|mod_item| mod_item.id.clone());
-    let mut enabled: HashSet<String> = base_mod_ids
-        .iter()
-        .cloned()
-        .chain(protected_mod_ids)
-        .collect();
-    let mut queue: VecDeque<String> = enabled.iter().cloned().collect();
-
-    for map in scan
-        .maps
-        .iter()
-        .filter(|map| map.protected || enabled_map_ids.contains(&map.id))
-    {
-        for dependency in &map.dependencies {
-            if let Some(mod_id) = resolve_dependency_id(&dependency.name, &alias_to_mod_id) {
-                if enabled.insert(mod_id.clone()) {
-                    queue.push_back(mod_id);
-                }
-            }
-        }
-    }
-
-    while let Some(mod_id) = queue.pop_front() {
-        let Some(mod_item) = mod_by_id.get(&mod_id) else {
-            continue;
-        };
-        for dependency in &mod_item.dependencies {
-            if let Some(next_id) = resolve_dependency_id(&dependency.name, &alias_to_mod_id) {
-                if enabled.insert(next_id.clone()) {
-                    queue.push_back(next_id);
-                }
-            }
-        }
-    }
-
-    let mut result: Vec<String> = enabled.into_iter().collect();
-    result.sort();
-    result
-}
-
-fn mod_alias_map(scan: &ScanResult) -> HashMap<String, String> {
-    let mut aliases = HashMap::new();
-    for mod_item in &scan.other_mods {
-        for alias in [
-            mod_item.id.as_str(),
-            mod_item.name.as_str(),
-            mod_item.metadata.name.as_str(),
-            mod_item.file_name.as_str(),
-            mod_item.file_name.trim_end_matches(".zip"),
-            mod_item.relative_path.as_str(),
-        ] {
-            let normalized = normalize_dependency_name(alias);
-            if !normalized.is_empty() {
-                aliases.insert(normalized, mod_item.id.clone());
-            }
-        }
-    }
-
-    aliases
-}
-
-fn resolve_dependency_id(name: &str, alias_to_mod_id: &HashMap<String, String>) -> Option<String> {
-    alias_to_mod_id
-        .get(&normalize_dependency_name(name))
-        .cloned()
+    collect_required_dependency_closure_mod_ids(base_mod_ids, &scan.maps, &scan.other_mods, |map| {
+        map.protected || enabled_map_ids.contains(&map.id)
+    })
 }
 
 impl ProfileType {

@@ -1,3 +1,4 @@
+use crate::dependency_rules::version_too_low;
 use crate::domain::{Dependency, StagedDownload};
 use crate::domain::{
     InstalledModMatch, ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult,
@@ -803,45 +804,6 @@ fn find_catalog_entry_for_dependency<'a>(
 
 fn catalog_entry_satisfies_dependency(entry: &ModCatalogEntry, dependency: &Dependency) -> bool {
     !entry.download_url.trim().is_empty() && !version_too_low(&entry.version, &dependency.version)
-}
-
-fn version_too_low(installed_version: &str, required_version: &str) -> bool {
-    let Some(installed) = parse_numeric_version(installed_version) else {
-        return false;
-    };
-    let Some(required) = parse_numeric_version(required_version) else {
-        return false;
-    };
-    compare_numeric_versions(&installed, &required) == std::cmp::Ordering::Less
-}
-
-fn parse_numeric_version(value: &str) -> Option<Vec<u64>> {
-    let mut parts = vec![];
-    let mut current = String::new();
-    for ch in value.chars() {
-        if ch.is_ascii_digit() {
-            current.push(ch);
-        } else if !current.is_empty() {
-            parts.push(current.parse().ok()?);
-            current.clear();
-        }
-    }
-    if !current.is_empty() {
-        parts.push(current.parse().ok()?);
-    }
-    (!parts.is_empty()).then_some(parts)
-}
-
-fn compare_numeric_versions(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
-    for index in 0..left.len().max(right.len()) {
-        let left_part = left.get(index).copied().unwrap_or_default();
-        let right_part = right.get(index).copied().unwrap_or_default();
-        match left_part.cmp(&right_part) {
-            std::cmp::Ordering::Equal => {}
-            order => return order,
-        }
-    }
-    std::cmp::Ordering::Equal
 }
 
 fn query_looks_like_url_or_domain(query: &str) -> bool {

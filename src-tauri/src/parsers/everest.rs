@@ -1,3 +1,4 @@
+use crate::dependency_rules::is_builtin_dependency_name;
 use crate::domain::{Dependency, ModMetadata};
 use serde_yaml::Value;
 use std::borrow::Cow;
@@ -43,12 +44,7 @@ fn normalize_metadata_text(text: &str) -> Cow<'_, str> {
 }
 
 pub fn is_builtin_dependency(name: &str) -> bool {
-    let normalized = normalize_builtin_dependency_name(name);
-    normalized.starts_with("everest")
-        || matches!(
-            normalized.as_str(),
-            "celeste" | "monocle" | "fna" | "dotnet" | "netframework" | "microsoftnetframework"
-        )
+    is_builtin_dependency_name(name)
 }
 
 fn yaml_string(root: &Value, keys: &[&str]) -> String {
@@ -104,15 +100,6 @@ fn normalize_dependency(value: &Value) -> Option<Dependency> {
         }
         _ => None,
     }
-}
-
-fn normalize_builtin_dependency_name(name: &str) -> String {
-    // Built-in dependency names are matched loosely so punctuation variants such as
-    // ".NET Framework" and "net-framework" resolve to the same key.
-    name.chars()
-        .filter(|ch| ch.is_ascii_alphanumeric())
-        .collect::<String>()
-        .to_lowercase()
 }
 
 #[cfg(test)]

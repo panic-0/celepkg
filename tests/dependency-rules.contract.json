@@ -1,0 +1,333 @@
+{
+  "normalize": [
+    {
+      "input": "  Some_Mod-Name.ZIP  ",
+      "expected": "some mod name"
+    },
+    {
+      "input": "Mods\\Helper Pack",
+      "expected": "mods/helper pack"
+    },
+    {
+      "input": " \t\n ",
+      "expected": ""
+    }
+  ],
+  "builtin": [
+    {
+      "name": "EverestCore",
+      "expected": true
+    },
+    {
+      "name": "Everest 1.5577.0",
+      "expected": true
+    },
+    {
+      "name": ".NET Framework",
+      "expected": true
+    },
+    {
+      "name": "Communal Helper",
+      "expected": false
+    }
+  ],
+  "versions": [
+    {
+      "installed": "v1.2-beta.3",
+      "required": "1.2.4",
+      "tooLow": true
+    },
+    {
+      "installed": "1.2",
+      "required": "1.2.0",
+      "tooLow": false
+    },
+    {
+      "installed": "unknown",
+      "required": "1.2.9",
+      "tooLow": false
+    },
+    {
+      "installed": "1.3.0",
+      "required": "1.2.9",
+      "tooLow": false
+    }
+  ],
+  "closure": {
+    "enabledMapIds": ["map-main"],
+    "baseModIds": ["visual-pack"],
+    "expectedInferred": ["core-helper", "helper-one", "shared-lib"],
+    "expectedClosure": ["core-helper", "helper-one", "protected-helper", "shared-lib", "visual-pack"],
+    "maps": [
+      {
+        "id": "map-main",
+        "name": "Adventure",
+        "fileName": "Adventure.zip",
+        "relativePath": "Maps/Adventure.zip",
+        "absolutePath": "D:/Celeste/Mods/Adventure.zip",
+        "isArchive": true,
+        "kind": "map",
+        "enabled": true,
+        "favorite": false,
+        "protected": false,
+        "readOnly": false,
+        "metadata": {
+          "name": "Adventure",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [
+            {
+              "name": "Helper One",
+              "version": ""
+            }
+          ],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [
+          {
+            "name": "Helper One",
+            "version": ""
+          }
+        ],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      },
+      {
+        "id": "map-protected",
+        "name": "Protected Map",
+        "fileName": "ProtectedMap.zip",
+        "relativePath": "Maps/ProtectedMap.zip",
+        "absolutePath": "D:/Celeste/Mods/ProtectedMap.zip",
+        "isArchive": true,
+        "kind": "map",
+        "enabled": false,
+        "favorite": false,
+        "protected": true,
+        "readOnly": false,
+        "metadata": {
+          "name": "Protected Map",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [
+            {
+              "name": "SharedLib",
+              "version": ""
+            }
+          ],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [
+          {
+            "name": "SharedLib",
+            "version": ""
+          }
+        ],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      }
+    ],
+    "otherMods": [
+      {
+        "id": "helper-one",
+        "name": "Helper One",
+        "fileName": "Helper_One.zip",
+        "relativePath": "Mods/Helper_One.zip",
+        "absolutePath": "D:/Celeste/Mods/Helper_One.zip",
+        "isArchive": true,
+        "kind": "mod",
+        "enabled": true,
+        "favorite": false,
+        "protected": false,
+        "readOnly": false,
+        "metadata": {
+          "name": "HelperOne",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [
+            {
+              "name": "CoreHelper",
+              "version": ""
+            }
+          ],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [
+          {
+            "name": "CoreHelper",
+            "version": ""
+          }
+        ],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      },
+      {
+        "id": "core-helper",
+        "name": "Core Helper",
+        "fileName": "CoreHelper.zip",
+        "relativePath": "Mods/CoreHelper.zip",
+        "absolutePath": "D:/Celeste/Mods/CoreHelper.zip",
+        "isArchive": true,
+        "kind": "mod",
+        "enabled": true,
+        "favorite": false,
+        "protected": false,
+        "readOnly": false,
+        "metadata": {
+          "name": "CoreHelper",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      },
+      {
+        "id": "shared-lib",
+        "name": "Shared Lib",
+        "fileName": "SharedLib.zip",
+        "relativePath": "Mods/SharedLib.zip",
+        "absolutePath": "D:/Celeste/Mods/SharedLib.zip",
+        "isArchive": true,
+        "kind": "mod",
+        "enabled": true,
+        "favorite": false,
+        "protected": false,
+        "readOnly": false,
+        "metadata": {
+          "name": "SharedLib",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      },
+      {
+        "id": "visual-pack",
+        "name": "Visual Pack",
+        "fileName": "VisualPack.zip",
+        "relativePath": "Mods/VisualPack.zip",
+        "absolutePath": "D:/Celeste/Mods/VisualPack.zip",
+        "isArchive": true,
+        "kind": "mod",
+        "enabled": true,
+        "favorite": false,
+        "protected": false,
+        "readOnly": false,
+        "metadata": {
+          "name": "VisualPack",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [
+            {
+              "name": "SharedLib",
+              "version": ""
+            }
+          ],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [
+          {
+            "name": "SharedLib",
+            "version": ""
+          }
+        ],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      },
+      {
+        "id": "protected-helper",
+        "name": "Protected Helper",
+        "fileName": "ProtectedHelper.zip",
+        "relativePath": "Mods/ProtectedHelper.zip",
+        "absolutePath": "D:/Celeste/Mods/ProtectedHelper.zip",
+        "isArchive": true,
+        "kind": "mod",
+        "enabled": false,
+        "favorite": false,
+        "protected": true,
+        "readOnly": false,
+        "metadata": {
+          "name": "ProtectedHelper",
+          "version": "",
+          "author": "",
+          "description": "",
+          "dependencies": [
+            {
+              "name": "SharedLib",
+              "version": ""
+            }
+          ],
+          "optionalDependencies": []
+        },
+        "mapIds": [],
+        "subMaps": [],
+        "mapCount": 0,
+        "strawberryCount": 0,
+        "strawberryTotalCount": 0,
+        "completionStatus": "unknown",
+        "dependencies": [
+          {
+            "name": "SharedLib",
+            "version": ""
+          }
+        ],
+        "optionalDependencies": [],
+        "stats": null,
+        "warnings": []
+      }
+    ]
+  }
+}
