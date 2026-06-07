@@ -64,6 +64,43 @@ test("catalog install flow previews dependencies and queues the mock task", asyn
   await expect(page.locator(".download-task-panel")).toContainText("Everest Gate");
 });
 
+test("catalog rows keep mod names prominent and compact", async ({ page }) => {
+  await openMock(page);
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  const localModTitleWeight = await page
+    .locator(".mod-table .name-cell strong")
+    .first()
+    .evaluate((title) => getComputedStyle(title).fontWeight);
+
+  await openNav(page, "下载 Mod");
+
+  const entry = page.locator(".catalog-row", { hasText: "Everest Gate" }).first();
+  const title = entry.locator(".catalog-row-title");
+  await expect(entry).toBeVisible();
+  await expect(title).toContainText("Everest Gate");
+
+  const metrics = await entry.evaluate((row) => {
+    const titleElement = row.querySelector<HTMLElement>(".catalog-row-title");
+    const chipElement = row.querySelector<HTMLElement>(".catalog-row-chip");
+    if (!titleElement || !chipElement) throw new Error("Catalog row style targets are missing");
+    const titleStyle = getComputedStyle(titleElement);
+    const chipStyle = getComputedStyle(chipElement);
+    return {
+      chipRadius: chipStyle.borderRadius,
+      rowHeight: row.getBoundingClientRect().height,
+      titleFontSize: Number.parseFloat(titleStyle.fontSize),
+      titleFontWeight: titleStyle.fontWeight,
+      titleRadius: titleStyle.borderRadius,
+      chipFontSize: Number.parseFloat(chipStyle.fontSize)
+    };
+  });
+
+  expect(metrics.titleFontSize).toBeGreaterThan(metrics.chipFontSize);
+  expect(metrics.titleFontWeight).toBe(localModTitleWeight);
+  expect(metrics.titleRadius).not.toBe(metrics.chipRadius);
+  expect(metrics.rowHeight).toBeLessThanOrEqual(66);
+});
+
 test("mock dependency tree update opens the tree preview", async ({ page }) => {
   await openMock(page);
   await page.getByRole("button", { name: "其他 Mod", exact: true }).click();

@@ -246,11 +246,11 @@ function CatalogEntryRow({
       onClick={onOpenDetail}
     >
       <div className="catalog-row-main">
-        <strong title={entry.name}>
+        <strong className="catalog-row-title" title={entry.name}>
           <HighlightedText ranges={rangesForField(view.searchMatch, "name")} text={entry.name} />
         </strong>
-        <span className="ui-chip">{sourceLabel(entry.source)}</span>
-        <span className={`ui-chip catalog-state-chip ${view.state}`}>{catalogStateLabel(view)}</span>
+        <span className="ui-chip catalog-row-chip">{sourceLabel(entry.source)}</span>
+        <span className={`ui-chip catalog-row-chip catalog-state-chip ${view.state}`}>{catalogStateLabel(view)}</span>
       </div>
       <div className="catalog-row-meta">
         <small>
