@@ -24,7 +24,7 @@ export function resolveModProfileContent(profile: Profile, scan: ScanResult) {
 }
 
 export function nextCopyName(name: string, profiles: Profile[]) {
-  const base = `${name || "Main Profile"} Copy`;
+  const base = `${name || "Main Profile"} Clone`;
   return nextAvailableProfileName(base, profiles);
 }
 

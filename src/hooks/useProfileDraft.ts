@@ -278,7 +278,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       setLaunchArgs(sourceLaunchArgs);
       setEnabledMapDraft(new Set(content.enabledMapIds));
       setEnabledMapModDraft(new Set(content.enabledModIds));
-      notifier.showSuccess("地图 Profile 已复制。");
+      notifier.showSuccess("地图 Profile 已克隆。");
     });
   }
 
@@ -307,7 +307,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       setScan((value) => ({ ...value, profiles }));
       setSelectedModProfileId(profiles.activeModProfileId);
       setEnabledExplicitModDraft(new Set(content.enabledModIds));
-      notifier.showSuccess("Mod Profile 已复制。");
+      notifier.showSuccess("Mod Profile 已克隆。");
     });
   }
 

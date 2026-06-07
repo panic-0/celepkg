@@ -337,7 +337,7 @@ function ProfileColumn({
                   <button
                     className="profile-action-button"
                     disabled={loading || isRenaming}
-                    title="复制 Profile"
+                    title="克隆 Profile"
                     onClick={(event) => {
                       event.stopPropagation();
                       onCopy(profile);

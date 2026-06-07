@@ -21,7 +21,7 @@ async function createEmptyProfile(column: Locator, nameLabel: string, profileNam
   await expect(column.locator(".profile-row.active")).toContainText(profileName);
 }
 
-test("profile manager creates, copies, renames, and applies mock profiles", async ({ page }) => {
+test("profile manager creates, clones, renames, and applies mock profiles", async ({ page }) => {
   await openMock(page);
   await openNav(page, "Profile");
 
@@ -32,8 +32,8 @@ test("profile manager creates, copies, renames, and applies mock profiles", asyn
   await createEmptyProfile(modColumn, "新建 Mod Profile 名称", "回归 Mod Profile");
 
   const activeMapRow = mapColumn.locator(".profile-row.active");
-  await activeMapRow.getByTitle("复制 Profile").click();
-  await expect(mapColumn.locator(".profile-row.active")).toContainText("回归地图 Profile Copy");
+  await activeMapRow.getByTitle("克隆 Profile").click();
+  await expect(mapColumn.locator(".profile-row.active")).toContainText("回归地图 Profile Clone");
 
   await mapColumn.locator(".profile-row.active").getByTitle("重命名 Profile").click();
   await mapColumn.locator(".profile-row.active").getByRole("textbox").fill("回归地图重命名");

@@ -39,10 +39,10 @@ describe("profile draft logic", () => {
     expect(resolveModProfileContent(profile({ enabledModIds: null }), scan)).toEqual({ enabledModIds: ["enabled"] });
   });
 
-  it("generates non-conflicting copy names and detects duplicate profile names", () => {
-    const profiles = [profile({ id: "a", name: "Main" }), profile({ id: "b", name: "Main Copy" })];
+  it("generates non-conflicting clone names and detects duplicate profile names", () => {
+    const profiles = [profile({ id: "a", name: "Main" }), profile({ id: "b", name: "Main Clone" })];
 
-    expect(nextCopyName("Main", profiles)).toBe("Main Copy 2");
+    expect(nextCopyName("Main", profiles)).toBe("Main Clone 2");
     expect(profileNameExists(profiles, "Main", "b")).toBe(true);
     expect(profileNameExists(profiles, "Main", "a")).toBe(false);
   });
