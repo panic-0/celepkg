@@ -25,6 +25,18 @@ import type {
 } from "./types";
 import { catalogEntry, createMockCatalog, createMockEverestReleases, mockUpdateMetadata } from "./mockCatalogData";
 import { dependencyEntrySatisfies } from "./utils/appDependencyResolution";
+import {
+  DEFAULT_AUTO_BACKUP_CLEANUP_ENABLED,
+  DEFAULT_AUTO_BACKUP_ENABLED,
+  DEFAULT_AUTO_BACKUP_RETENTION_COUNT,
+  DEFAULT_AUTO_CHECK_APP_UPDATES_ON_STARTUP,
+  DEFAULT_AUTO_CHECK_MOD_UPDATES_ON_STARTUP,
+  DEFAULT_AUTO_REFRESH_MOD_CATALOG_CACHE_ON_STARTUP,
+  DEFAULT_MOD_CATALOG_SOURCE_ENABLED_COUNT,
+  DEFAULT_MOD_CATALOG_SOURCE_ORDER,
+  DEFAULT_SELECTED_SAVE_FILES,
+  normalizeModCatalogSourceSettings
+} from "./utils/configDefaults";
 import { normalizeDependencyName } from "./utils/dependencies";
 
 type MockRecordOptions = Partial<ModRecord> &
@@ -34,15 +46,15 @@ type MockRecordOptions = Partial<ModRecord> &
   };
 
 const mockCelestePath = "D:\\Games\\Celeste";
-let autoBackupEnabled = true;
-let autoBackupCleanupEnabled = true;
-let autoBackupRetentionCount = 20;
-let modCatalogSourceOrder: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
-let modCatalogSourceEnabledCount = 2;
-let autoCheckModUpdatesOnStartup = true;
-let autoCheckAppUpdatesOnStartup = true;
-let autoRefreshModCatalogCacheOnStartup = true;
-let selectedSaveFiles = ["0.celeste", "1.celeste"];
+let autoBackupEnabled = DEFAULT_AUTO_BACKUP_ENABLED;
+let autoBackupCleanupEnabled = DEFAULT_AUTO_BACKUP_CLEANUP_ENABLED;
+let autoBackupRetentionCount = DEFAULT_AUTO_BACKUP_RETENTION_COUNT;
+let modCatalogSourceOrder: ModCatalogSourceKind[] = [...DEFAULT_MOD_CATALOG_SOURCE_ORDER];
+let modCatalogSourceEnabledCount = DEFAULT_MOD_CATALOG_SOURCE_ENABLED_COUNT;
+let autoCheckModUpdatesOnStartup = DEFAULT_AUTO_CHECK_MOD_UPDATES_ON_STARTUP;
+let autoCheckAppUpdatesOnStartup = DEFAULT_AUTO_CHECK_APP_UPDATES_ON_STARTUP;
+let autoRefreshModCatalogCacheOnStartup = DEFAULT_AUTO_REFRESH_MOD_CATALOG_CACHE_ON_STARTUP;
+let selectedSaveFiles = [...DEFAULT_SELECTED_SAVE_FILES, "1.celeste"];
 let backupSequence = 4;
 
 let profiles: ProfilesState = {
@@ -110,8 +122,9 @@ export const mockApi = {
   },
 
   async setModCatalogSources(order: ModCatalogSourceKind[], enabledCount: number): Promise<ConfigResponse> {
-    modCatalogSourceOrder = normalizeMockSourceOrder(order);
-    modCatalogSourceEnabledCount = clampMockEnabledSourceCount(enabledCount, modCatalogSourceOrder.length);
+    const settings = normalizeModCatalogSourceSettings(order, enabledCount);
+    modCatalogSourceOrder = settings.order;
+    modCatalogSourceEnabledCount = settings.enabledCount;
     return clone(config());
   },
 
@@ -521,26 +534,6 @@ function config(): ConfigResponse {
     profiles,
     warnings: []
   };
-}
-
-function normalizeMockSourceOrder(order: ModCatalogSourceKind[]) {
-  const allSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
-  const seen = new Set<ModCatalogSourceKind>();
-  const normalized: ModCatalogSourceKind[] = [];
-  for (const source of order) {
-    if (!allSources.includes(source) || seen.has(source)) continue;
-    seen.add(source);
-    normalized.push(source);
-  }
-  for (const source of allSources) {
-    if (!seen.has(source)) normalized.push(source);
-  }
-  return normalized;
-}
-
-function clampMockEnabledSourceCount(count: number, max: number) {
-  const value = Number.isFinite(count) ? Math.trunc(count) : 2;
-  return Math.max(1, Math.min(value, max));
 }
 
 function createMockScan(): ScanResult {

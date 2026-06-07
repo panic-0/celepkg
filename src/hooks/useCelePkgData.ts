@@ -16,6 +16,18 @@ import {
   setSelectedSaveFiles
 } from "../api";
 import type { AppNotice, AppNoticeTone, AppNotifier, ModCatalogSourceKind, ScanResult } from "../types";
+import {
+  activeModCatalogSources,
+  DEFAULT_AUTO_BACKUP_CLEANUP_ENABLED,
+  DEFAULT_AUTO_BACKUP_ENABLED,
+  DEFAULT_AUTO_BACKUP_RETENTION_COUNT,
+  DEFAULT_AUTO_CHECK_APP_UPDATES_ON_STARTUP,
+  DEFAULT_AUTO_CHECK_MOD_UPDATES_ON_STARTUP,
+  DEFAULT_AUTO_REFRESH_MOD_CATALOG_CACHE_ON_STARTUP,
+  DEFAULT_MOD_CATALOG_SOURCE_ENABLED_COUNT,
+  DEFAULT_MOD_CATALOG_SOURCE_ORDER,
+  DEFAULT_SELECTED_SAVE_FILES
+} from "../utils/configDefaults";
 import { createLatestRequestTracker } from "../utils/latestRequest";
 import { emptyLoadingState, nextLoadingState } from "../utils/loadingState";
 import { notifyError } from "../utils/notify";
@@ -30,7 +42,7 @@ const emptyScan: ScanResult = {
   otherMods: [],
   profiles: { activeMapProfileId: "default-maps", activeModProfileId: "default-mods", profiles: [] },
   availableSaveFiles: [],
-  selectedSaveFiles: ["0.celeste"],
+  selectedSaveFiles: [...DEFAULT_SELECTED_SAVE_FILES],
   warnings: [],
   timings: []
 };
@@ -38,19 +50,23 @@ const emptyScan: ScanResult = {
 export function useCelePkgData() {
   const [celestePath, setPathInput] = useState("");
   const [scan, setScan] = useState<ScanResult>(emptyScan);
-  const [autoBackupEnabled, setAutoBackupEnabledState] = useState(true);
-  const [autoBackupCleanupEnabled, setAutoBackupCleanupEnabledState] = useState(true);
-  const [autoBackupRetentionCount, setAutoBackupRetentionCountState] = useState(20);
-  const [modCatalogSourceOrder, setModCatalogSourceOrderState] = useState<ModCatalogSourceKind[]>(["wegfan", "everestMirror", "everest"]);
-  const [modCatalogSourceEnabledCount, setModCatalogSourceEnabledCountState] = useState(2);
+  const [autoBackupEnabled, setAutoBackupEnabledState] = useState(DEFAULT_AUTO_BACKUP_ENABLED);
+  const [autoBackupCleanupEnabled, setAutoBackupCleanupEnabledState] = useState(DEFAULT_AUTO_BACKUP_CLEANUP_ENABLED);
+  const [autoBackupRetentionCount, setAutoBackupRetentionCountState] = useState(DEFAULT_AUTO_BACKUP_RETENTION_COUNT);
+  const [modCatalogSourceOrder, setModCatalogSourceOrderState] = useState<ModCatalogSourceKind[]>(() => [
+    ...DEFAULT_MOD_CATALOG_SOURCE_ORDER
+  ]);
+  const [modCatalogSourceEnabledCount, setModCatalogSourceEnabledCountState] = useState(DEFAULT_MOD_CATALOG_SOURCE_ENABLED_COUNT);
   const modCatalogSources = useMemo(
     () => activeModCatalogSources(modCatalogSourceOrder, modCatalogSourceEnabledCount),
     [modCatalogSourceEnabledCount, modCatalogSourceOrder]
   );
-  const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(true);
-  const [autoCheckAppUpdatesOnStartup, setAutoCheckAppUpdatesOnStartupState] = useState(true);
-  const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(true);
-  const [autoRefreshModCatalogCacheOnStartup, setAutoRefreshModCatalogCacheOnStartupState] = useState(true);
+  const [autoCheckModUpdatesOnStartup, setAutoCheckModUpdatesOnStartupState] = useState(DEFAULT_AUTO_CHECK_MOD_UPDATES_ON_STARTUP);
+  const [autoCheckAppUpdatesOnStartup, setAutoCheckAppUpdatesOnStartupState] = useState(DEFAULT_AUTO_CHECK_APP_UPDATES_ON_STARTUP);
+  const [startupAutoCheckModUpdatesOnStartup, setStartupAutoCheckModUpdatesOnStartup] = useState(DEFAULT_AUTO_CHECK_MOD_UPDATES_ON_STARTUP);
+  const [autoRefreshModCatalogCacheOnStartup, setAutoRefreshModCatalogCacheOnStartupState] = useState(
+    DEFAULT_AUTO_REFRESH_MOD_CATALOG_CACHE_ON_STARTUP
+  );
   const [catalogCacheRefreshing, setCatalogCacheRefreshing] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [configWarnings, setConfigWarnings] = useState<string[]>([]);
@@ -455,23 +471,4 @@ export function useCelePkgData() {
     updateModCatalogSources,
     updateSelectedSaveFiles
   };
-}
-
-function activeModCatalogSources(order: ModCatalogSourceKind[], enabledCount: number) {
-  const normalizedOrder = normalizeModCatalogSourceOrder(order);
-  return normalizedOrder.slice(0, Math.max(1, Math.min(enabledCount, normalizedOrder.length)));
-}
-
-function normalizeModCatalogSourceOrder(order: ModCatalogSourceKind[]) {
-  const allSources: ModCatalogSourceKind[] = ["wegfan", "everestMirror", "everest"];
-  const seen = new Set<ModCatalogSourceKind>();
-  const normalized = order.filter((source) => {
-    if (!allSources.includes(source) || seen.has(source)) return false;
-    seen.add(source);
-    return true;
-  });
-  for (const source of allSources) {
-    if (!seen.has(source)) normalized.push(source);
-  }
-  return normalized;
 }
