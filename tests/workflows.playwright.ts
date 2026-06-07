@@ -44,9 +44,78 @@ test("profile manager creates, clones, renames, and applies mock profiles", asyn
   await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
 });
 
+test("workspace navigation groups content around profile state", async ({ page }) => {
+  await openMock(page);
+
+  const nav = page.locator(".workspace-nav");
+  await expect(nav.getByText("内容管理")).toBeVisible();
+  await expect(nav.getByText("获取与安装")).toBeVisible();
+  await expect(nav.getByText("维护")).toBeVisible();
+  await expect(nav.locator(".nav-profile-summary")).toContainText("依赖 Mod");
+  await expect(nav.locator(".nav-profile-summary")).toContainText("推导依赖");
+  await expect(nav.getByRole("button", { name: "地图", exact: true })).toHaveCount(0);
+
+  const profileSummaryPlacement = await nav.evaluate((navElement) => {
+    const profileButton = Array.from(navElement.querySelectorAll("button")).find((button) => button.textContent?.trim() === "Profile");
+    const profileSummary = navElement.querySelector(".nav-profile-summary");
+    const installHeading = Array.from(navElement.querySelectorAll(".nav-section-title")).find(
+      (heading) => heading.textContent?.trim() === "获取与安装"
+    );
+    if (!profileButton || !profileSummary || !installHeading) throw new Error("Navigation profile placement targets are missing");
+    return {
+      profileButtonBottom: profileButton.getBoundingClientRect().bottom,
+      profileSummaryTop: profileSummary.getBoundingClientRect().top,
+      profileSummaryBottom: profileSummary.getBoundingClientRect().bottom,
+      installHeadingTop: installHeading.getBoundingClientRect().top
+    };
+  });
+
+  expect(profileSummaryPlacement.profileSummaryTop).toBeGreaterThanOrEqual(profileSummaryPlacement.profileButtonBottom - 1);
+  expect(profileSummaryPlacement.profileSummaryBottom).toBeLessThanOrEqual(profileSummaryPlacement.installHeadingTop + 1);
+
+  const profileSummaryMetrics = await nav.locator(".nav-profile-summary").evaluate((summary) => {
+    const badges = Array.from(summary.querySelectorAll(".nav-summary-badge")).map((badge) => badge.getBoundingClientRect().width);
+    const names = Array.from(summary.querySelectorAll(".nav-summary-name")).map((name) =>
+      Number.parseFloat(getComputedStyle(name).fontSize)
+    );
+    const rightColumnAligned = Array.from(summary.querySelectorAll(".nav-summary-item")).every((row) => {
+      const badge = row.querySelector(".nav-summary-badge")?.getBoundingClientRect();
+      const note = row.querySelector("small")?.getBoundingClientRect();
+      if (!badge || !note) return false;
+      const badgeCenter = badge.left + badge.width / 2;
+      const noteCenter = note.left + note.width / 2;
+      return Math.abs(badgeCenter - noteCenter) <= 1;
+    });
+    const internalBorders = Array.from(summary.querySelectorAll(".nav-summary-item")).map((row) => getComputedStyle(row).borderTopWidth);
+    return { badgeWidths: badges, nameFontSizes: names, rightColumnAligned, internalBorders };
+  });
+  expect(new Set(profileSummaryMetrics.badgeWidths).size).toBe(1);
+  expect(Math.min(...profileSummaryMetrics.nameFontSizes)).toBeGreaterThanOrEqual(13);
+  expect(profileSummaryMetrics.rightColumnAligned).toBe(true);
+  expect(profileSummaryMetrics.internalBorders.every((width) => width === "0px")).toBe(true);
+
+  const localContentNav = nav.getByRole("button", { name: /本地内容/ });
+  const navBadgeAlignment = await nav.evaluate((navElement) => {
+    const localBadge = navElement.querySelector(".nav-count")?.getBoundingClientRect();
+    const profileBadges = Array.from(navElement.querySelectorAll(".nav-summary-badge")).map((badge) => badge.getBoundingClientRect());
+    if (!localBadge || profileBadges.length === 0) return false;
+    const localCenter = localBadge.left + localBadge.width / 2;
+    return profileBadges.every((badge) => Math.abs(localCenter - (badge.left + badge.width / 2)) <= 1);
+  });
+  expect(navBadgeAlignment).toBe(true);
+  await expect(localContentNav).toHaveClass(/active/);
+  await page.locator(".record-view-switch").getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await expect(localContentNav).toHaveClass(/active/);
+  await localContentNav.click();
+  await expect(page.locator(".record-view-switch").getByRole("button", { name: "其他 Mod", exact: true })).toHaveClass(/active/);
+
+  await openNav(page, "Mod 获取");
+  await expect(page.getByRole("heading", { name: "Mod 获取" })).toBeVisible();
+});
+
 test("catalog install flow previews dependencies and queues the mock task", async ({ page }) => {
   await openMock(page);
-  await openNav(page, "下载 Mod");
+  await openNav(page, "Mod 获取");
 
   await page.getByPlaceholder("搜索 Mod、地图、Helper").fill("Everest Gate");
   const entry = page.locator(".catalog-row", { hasText: "Everest Gate" }).first();
@@ -72,7 +141,7 @@ test("catalog rows keep mod names prominent and compact", async ({ page }) => {
     .first()
     .evaluate((title) => getComputedStyle(title).fontWeight);
 
-  await openNav(page, "下载 Mod");
+  await openNav(page, "Mod 获取");
 
   const entry = page.locator(".catalog-row", { hasText: "Everest Gate" }).first();
   const title = entry.locator(".catalog-row-title");
@@ -143,6 +212,22 @@ test("map detail opens the local map location from the header", async ({ page })
 
   await page.locator(".detail-heading").getByRole("button", { name: "打开所在位置" }).click();
   await expect(page.getByText("已打开本地内容位置。")).toBeVisible();
+});
+
+test("sub-map filters stay scoped to the map detail sub-map tab", async ({ page }) => {
+  await openMock(page);
+  await expect(page.locator(".filter-dock")).toHaveCount(0);
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Strawberry Jam");
+  const mapRow = page.locator("tbody tr", { hasText: "Strawberry Jam Collab" });
+  await expect(mapRow).toHaveCount(1);
+  await mapRow.click();
+
+  await expect(page.locator(".filter-dock")).toHaveCount(0);
+  await page.locator(".detail-tabs button", { hasText: "小图" }).click();
+  await expect(page.locator(".filter-dock")).toContainText("小图筛选");
+  await openNav(page, "Profile");
+  await expect(page.locator(".filter-dock")).toHaveCount(0);
 });
 
 test("settings save-file and catalog-cache actions show persistent feedback", async ({ page }) => {

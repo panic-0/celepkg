@@ -4,9 +4,7 @@ import {
   Archive,
   Download,
   Gamepad2,
-  Map,
   Mountain,
-  Package,
   PackageSearch,
   Settings2,
   SlidersHorizontal,
@@ -28,6 +26,7 @@ type WorkspaceNavProps = {
   downloadTask: DownloadTask | null;
   enabledMapCount: number;
   enabledModCount: number;
+  mapDependencyModCount: number;
   mapProfileName: string;
   modProfileName: string;
   mainMode: "list" | "detail";
@@ -44,6 +43,7 @@ export function WorkspaceNav({
   downloadTask,
   enabledMapCount,
   enabledModCount,
+  mapDependencyModCount,
   mapProfileName,
   modProfileName,
   mainMode,
@@ -63,7 +63,10 @@ export function WorkspaceNav({
 
   return (
     <aside className="workspace-nav">
-      <section className="nav-section">
+      <section className="nav-section" aria-labelledby="nav-content-management">
+        <div className="nav-section-title" id="nav-content-management">
+          内容管理
+        </div>
         <button
           className={activeView === "maps" || activeView === "mods" ? "nav-item active" : "nav-item"}
           onClick={() => onActiveViewChange(activeView === "mods" ? "mods" : "maps")}
@@ -77,13 +80,47 @@ export function WorkspaceNav({
             {enabledMapCount + enabledModCount} / {totalMapCount + totalModCount}
           </strong>
         </button>
-        <button className={activeView === "everest" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("everest")}>
-          <Mountain size={18} />
-          <span>Everest</span>
+        <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
+          <UserRound size={18} />
+          <span>Profile</span>
         </button>
+        <div className="nav-profile-summary" aria-label="当前 Profile">
+          <button
+            className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
+            onClick={() => onActiveViewChange("profiles")}
+            title="打开 Profile 管理"
+            type="button"
+          >
+            <span className="nav-summary-label">地图</span>
+            <span className="nav-summary-badge">{`${enabledMapCount} / ${totalMapCount}`}</span>
+            <strong className="nav-summary-name" title={mapProfileName || "未选择"}>
+              {mapProfileName || "未选择"}
+            </strong>
+            <small>{`${mapDependencyModCount} 个依赖 Mod`}</small>
+          </button>
+          <button
+            className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
+            onClick={() => onActiveViewChange("profiles")}
+            title="打开 Profile 管理"
+            type="button"
+          >
+            <span className="nav-summary-label">Mod</span>
+            <span className="nav-summary-badge">{`${enabledModCount} / ${totalModCount}`}</span>
+            <strong className="nav-summary-name" title={modProfileName || "未选择"}>
+              {modProfileName || "未选择"}
+            </strong>
+            <small>{`${dependencyModCount} 个推导依赖`}</small>
+          </button>
+        </div>
+      </section>
+
+      <section className="nav-section" aria-labelledby="nav-install-management">
+        <div className="nav-section-title" id="nav-install-management">
+          获取与安装
+        </div>
         <button className={activeView === "catalog" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("catalog")}>
           <PackageSearch size={18} />
-          <span>下载 Mod</span>
+          <span>Mod 获取</span>
         </button>
         <button
           aria-label="下载管理"
@@ -99,56 +136,23 @@ export function WorkspaceNav({
             </strong>
           )}
         </button>
-        <button className={activeView === "profiles" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("profiles")}>
-          <UserRound size={18} />
-          <span>Profile</span>
+        <button className={activeView === "everest" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("everest")}>
+          <Mountain size={18} />
+          <span>Everest</span>
         </button>
-        <button className={activeView === "settings" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("settings")}>
-          <Settings2 size={18} />
-          <span>设置</span>
-        </button>
+      </section>
+
+      <section className="nav-section" aria-labelledby="nav-maintenance">
+        <div className="nav-section-title" id="nav-maintenance">
+          维护
+        </div>
         <button className={activeView === "backups" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("backups")}>
           <Archive size={18} />
           <span>备份还原</span>
         </button>
-      </section>
-
-      <section className="nav-summary">
-        <div className="nav-summary-heading">
-          <UserRound size={15} />
-          <span>当前 Profile</span>
-        </div>
-        <button
-          className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
-          onClick={() => onActiveViewChange("profiles")}
-          title="打开 Profile 管理"
-          type="button"
-        >
-          <span className="nav-summary-icon map-profile-icon">
-            <Map size={15} />
-          </span>
-          <span className="nav-summary-copy">
-            <span className="nav-summary-label">地图 Profile</span>
-            <strong title={mapProfileName || "未选择"}>{mapProfileName || "未选择"}</strong>
-          </span>
-          <span className="nav-summary-badge">{`${enabledMapCount} / ${totalMapCount}`}</span>
-          <small>地图</small>
-        </button>
-        <button
-          className={activeView === "profiles" ? "nav-summary-item active" : "nav-summary-item"}
-          onClick={() => onActiveViewChange("profiles")}
-          title="打开 Profile 管理"
-          type="button"
-        >
-          <span className="nav-summary-icon mod-profile-icon">
-            <Package size={15} />
-          </span>
-          <span className="nav-summary-copy">
-            <span className="nav-summary-label">Mod Profile</span>
-            <strong title={modProfileName || "未选择"}>{modProfileName || "未选择"}</strong>
-          </span>
-          <span className="nav-summary-badge">{`${enabledModCount} / ${totalModCount}`}</span>
-          <small>{`${dependencyModCount} 依赖`}</small>
+        <button className={activeView === "settings" ? "nav-item active" : "nav-item"} onClick={() => onActiveViewChange("settings")}>
+          <Settings2 size={18} />
+          <span>设置</span>
         </button>
       </section>
 

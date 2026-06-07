@@ -234,6 +234,7 @@ export function App() {
           activeView={workspaceView.activeView}
           dependencyModCount={profileDraft.dependencyModDraft.size}
           downloadTask={downloadTask}
+          mapDependencyModCount={profileDraft.enabledMapModDraft.size + profileDraft.dependencyModDraft.size}
           enabledMapCount={workspaceView.enabledMapCount}
           enabledModCount={workspaceView.enabledModCount}
           mapProfileName={workspaceView.mapProfileName}

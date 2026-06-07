@@ -235,7 +235,7 @@ export function SettingsManager({
                 className={autoRefreshModCatalogCacheOnStartup ? "inline-toggle active" : "inline-toggle"}
                 disabled={loading}
                 onClick={() => onAutoRefreshModCatalogCacheOnStartupChange(!autoRefreshModCatalogCacheOnStartup)}
-                title="应用启动后在后台刷新 Mod 获取中心的列表缓存"
+                title="应用启动后在后台刷新 Mod 获取的列表缓存"
               >
                 {autoRefreshModCatalogCacheOnStartup ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
                 <PackageSearch size={16} />

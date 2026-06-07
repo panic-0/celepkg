@@ -110,7 +110,7 @@ export function ModCatalogManager({ downloadTask, loading, notifier, scan, sourc
     <section className="mod-catalog-manager">
       <div className="list-header catalog-header">
         <div>
-          <h2>Mod 获取中心</h2>
+          <h2>Mod 获取</h2>
           <p>{resultText}</p>
         </div>
       </div>
