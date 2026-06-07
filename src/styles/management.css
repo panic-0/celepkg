@@ -313,6 +313,15 @@
   white-space: nowrap;
 }
 
+.download-task-group em.download-task-error {
+  overflow: visible;
+  color: var(--color-danger);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .profile-header-actions {
   display: flex;
   flex-wrap: wrap;

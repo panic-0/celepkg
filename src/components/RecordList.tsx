@@ -276,6 +276,7 @@ function RecordFilterBar({
         <>
           <Select label="进度" value={progressFilter} onChange={(value) => onProgressFilterChange(value as ProgressFilter)}>
             <option value="all">全部进度</option>
+            <option value="updates">有更新</option>
             <option value="completed">已完成</option>
             <option value="unfinished">未完成</option>
             <option value="withStats">有存档统计</option>
@@ -302,11 +303,12 @@ function RecordFilterBar({
         <>
           <ReferenceFilterControl value={referenceFilter} onChange={onReferenceFilterChange} />
           <Select
-            label="警告"
-            value={progressFilter === "warnings" ? "warnings" : "all"}
+            label="状态"
+            value={progressFilter === "warnings" || progressFilter === "updates" ? progressFilter : "all"}
             onChange={(value) => onProgressFilterChange(value as ProgressFilter)}
           >
             <option value="all">全部 Mod</option>
+            <option value="updates">有更新</option>
             <option value="warnings">有警告</option>
           </Select>
         </>

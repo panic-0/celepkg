@@ -156,9 +156,14 @@ export function App() {
   );
   const referencedModIds = useMemo(() => new Set(dependencyReferences.requiredReferencesByModId.keys()), [dependencyReferences]);
   const optionalReferencedModIds = useMemo(() => new Set(dependencyReferences.optionalReferencesByModId.keys()), [dependencyReferences]);
+  const downloadableUpdateRecordOrder = useMemo(
+    () => new Map(downloadableModUpdates.map((candidate, index) => [candidate.installed.recordId, index])),
+    [downloadableModUpdates]
+  );
   const filters = useModFilters({
     enabledMapDraft: profileDraft.enabledMapDraft,
     enabledModDraft: profileDraft.enabledModDraft,
+    downloadableUpdateRecordOrder,
     optionalReferencesByModId: dependencyReferences.optionalReferencesByModId,
     optionalReferencedModIds,
     requiredReferencesByModId: dependencyReferences.requiredReferencesByModId,
@@ -201,6 +206,14 @@ export function App() {
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
   const showingModRecords = workspaceView.activeView === "mods";
+  const activeUpdateRecordIds = useMemo(
+    () => new Set((showingModRecords ? filters.filteredMods : filters.filteredMaps).map((record) => record.id)),
+    [filters.filteredMaps, filters.filteredMods, showingModRecords]
+  );
+  const activeDownloadableModUpdates = useMemo(
+    () => downloadableModUpdates.filter((candidate) => activeUpdateRecordIds.has(candidate.installed.recordId)),
+    [activeUpdateRecordIds, downloadableModUpdates]
+  );
 
   async function openRecordLocation(record: ModRecord) {
     try {
@@ -409,7 +422,7 @@ export function App() {
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
             modUpdateChecking={modUpdateChecking}
-            modUpdateCount={downloadableModUpdates.length}
+            modUpdateCount={activeDownloadableModUpdates.length}
             modUpdatesByRecordId={modUpdatesByRecordId}
             recordSearchMatches={filters.recordSearchMatches}
             requiredReferencesByModId={dependencyReferences.requiredReferencesByModId}
@@ -428,7 +441,7 @@ export function App() {
             onReferenceFilterChange={filters.setModReferenceFilter}
             onShowHelperMapsChange={filters.setShowHelperMaps}
             onSortKeyChange={filters.setMapSortKey}
-            onUpdateAllMods={updateAllMods}
+            onUpdateAllMods={() => updateAllMods(activeDownloadableModUpdates)}
             onFavoriteToggle={recordActions.updateRecordFavorite}
             onProtectedToggle={recordActions.updateRecordProtected}
             isMapEnabled={recordActions.isMapEnabled}

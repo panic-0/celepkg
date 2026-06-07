@@ -8,6 +8,7 @@ import { createSearchMatcher, matchSearchFields, type SearchField, type SearchMa
 type ModFiltersOptions = {
   enabledMapDraft: Set<string>;
   enabledModDraft: Set<string>;
+  downloadableUpdateRecordOrder: Map<string, number>;
   optionalReferencesByModId: Map<string, DependencyReference[]>;
   optionalReferencedModIds: Set<string>;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
@@ -18,6 +19,7 @@ type ModFiltersOptions = {
 export function useModFilters({
   enabledMapDraft,
   enabledModDraft,
+  downloadableUpdateRecordOrder,
   optionalReferencesByModId,
   optionalReferencedModIds,
   requiredReferencesByModId,
@@ -51,15 +53,28 @@ export function useModFilters({
         if (mapProgressFilter === "unfinished" && map.completionStatus !== "unfinished") return false;
         if (mapProgressFilter === "withStats" && !map.stats) return false;
         if (mapProgressFilter === "warnings" && !map.warnings.length) return false;
+        if (mapProgressFilter === "updates" && !downloadableUpdateRecordOrder.has(map.id)) return false;
         return match.matched;
       });
     return [...maps]
       .sort((a, b) => {
         if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
+        if (mapProgressFilter === "updates") {
+          return (downloadableUpdateRecordOrder.get(a.record.id) ?? 0) - (downloadableUpdateRecordOrder.get(b.record.id) ?? 0);
+        }
         return compareMaps(a.record, b.record, mapSortKey);
       })
       .map((item) => item.record);
-  }, [enabledMapDraft, enabledModDraft, mapEnabledFilter, mapProgressFilter, mapSortKey, searchMatcher, visibleMapRecords]);
+  }, [
+    downloadableUpdateRecordOrder,
+    enabledMapDraft,
+    enabledModDraft,
+    mapEnabledFilter,
+    mapProgressFilter,
+    mapSortKey,
+    searchMatcher,
+    visibleMapRecords
+  ]);
 
   const filteredMods = useMemo(() => {
     const mods = scan.otherMods
@@ -75,6 +90,7 @@ export function useModFilters({
         if (modEnabledFilter === "enabled" && !draftEnabled) return false;
         if (modEnabledFilter === "disabled" && draftEnabled) return false;
         if (modProgressFilter === "warnings" && !modItem.warnings.length) return false;
+        if (modProgressFilter === "updates" && !downloadableUpdateRecordOrder.has(modItem.id)) return false;
         const isReferenced = referencedModIds.has(modItem.id);
         const isOptionalReferenced = optionalReferencedModIds.has(modItem.id);
         if (modReferenceFilter === "unreferenced" && isReferenced && !modItem.favorite) return false;
@@ -84,11 +100,15 @@ export function useModFilters({
     return [...mods]
       .sort((a, b) => {
         if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
+        if (modProgressFilter === "updates") {
+          return (downloadableUpdateRecordOrder.get(a.record.id) ?? 0) - (downloadableUpdateRecordOrder.get(b.record.id) ?? 0);
+        }
         return a.record.name.localeCompare(b.record.name, "zh-Hans-CN");
       })
       .map((item) => item.record);
   }, [
     enabledModDraft,
+    downloadableUpdateRecordOrder,
     modEnabledFilter,
     modProgressFilter,
     modReferenceFilter,

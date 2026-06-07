@@ -25,6 +25,28 @@ describe("mock staged downloads", () => {
     await expect(mockApi.installStagedMod("D:\\Games\\Celeste", staged.stagedId, entry!)).rejects.toThrow("staged");
   });
 
+  it("exposes a mock mod that fails during install", async () => {
+    const result = await mockApi.searchModCatalog("Mock Install Failure", ["everestMirror"]);
+    const entry = result.entries.find((item) => item.name === "Mock Install Failure");
+    expect(entry).toBeTruthy();
+
+    const staged = await mockApi.downloadModToStaging("D:\\Games\\Celeste", entry!, "mock-install-failure");
+
+    await expect(mockApi.installStagedMod("D:\\Games\\Celeste", staged.stagedId, entry!)).rejects.toThrow(
+      "暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)"
+    );
+  });
+
+  it("exposes a mock mod that fails during download", async () => {
+    const result = await mockApi.searchModCatalog("Mock Download Failure", ["everestMirror"]);
+    const entry = result.entries.find((item) => item.name === "Mock Download Failure");
+    expect(entry).toBeTruthy();
+
+    await expect(mockApi.downloadModToStaging("D:\\Games\\Celeste", entry!, "mock-download-failure")).rejects.toThrow(
+      "下载 Mod 失败：网络连接已中断，无法继续读取远端文件。"
+    );
+  });
+
   it("downloads and installs a staged everest release once", async () => {
     const releases = await mockApi.listEverestReleases();
     const release = releases.releases[0];
@@ -102,6 +124,8 @@ describe("mock staged downloads", () => {
     const result = await mockApi.checkModUpdates("D:\\Games\\Celeste", ["everestMirror", "wegfan"]);
     const updateNames = result.updates.map((item) => item.installed.name);
 
+    expect(updateNames).toContain("Mock Install Failure");
+    expect(updateNames).toContain("Mock Download Failure");
     expect(updateNames).toContain("Mock Helper 001");
     expect(updateNames).toContain("Mock Dependency Tree Root");
     expect(updateNames).not.toContain("MockBulkUpdate1");

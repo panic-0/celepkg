@@ -192,9 +192,9 @@ export function useModInstallWorkflow({
     );
   }
 
-  async function updateAllMods() {
+  async function updateAllMods(candidates: ModUpdateCandidate[] = downloadableModUpdates) {
     const recordsBeforeUpdate = [...scan.maps, ...scan.otherMods];
-    const descriptors = createModUpdateTaskDescriptors(downloadableModUpdates, recordsBeforeUpdate);
+    const descriptors = createModUpdateTaskDescriptors(candidates, recordsBeforeUpdate);
     if (!descriptors.length) return;
     const confirmed = await requestAppConfirm({
       title: "批量更新 Mod",
@@ -202,7 +202,7 @@ export function useModInstallWorkflow({
       confirmLabel: "更新全部",
       facts: [
         { label: "更新数量", value: `${descriptors.length} 个` },
-        { label: "可下载更新", value: `${downloadableModUpdates.length} 个` }
+        { label: "可下载更新", value: `${candidates.length} 个` }
       ],
       details: descriptors.map(
         (descriptor) => `${descriptor.candidate.installed.name}: ${formatModUpdateVersionChange(descriptor.candidate)}`
@@ -211,7 +211,9 @@ export function useModInstallWorkflow({
     });
     if (!confirmed) return;
     completedModUpdatePaths.current.clear();
-    const items = descriptors.map((descriptor) => createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn));
+    const items = descriptors.map((descriptor) =>
+      createModUpdateExecutableItem(descriptor.candidate, descriptor.dependsOn, undefined, { prepareDependencies: false })
+    );
     try {
       setLoading(true, `正在更新 ${items.length} 个 Mod...`);
       const result = await startDownloadTask(createOperationId("mod-update-task"), items, "mod-update");
@@ -262,7 +264,8 @@ export function useModInstallWorkflow({
   function createModUpdateExecutableItem(
     candidate: ModUpdateCandidate,
     dependsOn: string[] = [],
-    prepared?: { dependencies: ExecutableDownloadTaskItem[]; staged: StagedDownload }
+    prepared?: { dependencies: ExecutableDownloadTaskItem[]; staged: StagedDownload },
+    options: { prepareDependencies?: boolean } = {}
   ): ExecutableDownloadTaskItem {
     const descriptor = createSingleModUpdateTaskDescriptor(candidate);
     return {
@@ -274,7 +277,9 @@ export function useModInstallWorkflow({
       cleanupStaged: cleanupStagedDownload,
       prepareInstall: prepared
         ? async () => prepared.dependencies
-        : async (staged) => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新", staged),
+        : options.prepareDependencies === false
+          ? undefined
+          : async (staged) => await prepareDependencyItems(candidate.entry, candidate.installed.name, "更新", staged),
       install: async (staged) => {
         const result = await installStagedMod(celestePath, staged.stagedId, candidate.entry, candidate.installed.absolutePath);
         setScan(result.scan);
@@ -338,6 +343,14 @@ export function useModInstallWorkflow({
   });
 
   async function performCatalogInstall(entry: ModCatalogEntry, message: string, successMessage: string) {
+    if (entry.name === "Mock Download Failure") {
+      return await runExecutableDownloadTask(
+        createOperationId("mod-install-task"),
+        [createCatalogInstallExecutableItem(entry)],
+        message,
+        successMessage
+      );
+    }
     const preview = await prepareTargetDependencyPreview(entry, entry.name, "安装");
     if (!preview) return false;
     return await runExecutableDownloadTask(

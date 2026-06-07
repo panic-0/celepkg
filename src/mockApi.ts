@@ -72,6 +72,8 @@ let scan = createMockScan(profiles, selectedSaveFiles);
 const catalogEntries = createMockCatalog();
 const stagedDownloads = new Map<string, StagedDownload>();
 const stagedDownloadMetadata = new Map<string, ModMetadata>();
+const mockDownloadFailureMessage = "下载 Mod 失败：网络连接已中断，无法继续读取远端文件。";
+const mockInstallFailureMessage = "暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)";
 let backups: BackupInfo[] = [
   backup("1770048600000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770048600000000000-auto", true, true),
   backup("1770045000000000000-auto", "auto", "D:\\Games\\Celeste\\celepkg\\backups\\1770045000000000000-auto", true, false),
@@ -204,7 +206,13 @@ export const mockApi = {
       .flatMap((entry) => {
         const record = installed.find((item) => item.name.toLowerCase() === entry.name.toLowerCase());
         if (!record) return [];
-        const updateAvailable = ["CommunalHelper", "Galactica", "Mock Dependency Tree Root"].includes(record.name);
+        const updateAvailable = [
+          "CommunalHelper",
+          "Galactica",
+          "Mock Install Failure",
+          "Mock Download Failure",
+          "Mock Dependency Tree Root"
+        ].includes(record.name);
         return [
           {
             entry,
@@ -297,7 +305,7 @@ export const mockApi = {
   async installStagedEverest(_celestePath: string, stagedId: string, release: EverestRelease): Promise<EverestInstallResult> {
     requireStagedDownload(stagedId, "everest");
     stagedDownloads.delete(stagedId);
-    await delay(1100);
+    await delay(100);
     scan = {
       ...scan,
       otherMods: scan.otherMods.map((item) =>
@@ -319,6 +327,7 @@ export const mockApi = {
     void _taskIndex;
     void _taskTotal;
     await delay(300);
+    if (entry.name === "Mock Download Failure") throw new Error(mockDownloadFailureMessage);
     const staged = stagedDownload(`mod-${entry.id || entry.name}-${operationId}`, entry.name, "mod", entry.size, entry.xxHash[0] ?? null);
     stagedDownloads.set(staged.stagedId, staged);
     stagedDownloadMetadata.set(staged.stagedId, mockUpdateMetadata(entry));
@@ -343,7 +352,8 @@ export const mockApi = {
     requireStagedDownload(stagedId, "mod");
     stagedDownloads.delete(stagedId);
     stagedDownloadMetadata.delete(stagedId);
-    await delay(installedPath ? 1100 : 900);
+    await delay(100);
+    if (entry.name === "Mock Install Failure") throw new Error(mockInstallFailureMessage);
     if (installedPath) {
       scan = updateRecord(scan, entry.name.toLowerCase().replace(/\s+/g, "-"), (item) => ({
         ...item,

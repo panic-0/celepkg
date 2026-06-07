@@ -311,6 +311,15 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   await page.getByRole("button", { name: "其他 Mod" }).click();
   await page.getByRole("button", { name: "检查更新" }).click();
   await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
+  const updateFilter = page.locator(".mod-filters .field", { has: page.locator("span", { hasText: /^状态$/ }) }).locator("select");
+  await expect(updateFilter).toHaveCount(1);
+  await updateFilter.selectOption("updates");
+  await expect(page.locator(".record-panel")).toContainText("Mock Install Failure");
+  await expect(page.locator(".record-panel")).toContainText("Mock Download Failure");
+  const updateTitle = await page.locator(".update-all-button").getAttribute("title");
+  const updateCount = Number(updateTitle?.match(/更新全部 (\d+) 个 Mod/)?.[1] ?? 0);
+  const shownUpdateCount = await page.locator(".record-list-title p").textContent();
+  expect(shownUpdateCount).toContain(`${updateCount} /`);
 
   await page.getByRole("button", { name: /更新全部/ }).click();
   const updateDialog = page.locator(".confirm-dialog", { hasText: "批量更新 Mod" });
@@ -323,6 +332,26 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   await openNav(page, "下载管理");
   await expect(page.getByRole("heading", { name: "下载管理" })).toBeVisible();
   await expect(page.locator(".download-task-panel")).toContainText(/下载中 [1-9]/);
+  const taskOrder = await page.locator(".download-task-panel").evaluate((panel) => {
+    const text = panel.textContent ?? "";
+    return {
+      downloadFailure: text.indexOf("Mock Download Failure"),
+      helper: text.indexOf("Mock Helper 001"),
+      installFailure: text.indexOf("Mock Install Failure")
+    };
+  });
+  expect(taskOrder.installFailure).toBeGreaterThanOrEqual(0);
+  expect(taskOrder.downloadFailure).toBeGreaterThanOrEqual(0);
+  expect(taskOrder.helper).toBeGreaterThan(taskOrder.installFailure);
+  expect(taskOrder.helper).toBeGreaterThan(taskOrder.downloadFailure);
+  await expect(page.locator(".download-task-panel")).toContainText("安装失败 1", { timeout: 5000 });
+  await expect(page.locator(".download-task-panel")).toContainText("下载失败 1", { timeout: 5000 });
+  await expect(page.locator(".download-task-panel")).toContainText("暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)");
+  await expect(page.locator(".download-task-panel")).toContainText("下载 Mod 失败：网络连接已中断，无法继续读取远端文件。");
+  const installFailureMessage = page.locator(".download-task-group em.download-task-error", { hasText: "暂存旧 Mod 失败" });
+  await expect(installFailureMessage).toHaveCSS("white-space", "normal");
+  await expect(installFailureMessage).toHaveCSS("overflow-wrap", "anywhere");
+  await expect(installFailureMessage).toHaveCSS("text-overflow", "clip");
 
   await page.getByRole("button", { name: "停止下载" }).click();
   await expect(page.getByRole("button", { name: "恢复下载" })).toBeVisible();
@@ -331,6 +360,10 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
 
   await page.getByRole("button", { name: "取消下载" }).click();
   await expect(page.locator(".download-task-panel")).toContainText(/下载失败 [1-9]/);
+  const failedMessage = page.locator(".download-task-group em.download-task-error").first();
+  await expect(failedMessage).toHaveCSS("white-space", "normal");
+  await expect(failedMessage).toHaveCSS("overflow-wrap", "anywhere");
+  await expect(failedMessage).toHaveCSS("text-overflow", "clip");
   await page.waitForTimeout(500);
 
   await page.getByRole("button", { name: "重试失败" }).click();

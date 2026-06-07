@@ -201,6 +201,7 @@ function createMockScanState(): ScanResult {
       description: "用于检查较长 Mod 名称与列表密度。",
       version: "0.5.0"
     }),
+    ...createMockFailureMods(),
     ...createMockDependencyTreeMods(),
     ...createMockBulkMods()
   ];
@@ -300,6 +301,31 @@ function createMockBulkMods(): ModRecord[] {
           : []
     });
   });
+}
+
+function createMockFailureMods(): ModRecord[] {
+  return [
+    record({
+      id: "mock-install-failure",
+      name: "Mock Install Failure",
+      fileName: "MockInstallFailure.zip",
+      relativePath: "Mods/MockInstallFailure.zip",
+      kind: "mod",
+      enabled: true,
+      description: "Mock 更新失败样例：下载成功后在安装阶段失败。",
+      version: "0.9.0"
+    }),
+    record({
+      id: "mock-download-failure",
+      name: "Mock Download Failure",
+      fileName: "MockDownloadFailure.zip",
+      relativePath: "Mods/MockDownloadFailure.zip",
+      kind: "mod",
+      enabled: true,
+      description: "Mock 更新失败样例：下载阶段失败。",
+      version: "0.9.0"
+    })
+  ];
 }
 
 function createMockDependencyTreeMods(): ModRecord[] {

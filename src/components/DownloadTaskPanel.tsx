@@ -77,16 +77,21 @@ function TaskGroup({ emptyText, items, task, title }: { emptyText: string; items
       <h3>{`${title} ${items.length}`}</h3>
       {items.length ? (
         <ul>
-          {items.map((item) => (
-            <li key={item.id}>
-              <span>
-                <strong title={item.name}>{item.name}</strong>
-                {item.detail && <small title={item.detail}>{item.detail}</small>}
-                <small>{formatTaskItemKind(item.kind)}</small>
-              </span>
-              <em>{formatTaskItemMeta(item, task)}</em>
-            </li>
-          ))}
+          {items.map((item) => {
+            const meta = formatTaskItemMeta(item, task);
+            return (
+              <li key={item.id}>
+                <span>
+                  <strong title={item.name}>{item.name}</strong>
+                  {item.detail && <small title={item.detail}>{item.detail}</small>}
+                  <small>{formatTaskItemKind(item.kind)}</small>
+                </span>
+                <em className={item.error ? "download-task-error" : undefined} title={meta}>
+                  {meta}
+                </em>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p>{emptyText}</p>

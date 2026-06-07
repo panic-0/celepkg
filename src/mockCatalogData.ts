@@ -2,6 +2,24 @@ import type { EverestRelease, ModCatalogEntry, ModCatalogSourceKind, ModMetadata
 
 export function createMockCatalog(): ModCatalogEntry[] {
   return [
+    catalogEntry(
+      "everestMirror",
+      "Mock Install Failure",
+      "1.0.0",
+      "Mod",
+      "https://gamebanana.com/mmdl/5560",
+      ["mock-install-failure-hash"],
+      "Tools"
+    ),
+    catalogEntry(
+      "everestMirror",
+      "Mock Download Failure",
+      "1.0.0",
+      "Mod",
+      "https://example.invalid/mock-download-failure",
+      ["mock-download-failure-hash"],
+      "Tools"
+    ),
     catalogEntry("everestMirror", "CommunalHelper", "1.24.3", "Mod", "https://gamebanana.com/mmdl/1111", ["new-communal-hash"], "Helpers"),
     catalogEntry(
       "everestMirror",
