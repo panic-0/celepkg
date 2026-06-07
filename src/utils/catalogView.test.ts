@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ModCatalogEntry, ModRecord } from "../types";
+import type { ModCatalogEntry } from "../types";
 import { createDownloadTask } from "./downloadTask";
 import {
   buildCatalogEntryViews,
@@ -10,6 +10,7 @@ import {
   type CatalogFilters
 } from "./catalogView";
 import { buildPageItems } from "./pagination";
+import { createModRecord } from "./testFixtures";
 
 function entry(name: string, partial: Partial<ModCatalogEntry> = {}): ModCatalogEntry {
   return {
@@ -28,33 +29,6 @@ function entry(name: string, partial: Partial<ModCatalogEntry> = {}): ModCatalog
     lastUpdate: 1000,
     xxHash: [],
     ...partial
-  };
-}
-
-function record(name: string): ModRecord {
-  return {
-    id: name.toLowerCase(),
-    name,
-    fileName: `${name}.zip`,
-    relativePath: `Mods/${name}.zip`,
-    absolutePath: `D:\\Games\\Celeste\\Mods\\${name}.zip`,
-    isArchive: true,
-    kind: "mod",
-    enabled: true,
-    favorite: false,
-    protected: false,
-    readOnly: false,
-    metadata: { name, version: "1.0.0", author: "", description: "", dependencies: [], optionalDependencies: [] },
-    mapIds: [],
-    subMaps: [],
-    mapCount: 0,
-    strawberryCount: 0,
-    strawberryTotalCount: 0,
-    completionStatus: "notApplicable",
-    dependencies: [],
-    optionalDependencies: [],
-    stats: null,
-    warnings: []
   };
 }
 
@@ -77,7 +51,7 @@ describe("catalog view model", () => {
       }
     ]);
 
-    const views = buildCatalogEntryViews([entry("Installed Helper"), queued], [record("Installed Helper")], task, "");
+    const views = buildCatalogEntryViews([entry("Installed Helper"), queued], [createModRecord("Installed Helper")], task, "");
 
     expect(views.map((view) => [view.entry.name, view.state])).toEqual([
       ["Installed Helper", "installed"],
@@ -93,7 +67,7 @@ describe("catalog view model", () => {
         entry("Installed Helper"),
         entry("Missing Link", { downloadUrl: "" })
       ],
-      [record("Installed Helper")],
+      [createModRecord("Installed Helper")],
       null,
       ""
     );

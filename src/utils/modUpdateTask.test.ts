@@ -6,6 +6,7 @@ import {
   createSingleModUpdateTaskDescriptor,
   formatModUpdateVersionChange
 } from "./modUpdateTask";
+import { createModRecord } from "./testFixtures";
 
 function entry(name: string): ModCatalogEntry {
   return {
@@ -27,30 +28,11 @@ function entry(name: string): ModCatalogEntry {
 }
 
 function record(id: string, name: string, dependencies = [] as ModRecord["dependencies"]): ModRecord {
-  return {
+  return createModRecord(name, {
     id,
-    name,
-    fileName: `${name}.zip`,
-    relativePath: `Mods/${name}.zip`,
-    absolutePath: `D:\\Games\\Celeste\\Mods\\${name}.zip`,
-    isArchive: true,
-    kind: "mod",
-    enabled: true,
-    favorite: false,
-    protected: false,
-    readOnly: false,
-    metadata: { name, version: "1.0.0", author: "", description: "", dependencies, optionalDependencies: [] },
-    mapIds: [],
-    subMaps: [],
-    mapCount: 0,
-    strawberryCount: 0,
-    strawberryTotalCount: 0,
-    completionStatus: "notApplicable",
     dependencies,
-    optionalDependencies: [],
-    stats: null,
-    warnings: []
-  };
+    metadata: { dependencies }
+  });
 }
 
 function candidate(recordItem: ModRecord, entryName = recordItem.name): ModUpdateCandidate {

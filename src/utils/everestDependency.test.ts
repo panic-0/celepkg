@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EverestRelease, ModRecord } from "../types";
+import type { EverestRelease } from "../types";
 import {
   formatEverestBuildVersion,
   installedEverestBuild,
@@ -7,6 +7,7 @@ import {
   requiredEverestBuild,
   selectEverestReleaseForBuild
 } from "./everestDependency";
+import { createModRecord } from "./testFixtures";
 
 describe("everest dependency helpers", () => {
   it("recognizes Everest dependency name variants", () => {
@@ -31,7 +32,7 @@ describe("everest dependency helpers", () => {
   });
 
   it("reads the installed Everest build from Everest or EverestCore records", () => {
-    expect(installedEverestBuild([record("EverestCore", "1.5577.0")])).toBe(5577);
+    expect(installedEverestBuild([createModRecord("EverestCore", { id: "EverestCore", metadata: { version: "1.5577.0" } })])).toBe(5577);
   });
 
   it("formats an Everest build as a version", () => {
@@ -49,32 +50,5 @@ function release(version: number): EverestRelease {
     mainDownload: "",
     mirrorDownload: "",
     isNative: false
-  };
-}
-
-function record(name: string, version: string): ModRecord {
-  return {
-    id: name,
-    name,
-    fileName: `${name}.zip`,
-    relativePath: `Mods/${name}.zip`,
-    absolutePath: `D:\\Games\\Celeste\\Mods\\${name}.zip`,
-    isArchive: true,
-    kind: "mod",
-    enabled: true,
-    favorite: false,
-    protected: false,
-    readOnly: false,
-    metadata: { name, version, author: "", description: "", dependencies: [], optionalDependencies: [] },
-    mapIds: [],
-    subMaps: [],
-    mapCount: 0,
-    strawberryCount: 0,
-    strawberryTotalCount: 0,
-    completionStatus: "notApplicable",
-    dependencies: [],
-    optionalDependencies: [],
-    stats: null,
-    warnings: []
   };
 }
