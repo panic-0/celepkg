@@ -46,100 +46,142 @@ async function invokeChecked<T>(command: string, validator: (value: unknown) => 
   return validator(await invoke<unknown>(command, args));
 }
 
+async function callApi<T>(
+  mockCall: () => Promise<T>,
+  command: string,
+  validator: (value: unknown) => T,
+  args?: Record<string, unknown>
+): Promise<T> {
+  if (isMockMode()) return mockCall();
+  return invokeChecked(command, validator, args);
+}
+
 export async function getConfig(): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.getConfig();
-  return invokeChecked("get_config", validateConfigResponse);
+  return callApi(() => mockApi.getConfig(), "get_config", validateConfigResponse);
 }
 
 export async function setCelestePath(celestePath: string): Promise<{ celestePath: string }> {
-  if (isMockMode()) return mockApi.setCelestePath(celestePath);
-  return invokeChecked("set_celeste_path", validateCelestePathResponse, { celestePath });
+  return callApi(() => mockApi.setCelestePath(celestePath), "set_celeste_path", validateCelestePathResponse, { celestePath });
 }
 
 export async function selectCelesteDirectory(): Promise<string | null> {
-  if (isMockMode()) return mockApi.selectCelesteDirectory();
-  return invokeChecked("select_celeste_directory", validateNullableString);
+  return callApi(() => mockApi.selectCelesteDirectory(), "select_celeste_directory", validateNullableString);
 }
 
 export async function setAutoBackupEnabled(autoBackupEnabled: boolean): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setAutoBackupEnabled(autoBackupEnabled);
-  return invokeChecked("set_auto_backup_enabled", validateConfigResponse, { autoBackupEnabled });
+  return callApi(() => mockApi.setAutoBackupEnabled(autoBackupEnabled), "set_auto_backup_enabled", validateConfigResponse, {
+    autoBackupEnabled
+  });
 }
 
 export async function setAutoBackupCleanupEnabled(autoBackupCleanupEnabled: boolean): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setAutoBackupCleanupEnabled(autoBackupCleanupEnabled);
-  return invokeChecked("set_auto_backup_cleanup_enabled", validateConfigResponse, { autoBackupCleanupEnabled });
+  return callApi(
+    () => mockApi.setAutoBackupCleanupEnabled(autoBackupCleanupEnabled),
+    "set_auto_backup_cleanup_enabled",
+    validateConfigResponse,
+    {
+      autoBackupCleanupEnabled
+    }
+  );
 }
 
 export async function setAutoBackupRetentionCount(autoBackupRetentionCount: number): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setAutoBackupRetentionCount(autoBackupRetentionCount);
-  return invokeChecked("set_auto_backup_retention_count", validateConfigResponse, { autoBackupRetentionCount });
+  return callApi(
+    () => mockApi.setAutoBackupRetentionCount(autoBackupRetentionCount),
+    "set_auto_backup_retention_count",
+    validateConfigResponse,
+    {
+      autoBackupRetentionCount
+    }
+  );
 }
 
 export async function setModCatalogSources(
   modCatalogSourceOrder: ModCatalogSourceKind[],
   modCatalogSourceEnabledCount: number
 ): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setModCatalogSources(modCatalogSourceOrder, modCatalogSourceEnabledCount);
-  return invokeChecked("set_mod_catalog_sources", validateConfigResponse, { modCatalogSourceOrder, modCatalogSourceEnabledCount });
+  return callApi(
+    () => mockApi.setModCatalogSources(modCatalogSourceOrder, modCatalogSourceEnabledCount),
+    "set_mod_catalog_sources",
+    validateConfigResponse,
+    {
+      modCatalogSourceOrder,
+      modCatalogSourceEnabledCount
+    }
+  );
 }
 
 export async function setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStartup: boolean): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStartup);
-  return invokeChecked("set_auto_check_mod_updates_on_startup", validateConfigResponse, { autoCheckModUpdatesOnStartup });
+  return callApi(
+    () => mockApi.setAutoCheckModUpdatesOnStartup(autoCheckModUpdatesOnStartup),
+    "set_auto_check_mod_updates_on_startup",
+    validateConfigResponse,
+    { autoCheckModUpdatesOnStartup }
+  );
 }
 
 export async function setAutoCheckAppUpdatesOnStartup(autoCheckAppUpdatesOnStartup: boolean): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setAutoCheckAppUpdatesOnStartup(autoCheckAppUpdatesOnStartup);
-  return invokeChecked("set_auto_check_app_updates_on_startup", validateConfigResponse, { autoCheckAppUpdatesOnStartup });
+  return callApi(
+    () => mockApi.setAutoCheckAppUpdatesOnStartup(autoCheckAppUpdatesOnStartup),
+    "set_auto_check_app_updates_on_startup",
+    validateConfigResponse,
+    { autoCheckAppUpdatesOnStartup }
+  );
 }
 
 export async function setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup: boolean): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup);
-  return invokeChecked("set_auto_refresh_mod_catalog_cache_on_startup", validateConfigResponse, { autoRefreshModCatalogCacheOnStartup });
+  return callApi(
+    () => mockApi.setAutoRefreshModCatalogCacheOnStartup(autoRefreshModCatalogCacheOnStartup),
+    "set_auto_refresh_mod_catalog_cache_on_startup",
+    validateConfigResponse,
+    { autoRefreshModCatalogCacheOnStartup }
+  );
 }
 
 export async function setSelectedSaveFiles(saveFiles: string[]): Promise<ConfigResponse> {
-  if (isMockMode()) return mockApi.setSelectedSaveFiles(saveFiles);
-  return invokeChecked("set_selected_save_files", validateConfigResponse, { saveFiles });
+  return callApi(() => mockApi.setSelectedSaveFiles(saveFiles), "set_selected_save_files", validateConfigResponse, { saveFiles });
 }
 
 export async function scanCeleste(celestePath: string): Promise<ScanResult> {
-  if (isMockMode()) return mockApi.scanCeleste(celestePath);
-  return invokeChecked("scan_celeste", validateScanResult, { celestePath });
+  return callApi(() => mockApi.scanCeleste(celestePath), "scan_celeste", validateScanResult, { celestePath });
 }
 
 export async function rescanCeleste(celestePath: string): Promise<ScanResult> {
-  if (isMockMode()) return mockApi.rescanCeleste(celestePath);
-  return invokeChecked("rescan_celeste", validateScanResult, { celestePath });
+  return callApi(() => mockApi.rescanCeleste(celestePath), "rescan_celeste", validateScanResult, { celestePath });
 }
 
 export async function searchModCatalog(query: string, sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
-  if (isMockMode()) return mockApi.searchModCatalog(query, sources);
-  return invokeChecked("search_mod_catalog", validateModCatalogSearchResult, { query, sources });
+  return callApi(() => mockApi.searchModCatalog(query, sources), "search_mod_catalog", validateModCatalogSearchResult, { query, sources });
 }
 
 export async function refreshModCatalogCache(sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
-  if (isMockMode()) return mockApi.refreshModCatalogCache(sources);
-  return invokeChecked("refresh_mod_catalog_cache", validateModCatalogSearchResult, { sources });
+  return callApi(() => mockApi.refreshModCatalogCache(sources), "refresh_mod_catalog_cache", validateModCatalogSearchResult, { sources });
 }
 
 export async function resolveModCatalogDependencies(
   dependencies: Dependency[],
   sources: ModCatalogSourceKind[]
 ): Promise<ModCatalogDependencyResolutionResult> {
-  if (isMockMode()) return mockApi.resolveModCatalogDependencies(dependencies, sources);
-  return invokeChecked("resolve_mod_catalog_dependencies", validateModCatalogDependencyResolutionResult, { dependencies, sources });
+  return callApi(
+    () => mockApi.resolveModCatalogDependencies(dependencies, sources),
+    "resolve_mod_catalog_dependencies",
+    validateModCatalogDependencyResolutionResult,
+    { dependencies, sources }
+  );
 }
 
 export async function checkModUpdates(celestePath: string, sources: ModCatalogSourceKind[]): Promise<ModUpdateCheckResult> {
-  if (isMockMode()) return mockApi.checkModUpdates(celestePath, sources);
-  return invokeChecked("check_mod_updates", validateModUpdateCheckResult, { celestePath, sources });
+  return callApi(() => mockApi.checkModUpdates(celestePath, sources), "check_mod_updates", validateModUpdateCheckResult, {
+    celestePath,
+    sources
+  });
 }
 
 export async function previewModUpdateMetadata(celestePath: string, entry: ModCatalogEntry): Promise<ModMetadata> {
-  if (isMockMode()) return mockApi.previewModUpdateMetadata(celestePath, entry);
-  return invokeChecked("preview_mod_update_metadata", validateModMetadata, { celestePath, entry });
+  return callApi(() => mockApi.previewModUpdateMetadata(celestePath, entry), "preview_mod_update_metadata", validateModMetadata, {
+    celestePath,
+    entry
+  });
 }
 
 export async function stageModPreview(
@@ -147,18 +189,22 @@ export async function stageModPreview(
   entry: ModCatalogEntry,
   operationId = createOperationId("mod-preview")
 ): Promise<ModPreviewStaging> {
-  if (isMockMode()) return mockApi.stageModPreview(celestePath, entry, operationId);
-  return invokeChecked("stage_mod_preview", validateModPreviewStaging, { celestePath, entry, operationId });
+  return callApi(() => mockApi.stageModPreview(celestePath, entry, operationId), "stage_mod_preview", validateModPreviewStaging, {
+    celestePath,
+    entry,
+    operationId
+  });
 }
 
 export async function readStagedModMetadata(celestePath: string, stagedId: string): Promise<ModMetadata> {
-  if (isMockMode()) return mockApi.readStagedModMetadata(celestePath, stagedId);
-  return invokeChecked("read_staged_mod_metadata", validateModMetadata, { celestePath, stagedId });
+  return callApi(() => mockApi.readStagedModMetadata(celestePath, stagedId), "read_staged_mod_metadata", validateModMetadata, {
+    celestePath,
+    stagedId
+  });
 }
 
 export async function listEverestReleases(): Promise<EverestReleaseList> {
-  if (isMockMode()) return mockApi.listEverestReleases();
-  return invokeChecked("list_everest_releases", validateEverestReleaseList);
+  return callApi(() => mockApi.listEverestReleases(), "list_everest_releases", validateEverestReleaseList);
 }
 
 export async function downloadEverestToStaging(
@@ -166,13 +212,29 @@ export async function downloadEverestToStaging(
   release: EverestRelease,
   operationId = createOperationId("everest")
 ): Promise<StagedDownload> {
-  if (isMockMode()) return mockApi.downloadEverestToStaging(celestePath, release, operationId);
-  return invokeChecked("download_everest_to_staging", validateStagedDownload, { celestePath, release, operationId });
+  return callApi(
+    () => mockApi.downloadEverestToStaging(celestePath, release, operationId),
+    "download_everest_to_staging",
+    validateStagedDownload,
+    {
+      celestePath,
+      release,
+      operationId
+    }
+  );
 }
 
 export async function installStagedEverest(celestePath: string, stagedId: string, release: EverestRelease): Promise<EverestInstallResult> {
-  if (isMockMode()) return mockApi.installStagedEverest(celestePath, stagedId, release);
-  return invokeChecked("install_staged_everest", validateEverestInstallResult, { celestePath, stagedId, release });
+  return callApi(
+    () => mockApi.installStagedEverest(celestePath, stagedId, release),
+    "install_staged_everest",
+    validateEverestInstallResult,
+    {
+      celestePath,
+      stagedId,
+      release
+    }
+  );
 }
 
 export async function downloadModToStaging(
@@ -182,8 +244,18 @@ export async function downloadModToStaging(
   taskIndex = 1,
   taskTotal = 1
 ): Promise<StagedDownload> {
-  if (isMockMode()) return mockApi.downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal);
-  return invokeChecked("download_mod_to_staging", validateStagedDownload, { celestePath, entry, operationId, taskIndex, taskTotal });
+  return callApi(
+    () => mockApi.downloadModToStaging(celestePath, entry, operationId, taskIndex, taskTotal),
+    "download_mod_to_staging",
+    validateStagedDownload,
+    {
+      celestePath,
+      entry,
+      operationId,
+      taskIndex,
+      taskTotal
+    }
+  );
 }
 
 export async function installStagedMod(
@@ -192,38 +264,44 @@ export async function installStagedMod(
   entry: ModCatalogEntry,
   installedPath?: string
 ): Promise<ModInstallResult> {
-  if (isMockMode()) return mockApi.installStagedMod(celestePath, stagedId, entry, installedPath);
-  return invokeChecked("install_staged_mod", validateModInstallResult, {
-    celestePath,
-    stagedId,
-    entry,
-    installedPath: installedPath ?? null
-  });
+  return callApi(
+    () => mockApi.installStagedMod(celestePath, stagedId, entry, installedPath),
+    "install_staged_mod",
+    validateModInstallResult,
+    {
+      celestePath,
+      stagedId,
+      entry,
+      installedPath: installedPath ?? null
+    }
+  );
 }
 
 export async function deleteStagedDownload(celestePath: string, stagedId: string): Promise<boolean> {
-  if (isMockMode()) return mockApi.deleteStagedDownload(celestePath, stagedId);
-  return invokeChecked("delete_staged_download", validateBoolean, { celestePath, stagedId });
+  return callApi(() => mockApi.deleteStagedDownload(celestePath, stagedId), "delete_staged_download", validateBoolean, {
+    celestePath,
+    stagedId
+  });
 }
 
 export async function cancelModDownload(operationId: string): Promise<boolean> {
-  if (isMockMode()) return mockApi.cancelModDownload(operationId);
-  return invokeChecked("cancel_mod_download", validateBoolean, { operationId });
+  return callApi(() => mockApi.cancelModDownload(operationId), "cancel_mod_download", validateBoolean, { operationId });
 }
 
 export async function saveProfile(profile: Partial<Profile> & { name: string }): Promise<ProfilesState> {
-  if (isMockMode()) return mockApi.saveProfile(profile);
-  return invokeChecked("save_profile", validateProfilesState, { profile });
+  return callApi(() => mockApi.saveProfile(profile), "save_profile", validateProfilesState, { profile });
 }
 
 export async function deleteProfile(profileId: string): Promise<ProfilesState> {
-  if (isMockMode()) return mockApi.deleteProfile(profileId);
-  return invokeChecked("delete_profile", validateProfilesState, { profileId });
+  return callApi(() => mockApi.deleteProfile(profileId), "delete_profile", validateProfilesState, { profileId });
 }
 
 export async function applyProfile(celestePath: string, mapProfileId: string, modProfileId: string): Promise<ScanResult> {
-  if (isMockMode()) return mockApi.applyProfile(celestePath, mapProfileId, modProfileId);
-  return invokeChecked("apply_profile", validateScanResult, { celestePath, mapProfileId, modProfileId });
+  return callApi(() => mockApi.applyProfile(celestePath, mapProfileId, modProfileId), "apply_profile", validateScanResult, {
+    celestePath,
+    mapProfileId,
+    modProfileId
+  });
 }
 
 export async function launchProfile(
@@ -231,66 +309,66 @@ export async function launchProfile(
   mapProfileId: string,
   modProfileId: string
 ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
-  if (isMockMode()) return mockApi.launchProfile(celestePath, mapProfileId, modProfileId);
-  return invokeChecked("launch_profile", validateLaunchResult, { celestePath, mapProfileId, modProfileId });
+  return callApi(() => mockApi.launchProfile(celestePath, mapProfileId, modProfileId), "launch_profile", validateLaunchResult, {
+    celestePath,
+    mapProfileId,
+    modProfileId
+  });
 }
 
 export async function launchGame(
   celestePath: string,
   launchArgs: string
 ): Promise<{ launched: boolean; executable: string; mapProfileId: string; modProfileId: string }> {
-  if (isMockMode()) return mockApi.launchGame(celestePath, launchArgs);
-  return invokeChecked("launch_game", validateLaunchResult, { celestePath, launchArgs });
+  return callApi(() => mockApi.launchGame(celestePath, launchArgs), "launch_game", validateLaunchResult, { celestePath, launchArgs });
 }
 
 export async function setRecordFavorite(celestePath: string, recordId: string, favorite: boolean): Promise<ScanResult> {
-  if (isMockMode()) return mockApi.setRecordFavorite(celestePath, recordId, favorite);
-  return invokeChecked("set_record_favorite", validateScanResult, { celestePath, recordId, favorite });
+  return callApi(() => mockApi.setRecordFavorite(celestePath, recordId, favorite), "set_record_favorite", validateScanResult, {
+    celestePath,
+    recordId,
+    favorite
+  });
 }
 
 export async function setRecordProtected(celestePath: string, recordId: string, protectedValue: boolean): Promise<ScanResult> {
-  if (isMockMode()) return mockApi.setRecordProtected(celestePath, recordId, protectedValue);
-  return invokeChecked("set_record_protected", validateScanResult, { celestePath, recordId, protected: protectedValue });
+  return callApi(() => mockApi.setRecordProtected(celestePath, recordId, protectedValue), "set_record_protected", validateScanResult, {
+    celestePath,
+    recordId,
+    protected: protectedValue
+  });
 }
 
 export async function createBackup(celestePath: string, kind: "manual" | "auto" = "manual"): Promise<BackupInfo> {
-  if (isMockMode()) return mockApi.createBackup(celestePath, kind);
-  return invokeChecked("create_backup", validateBackupInfo, { celestePath, kind });
+  return callApi(() => mockApi.createBackup(celestePath, kind), "create_backup", validateBackupInfo, { celestePath, kind });
 }
 
 export async function listBackups(): Promise<BackupInfo[]> {
-  if (isMockMode()) return mockApi.listBackups();
-  return invokeChecked("list_backups", validateBackupList);
+  return callApi(() => mockApi.listBackups(), "list_backups", validateBackupList);
 }
 
 export async function restoreBackup(backupId: string, scope: RestoreScope): Promise<BackupInfo> {
-  if (isMockMode()) return mockApi.restoreBackup(backupId, scope);
-  return invokeChecked("restore_backup", validateBackupInfo, { backupId, scope });
+  return callApi(() => mockApi.restoreBackup(backupId, scope), "restore_backup", validateBackupInfo, { backupId, scope });
 }
 
 export async function deleteBackup(backupId: string): Promise<void> {
-  if (isMockMode()) return mockApi.deleteBackup(backupId);
-  return invokeChecked("delete_backup", validateVoid, { backupId });
+  return callApi(() => mockApi.deleteBackup(backupId), "delete_backup", validateVoid, { backupId });
 }
 
 export async function cleanupAutoBackups(): Promise<BackupInfo[]> {
-  if (isMockMode()) return mockApi.cleanupAutoBackups();
-  return invokeChecked("cleanup_auto_backups", validateBackupList);
+  return callApi(() => mockApi.cleanupAutoBackups(), "cleanup_auto_backups", validateBackupList);
 }
 
 export async function openBackupFolder(celestePath: string): Promise<void> {
-  if (isMockMode()) return mockApi.openBackupFolder(celestePath);
-  return invokeChecked("open_backup_folder", validateVoid, { celestePath });
+  return callApi(() => mockApi.openBackupFolder(celestePath), "open_backup_folder", validateVoid, { celestePath });
 }
 
 export async function openBackupLocation(backupPath: string): Promise<void> {
-  if (isMockMode()) return mockApi.openBackupLocation(backupPath);
-  return invokeChecked("open_backup_location", validateVoid, { backupPath });
+  return callApi(() => mockApi.openBackupLocation(backupPath), "open_backup_location", validateVoid, { backupPath });
 }
 
 export async function openModLocation(absolutePath: string): Promise<void> {
-  if (isMockMode()) return mockApi.openModLocation(absolutePath);
-  return invokeChecked("open_mod_location", validateVoid, { absolutePath });
+  return callApi(() => mockApi.openModLocation(absolutePath), "open_mod_location", validateVoid, { absolutePath });
 }
 
 export function createOperationId(prefix: string) {
