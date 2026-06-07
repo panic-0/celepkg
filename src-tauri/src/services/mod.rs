@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod download;
 pub mod everest;
 pub mod game;
 pub mod mod_catalog;

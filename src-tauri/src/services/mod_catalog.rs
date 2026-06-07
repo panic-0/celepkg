@@ -2,9 +2,16 @@ use crate::dependency_rules::version_too_low;
 use crate::domain::{Dependency, StagedDownload};
 use crate::domain::{
     InstalledModMatch, ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult,
-    ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModDownloadProgress,
-    ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate, ModUpdateCheckResult,
-    ProfilesState,
+    ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ModInstallResult, ModMetadata,
+    ModRecord, ModUpdateCandidate, ModUpdateCheckResult, ProfilesState,
+};
+#[cfg(test)]
+use crate::services::download::DownloadProgressThrottle;
+pub use crate::services::download::ModDownloadReporter;
+use crate::services::download::{
+    download_url_to_file, emit_progress as emit_download_progress, ensure_not_cancelled,
+    resolve_staged_download_path, staged_id_from_path,
+    staging_download_path as shared_staging_download_path, StagingDownloadFile,
 };
 use crate::services::mod_catalog_cache::{
     read_catalog_cache, read_valid_catalog_cache, write_catalog_cache,
@@ -14,10 +21,9 @@ use crate::utils::{normalize_dependency_name, normalize_slash, stable_id};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
-use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, UNIX_EPOCH};
 use xxhash_rust::xxh64::Xxh64;
 use zip::ZipArchive;
 
@@ -30,69 +36,13 @@ const CATALOG_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const CATALOG_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
-const DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(120);
 const INSTALLED_MOD_HASH_CACHE_VERSION: u32 = 1;
-
-#[derive(Clone, Copy)]
-pub struct ModDownloadReporter<'a> {
-    pub operation_id: &'a str,
-    pub progress: Option<&'a (dyn Fn(ModDownloadProgress) + Send + Sync)>,
-    pub cancel_token: Option<&'a AtomicBool>,
-    pub task_index: usize,
-    pub task_total: usize,
-}
 
 pub struct ModInstallContext<'a> {
     pub profiles: ProfilesState,
     pub protected_record_ids: &'a [String],
     pub selected_save_files: &'a [String],
     pub reporter: Option<ModDownloadReporter<'a>>,
-}
-
-pub(crate) struct DownloadProgressThrottle {
-    total: Option<u64>,
-    last_emit: Instant,
-    last_downloaded: u64,
-    last_percent: Option<u64>,
-}
-
-impl DownloadProgressThrottle {
-    pub(crate) fn new(total: Option<u64>) -> Self {
-        Self {
-            total,
-            last_emit: Instant::now(),
-            last_downloaded: 0,
-            last_percent: progress_percent(0, total),
-        }
-    }
-
-    pub(crate) fn should_emit(&mut self, downloaded: u64) -> bool {
-        if downloaded <= self.last_downloaded {
-            return false;
-        }
-
-        let percent = progress_percent(downloaded, self.total);
-        let first_chunk = self.last_downloaded == 0;
-        let percent_changed = percent != self.last_percent;
-        let interval_elapsed = self.last_emit.elapsed() >= DOWNLOAD_PROGRESS_INTERVAL;
-        let completed = self
-            .total
-            .is_some_and(|total| total > 0 && downloaded >= total);
-
-        if first_chunk || percent_changed || interval_elapsed || completed {
-            self.last_emit = Instant::now();
-            self.last_downloaded = downloaded;
-            self.last_percent = percent;
-            return true;
-        }
-
-        false
-    }
-}
-
-fn progress_percent(downloaded: u64, total: Option<u64>) -> Option<u64> {
-    let total = total.filter(|total| *total > 0)?;
-    Some((((downloaded as u128) * 100 / (total as u128)).min(100)) as u64)
 }
 
 pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
@@ -392,9 +342,16 @@ fn download_entry(
     let client = download_client()?;
     let mut last_error = None;
     for url in mirror_urls(&entry.download_url) {
-        ensure_download_not_cancelled(reporter)?;
+        ensure_not_cancelled(reporter)?;
         let _ = fs::remove_file(staging.path());
-        match download_url_to_file(&client, &url, staging.path(), entry, reporter) {
+        match download_url_to_file(
+            &client,
+            &url,
+            staging.path(),
+            &entry.name,
+            entry.size,
+            reporter,
+        ) {
             Ok(()) => {
                 emit_download_progress(reporter, &entry.name, "verifying", 0, None, 0.0, &url);
                 let hash = xxh64_file(staging.path())?;
@@ -442,34 +399,6 @@ fn download_client() -> Result<reqwest::blocking::Client, String> {
         .map_err(|error| format!("初始化下载客户端失败：{error}"))
 }
 
-struct StagingDownloadFile {
-    path: PathBuf,
-    keep: bool,
-}
-
-impl StagingDownloadFile {
-    fn new(path: PathBuf) -> Self {
-        Self { path, keep: false }
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn keep(&mut self) -> PathBuf {
-        self.keep = true;
-        self.path.clone()
-    }
-}
-
-impl Drop for StagingDownloadFile {
-    fn drop(&mut self) {
-        if !self.keep {
-            let _ = fs::remove_file(&self.path);
-        }
-    }
-}
-
 fn staging_download_path(
     celeste_path: &Path,
     entry: &ModCatalogEntry,
@@ -480,145 +409,7 @@ fn staging_download_path(
     } else {
         format!("{}-{operation_id}", entry.id)
     };
-    celeste_path
-        .join(".celepkg")
-        .join("downloads")
-        .join("staging")
-        .join(format!("{}.zip.download", stable_id(&key)))
-}
-
-fn staged_id_from_path(path: &Path) -> Result<String, String> {
-    path.file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .filter(|name| !name.trim().is_empty())
-        .ok_or_else(|| "生成 staging id 失败".to_string())
-}
-
-fn is_staged_download_file_name(staged_id: &str) -> bool {
-    staged_id.strip_suffix(".zip.download").is_some_and(|id| {
-        id.len() == 16
-            && id
-                .bytes()
-                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-    })
-}
-
-fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<PathBuf, String> {
-    let mut components = Path::new(staged_id).components();
-    let is_single_file_name = matches!(
-        components.next(),
-        Some(Component::Normal(name)) if name == std::ffi::OsStr::new(staged_id)
-    ) && components.next().is_none();
-
-    if staged_id.trim().is_empty()
-        || staged_id.contains('/')
-        || staged_id.contains('\\')
-        || staged_id.contains("..")
-        || !is_single_file_name
-        || !is_staged_download_file_name(staged_id)
-    {
-        return Err("无效的 staging id".to_string());
-    }
-    let staging_dir = celeste_path
-        .join(".celepkg")
-        .join("downloads")
-        .join("staging");
-    Ok(staging_dir.join(staged_id))
-}
-
-fn download_url_to_file(
-    client: &reqwest::blocking::Client,
-    url: &str,
-    destination: &Path,
-    entry: &ModCatalogEntry,
-    reporter: ModDownloadReporter<'_>,
-) -> Result<(), String> {
-    ensure_download_not_cancelled(reporter)?;
-    let mut response = client
-        .get(url)
-        .send()
-        .map_err(|error| format!("请求失败：{error}"))?
-        .error_for_status()
-        .map_err(|error| format!("服务器返回错误：{error}"))?;
-    let total = response.content_length().or(entry.size);
-    emit_download_progress(reporter, &entry.name, "downloading", 0, total, 0.0, url);
-    let mut file =
-        File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
-    let mut downloaded = 0;
-    let mut progress_throttle = DownloadProgressThrottle::new(total);
-    let started = Instant::now();
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        ensure_download_not_cancelled(reporter)?;
-        let read = response
-            .read(&mut buffer)
-            .map_err(|error| format!("读取下载内容失败：{error}"))?;
-        if read == 0 {
-            break;
-        }
-        file.write_all(&buffer[..read])
-            .map_err(|error| format!("写入下载文件失败：{error}"))?;
-        downloaded += read as u64;
-        if progress_throttle.should_emit(downloaded) {
-            emit_download_progress(
-                reporter,
-                &entry.name,
-                "downloading",
-                downloaded,
-                total,
-                download_speed(downloaded, started),
-                url,
-            );
-        }
-    }
-    emit_download_progress(
-        reporter,
-        &entry.name,
-        "downloading",
-        downloaded,
-        total,
-        download_speed(downloaded, started),
-        url,
-    );
-    Ok(())
-}
-
-fn ensure_download_not_cancelled(reporter: ModDownloadReporter<'_>) -> Result<(), String> {
-    if reporter
-        .cancel_token
-        .is_some_and(|token| token.load(Ordering::Relaxed))
-    {
-        return Err("下载已取消".to_string());
-    }
-    Ok(())
-}
-
-fn download_speed(downloaded: u64, started: Instant) -> f64 {
-    downloaded as f64 / started.elapsed().as_secs_f64().max(0.001)
-}
-
-fn emit_download_progress(
-    reporter: ModDownloadReporter<'_>,
-    mod_name: &str,
-    phase: &str,
-    downloaded: u64,
-    total: Option<u64>,
-    speed_bytes_per_sec: f64,
-    url: &str,
-) {
-    if let Some(progress) = reporter.progress {
-        progress(ModDownloadProgress {
-            operation_id: reporter.operation_id.to_string(),
-            mod_name: mod_name.to_string(),
-            phase: phase.to_string(),
-            downloaded,
-            total,
-            speed_bytes_per_sec,
-            task_index: reporter.task_index.max(1),
-            task_total: reporter.task_total.max(1),
-            url: url.to_string(),
-        });
-    }
+    shared_staging_download_path(celeste_path, &key)
 }
 
 fn read_zip_metadata(path: &Path) -> Result<ModMetadata, String> {
@@ -1328,11 +1119,12 @@ fn catalog_keys(entry: &ModCatalogEntry) -> impl Iterator<Item = String> + '_ {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{CompletionStatus, ModKind, ModMetadata};
+    use crate::domain::{CompletionStatus, ModDownloadProgress, ModKind, ModMetadata};
     use crate::storage::mod_catalog_cache_path;
     use std::fs;
     use std::io::{Cursor, Write};
     use std::net::TcpListener;
+    use std::sync::atomic::AtomicBool;
     use std::sync::{LazyLock, Mutex};
     use std::thread;
     use zip::write::SimpleFileOptions;
@@ -1882,7 +1674,8 @@ Helper:
             &client,
             "http://127.0.0.1:1/never-requested.zip",
             &dir.path().join("Helper.zip.download"),
-            &entry,
+            &entry.name,
+            entry.size,
             ModDownloadReporter {
                 operation_id: "cancel-test",
                 progress: None,
@@ -1930,7 +1723,8 @@ Helper:
             &reqwest::blocking::Client::new(),
             &url,
             &dir.path().join("Helper.zip.download"),
-            &entry,
+            &entry.name,
+            entry.size,
             ModDownloadReporter {
                 operation_id: "local-progress",
                 progress: Some(&emit),

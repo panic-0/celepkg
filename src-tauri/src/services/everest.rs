@@ -1,15 +1,15 @@
-use crate::domain::{
-    EverestInstallResult, EverestRelease, EverestReleaseList, ModDownloadProgress, StagedDownload,
+use crate::domain::{EverestInstallResult, EverestRelease, EverestReleaseList, StagedDownload};
+use crate::services::download::{
+    download_url_to_file, emit_progress, ensure_not_cancelled, resolve_staged_download_path,
+    staged_id_from_path, staging_download_path as shared_staging_download_path,
+    ModDownloadReporter, StagingDownloadFile,
 };
-use crate::services::mod_catalog::{DownloadProgressThrottle, ModDownloadReporter};
-use crate::utils::stable_id;
 use serde::Deserialize;
 use std::fs::{self, File};
-use std::io::{Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::Ordering;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use zip::ZipArchive;
 
 const EVEREST_RELEASES_URL: &str =
@@ -65,12 +65,13 @@ pub fn download_to_staging(
         fs::create_dir_all(parent).map_err(|error| format!("创建下载目录失败：{error}"))?;
     }
     let client = download_client()?;
-    let mut staging_guard = StagingFile::new(staging);
+    let mut staging_guard = StagingDownloadFile::new(staging);
     download_url_to_file(
         &client,
         &download_url,
         staging_guard.path(),
-        release,
+        "Everest",
+        release.main_file_size,
         reporter,
     )?;
     emit_progress(
@@ -199,33 +200,6 @@ fn download_client() -> Result<reqwest::blocking::Client, String> {
         .map_err(|error| format!("初始化下载客户端失败：{error}"))
 }
 
-struct StagingFile {
-    path: PathBuf,
-    keep: bool,
-}
-
-impl StagingFile {
-    fn new(path: PathBuf) -> Self {
-        Self { path, keep: false }
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn keep(&mut self) {
-        self.keep = true;
-    }
-}
-
-impl Drop for StagingFile {
-    fn drop(&mut self) {
-        if !self.keep {
-            let _ = fs::remove_file(&self.path);
-        }
-    }
-}
-
 fn staging_download_path(
     celeste_path: &Path,
     release: &EverestRelease,
@@ -239,107 +213,7 @@ fn staging_download_path(
             release.branch, release.version
         )
     };
-    celeste_path
-        .join(".celepkg")
-        .join("downloads")
-        .join("staging")
-        .join(format!("{}.zip.download", stable_id(&key)))
-}
-
-fn staged_id_from_path(path: &Path) -> Result<String, String> {
-    path.file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .filter(|name| !name.trim().is_empty())
-        .ok_or_else(|| "生成 staging id 失败".to_string())
-}
-
-fn is_staged_download_file_name(staged_id: &str) -> bool {
-    staged_id.strip_suffix(".zip.download").is_some_and(|id| {
-        id.len() == 16
-            && id
-                .bytes()
-                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-    })
-}
-
-fn resolve_staged_download_path(celeste_path: &Path, staged_id: &str) -> Result<PathBuf, String> {
-    let mut components = Path::new(staged_id).components();
-    let is_single_file_name = matches!(
-        components.next(),
-        Some(Component::Normal(name)) if name == std::ffi::OsStr::new(staged_id)
-    ) && components.next().is_none();
-
-    if staged_id.trim().is_empty()
-        || staged_id.contains('/')
-        || staged_id.contains('\\')
-        || staged_id.contains("..")
-        || !is_single_file_name
-        || !is_staged_download_file_name(staged_id)
-    {
-        return Err("无效的 staging id".to_string());
-    }
-    let staging_dir = celeste_path
-        .join(".celepkg")
-        .join("downloads")
-        .join("staging");
-    Ok(staging_dir.join(staged_id))
-}
-
-fn download_url_to_file(
-    client: &reqwest::blocking::Client,
-    url: &str,
-    destination: &Path,
-    release: &EverestRelease,
-    reporter: ModDownloadReporter<'_>,
-) -> Result<(), String> {
-    ensure_not_cancelled(reporter)?;
-    let mut response = client
-        .get(url)
-        .send()
-        .map_err(|error| format!("请求失败：{error}"))?
-        .error_for_status()
-        .map_err(|error| format!("服务器返回错误：{error}"))?;
-    let total = response.content_length().or(release.main_file_size);
-    emit_progress(reporter, "Everest", "downloading", 0, total, 0.0, url);
-    let mut file =
-        File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
-    let mut downloaded = 0;
-    let mut progress_throttle = DownloadProgressThrottle::new(total);
-    let started = Instant::now();
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        ensure_not_cancelled(reporter)?;
-        let read = response
-            .read(&mut buffer)
-            .map_err(|error| format!("读取下载内容失败：{error}"))?;
-        if read == 0 {
-            break;
-        }
-        file.write_all(&buffer[..read])
-            .map_err(|error| format!("写入下载文件失败：{error}"))?;
-        downloaded += read as u64;
-        if progress_throttle.should_emit(downloaded) {
-            emit_progress(
-                reporter,
-                "Everest",
-                "downloading",
-                downloaded,
-                total,
-                download_speed(downloaded, started),
-                url,
-            );
-        }
-    }
-    emit_progress(
-        reporter,
-        "Everest",
-        "downloading",
-        downloaded,
-        total,
-        download_speed(downloaded, started),
-        url,
-    );
-    Ok(())
+    shared_staging_download_path(celeste_path, &key)
 }
 
 fn validate_everest_zip(path: &Path) -> Result<(), String> {
@@ -511,44 +385,6 @@ fn installer_name() -> Result<&'static str, String> {
 #[cfg(target_os = "linux")]
 fn installer_name() -> Result<&'static str, String> {
     Ok("MiniInstaller-linux")
-}
-
-fn ensure_not_cancelled(reporter: ModDownloadReporter<'_>) -> Result<(), String> {
-    if reporter
-        .cancel_token
-        .is_some_and(|token| token.load(Ordering::Relaxed))
-    {
-        return Err("下载已取消".to_string());
-    }
-    Ok(())
-}
-
-fn download_speed(downloaded: u64, started: Instant) -> f64 {
-    downloaded as f64 / started.elapsed().as_secs_f64().max(0.001)
-}
-
-fn emit_progress(
-    reporter: ModDownloadReporter<'_>,
-    mod_name: &str,
-    phase: &str,
-    downloaded: u64,
-    total: Option<u64>,
-    speed_bytes_per_sec: f64,
-    url: &str,
-) {
-    if let Some(progress) = reporter.progress {
-        progress(ModDownloadProgress {
-            operation_id: reporter.operation_id.to_string(),
-            mod_name: mod_name.to_string(),
-            phase: phase.to_string(),
-            downloaded,
-            total,
-            speed_bytes_per_sec,
-            task_index: reporter.task_index.max(1),
-            task_total: reporter.task_total.max(1),
-            url: url.to_string(),
-        });
-    }
 }
 
 #[cfg(test)]
