@@ -86,6 +86,7 @@ npm run build
 
 ```bash
 npm run format:check
+npm run check:contract
 npm run lint
 npm run lint:css
 npm run test
@@ -126,6 +127,7 @@ cargo fmt
 
 ```bash
 npm run format:check
+npm run check:contract
 npm run lint
 npm run lint:css
 npm run test

@@ -1,4 +1,7 @@
-use crate::domain::{EverestInstallResult, EverestRelease, EverestReleaseList, StagedDownload};
+use crate::domain::{
+    EverestInstallResult, EverestRelease, EverestReleaseList, ModDownloadPhase, StagedDownload,
+    StagedDownloadKind,
+};
 use crate::services::download::{
     download_url_to_file, emit_progress, ensure_not_cancelled, resolve_staged_download_path,
     staged_id_from_path, staging_download_path as shared_staging_download_path,
@@ -77,7 +80,7 @@ pub fn download_to_staging(
     emit_progress(
         reporter,
         "Everest",
-        "verifying",
+        ModDownloadPhase::Verifying,
         0,
         None,
         0.0,
@@ -92,7 +95,7 @@ pub fn download_to_staging(
     Ok(StagedDownload {
         staged_id,
         name: "Everest".to_string(),
-        kind: "everest".to_string(),
+        kind: StagedDownloadKind::Everest,
         size,
         hash: None,
     })
@@ -117,7 +120,7 @@ pub fn install_staged_release(
             task_total: 1,
         }),
         "Everest",
-        "installing",
+        ModDownloadPhase::Installing,
         0,
         None,
         0.0,
@@ -149,7 +152,15 @@ pub fn install_staged_release(
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
     if let Some(reporter) = reporter {
-        emit_progress(reporter, "Everest", "done", 1, Some(1), 0.0, "");
+        emit_progress(
+            reporter,
+            "Everest",
+            ModDownloadPhase::Done,
+            1,
+            Some(1),
+            0.0,
+            "",
+        );
     }
     Ok(EverestInstallResult { release, scan })
 }
@@ -304,7 +315,7 @@ fn extract_everest_zip(
         emit_progress(
             reporter,
             "Everest",
-            "installing",
+            ModDownloadPhase::Installing,
             index as u64,
             Some(total as u64),
             0.0,

@@ -1,6 +1,11 @@
 use super::common::run_with_celeste_path;
+use crate::api_contract::{
+    CancelModDownloadPayload, DeleteStagedDownloadPayload, DownloadEverestToStagingPayload,
+    DownloadModToStagingPayload, InstallStagedEverestPayload, InstallStagedModPayload,
+    ReadStagedModMetadataPayload, StageModPreviewPayload,
+};
 use crate::domain::{
-    EverestInstallResult, EverestRelease, ModDownloadProgress, ModInstallResult, ModMetadata,
+    EverestInstallResult, ModDownloadPhase, ModDownloadProgress, ModInstallResult, ModMetadata,
     ModPreviewStaging, StagedDownload,
 };
 use crate::services;
@@ -18,10 +23,13 @@ static MOD_DOWNLOAD_CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>
 #[tauri::command]
 pub async fn download_everest_to_staging(
     app: tauri::AppHandle,
-    celeste_path: String,
-    release: EverestRelease,
-    operation_id: String,
+    payload: DownloadEverestToStagingPayload,
 ) -> Result<StagedDownload, String> {
+    let DownloadEverestToStagingPayload {
+        celeste_path,
+        release,
+        operation_id,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "下载 Everest 任务失败",
@@ -53,10 +61,13 @@ pub async fn download_everest_to_staging(
 
 #[tauri::command]
 pub async fn install_staged_everest(
-    celeste_path: String,
-    staged_id: String,
-    release: EverestRelease,
+    payload: InstallStagedEverestPayload,
 ) -> Result<EverestInstallResult, String> {
+    let InstallStagedEverestPayload {
+        celeste_path,
+        staged_id,
+        release,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "安装 staged Everest 任务失败",
@@ -78,12 +89,15 @@ pub async fn install_staged_everest(
 #[tauri::command]
 pub async fn download_mod_to_staging(
     app: tauri::AppHandle,
-    celeste_path: String,
-    entry: crate::domain::ModCatalogEntry,
-    operation_id: String,
-    task_index: usize,
-    task_total: usize,
+    payload: DownloadModToStagingPayload,
 ) -> Result<StagedDownload, String> {
+    let DownloadModToStagingPayload {
+        celeste_path,
+        entry,
+        operation_id,
+        task_index,
+        task_total,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "下载 Mod 任务失败",
@@ -116,10 +130,13 @@ pub async fn download_mod_to_staging(
 #[tauri::command]
 pub async fn stage_mod_preview(
     app: tauri::AppHandle,
-    celeste_path: String,
-    entry: crate::domain::ModCatalogEntry,
-    operation_id: String,
+    payload: StageModPreviewPayload,
 ) -> Result<ModPreviewStaging, String> {
+    let StageModPreviewPayload {
+        celeste_path,
+        entry,
+        operation_id,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "预览 Mod 依赖任务失败",
@@ -151,9 +168,12 @@ pub async fn stage_mod_preview(
 
 #[tauri::command]
 pub async fn read_staged_mod_metadata(
-    celeste_path: String,
-    staged_id: String,
+    payload: ReadStagedModMetadataPayload,
 ) -> Result<ModMetadata, String> {
+    let ReadStagedModMetadataPayload {
+        celeste_path,
+        staged_id,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "读取 staged Mod 元数据任务失败",
@@ -163,10 +183,11 @@ pub async fn read_staged_mod_metadata(
 }
 
 #[tauri::command]
-pub async fn delete_staged_download(
-    celeste_path: String,
-    staged_id: String,
-) -> Result<bool, String> {
+pub async fn delete_staged_download(payload: DeleteStagedDownloadPayload) -> Result<bool, String> {
+    let DeleteStagedDownloadPayload {
+        celeste_path,
+        staged_id,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "清理 staged 下载任务失败",
@@ -177,11 +198,14 @@ pub async fn delete_staged_download(
 
 #[tauri::command]
 pub async fn install_staged_mod(
-    celeste_path: String,
-    staged_id: String,
-    entry: crate::domain::ModCatalogEntry,
-    installed_path: Option<String>,
+    payload: InstallStagedModPayload,
 ) -> Result<ModInstallResult, String> {
+    let InstallStagedModPayload {
+        celeste_path,
+        staged_id,
+        entry,
+        installed_path,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "安装 staged Mod 任务失败",
@@ -204,7 +228,8 @@ pub async fn install_staged_mod(
 }
 
 #[tauri::command]
-pub fn cancel_mod_download(operation_id: String) -> Result<bool, String> {
+pub fn cancel_mod_download(payload: CancelModDownloadPayload) -> Result<bool, String> {
+    let CancelModDownloadPayload { operation_id } = payload;
     let flags = MOD_DOWNLOAD_CANCEL_FLAGS
         .lock()
         .map_err(|_| "取消下载状态不可用".to_string())?;
@@ -227,7 +252,7 @@ fn emit_download_error(
         ModDownloadProgress {
             operation_id,
             mod_name,
-            phase: "error".to_string(),
+            phase: ModDownloadPhase::Error,
             downloaded: 0,
             total: None,
             speed_bytes_per_sec: 0.0,
@@ -288,7 +313,10 @@ mod tests {
 
     fn fail_after_download_registration(operation_id: &str) -> Result<(), String> {
         let download_guard = register_mod_download(operation_id);
-        assert!(cancel_mod_download(operation_id.to_string()).unwrap());
+        assert!(cancel_mod_download(CancelModDownloadPayload {
+            operation_id: operation_id.to_string(),
+        })
+        .unwrap());
         assert!(download_guard.cancel_flag().load(Ordering::Relaxed));
         Err("提前失败".to_string())
     }
@@ -299,11 +327,14 @@ mod tests {
 
         {
             let download_guard = register_mod_download(&operation_id);
-            assert!(cancel_mod_download(operation_id.clone()).unwrap());
+            assert!(cancel_mod_download(CancelModDownloadPayload {
+                operation_id: operation_id.clone(),
+            })
+            .unwrap());
             assert!(download_guard.cancel_flag().load(Ordering::Relaxed));
         }
 
-        assert!(!cancel_mod_download(operation_id).unwrap());
+        assert!(!cancel_mod_download(CancelModDownloadPayload { operation_id }).unwrap());
     }
 
     #[test]
@@ -313,6 +344,6 @@ mod tests {
         let error = fail_after_download_registration(&operation_id).unwrap_err();
 
         assert_eq!(error, "提前失败");
-        assert!(!cancel_mod_download(operation_id).unwrap());
+        assert!(!cancel_mod_download(CancelModDownloadPayload { operation_id }).unwrap());
     }
 }

@@ -15,6 +15,7 @@ import {
   validateStagedDownload
 } from "./apiValidation";
 import apiContract from "./contractSamples/api-contract.json";
+import { readEventPayload, validateCommandPayload } from "./generated/api-validators";
 
 const profiles = {
   activeMapProfileId: "default-maps",
@@ -152,7 +153,7 @@ describe("api validation", () => {
         size: null,
         hash: null
       })
-    ).toThrow("staged download.kind");
+    ).toThrow("/kind");
   });
 
   it("rejects config responses with changed field types", () => {
@@ -171,7 +172,12 @@ describe("api validation", () => {
         profiles,
         warnings: []
       })
-    ).toThrow("config.autoBackupEnabled");
+    ).toThrow("/autoBackupEnabled");
+  });
+
+  it("rejects payloads with missing required fields and unknown fields", () => {
+    expect(() => validateCommandPayload("set_celeste_path", {})).toThrow("缺少字段 celestePath");
+    expect(() => validateCommandPayload("set_celeste_path", { celestePath: "D:/Celeste", extra: true })).toThrow("未知字段 extra");
   });
 
   it("accepts backup responses with installed mod snapshots", () => {
@@ -239,7 +245,24 @@ describe("api validation", () => {
         warnings: [],
         timings: []
       })
-    ).toThrow("scan.maps[0].kind");
+    ).toThrow("/maps/0/kind");
+  });
+
+  it("rejects invalid progress event payloads", () => {
+    expect(readEventPayload("mod-download-progress", { operationId: "op", phase: "done", downloaded: 1 })).toBeNull();
+    expect(
+      readEventPayload("mod-download-progress", {
+        operationId: "op",
+        modName: "Helper",
+        phase: "queued",
+        downloaded: 1,
+        total: null,
+        speedBytesPerSec: 0,
+        taskIndex: 1,
+        taskTotal: 1,
+        url: ""
+      })
+    ).toBeNull();
   });
 
   it("accepts mod catalog search and update responses", () => {

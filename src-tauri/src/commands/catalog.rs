@@ -1,17 +1,20 @@
 use super::common::{run_blocking, run_with_celeste_path};
+use crate::api_contract::{
+    CheckModUpdatesPayload, PreviewModUpdateMetadataPayload, RefreshModCatalogCachePayload,
+    ResolveModCatalogDependenciesPayload, SearchModCatalogPayload,
+};
 use crate::domain::{
-    Dependency, EverestReleaseList, ModCatalogDependencyResolutionResult, ModCatalogSearchResult,
-    ModMetadata, ModUpdateCheckResult,
+    EverestReleaseList, ModCatalogDependencyResolutionResult, ModCatalogSearchResult, ModMetadata,
+    ModUpdateCheckResult,
 };
 use crate::services;
 
 #[tauri::command]
 pub async fn search_mod_catalog(
-    query: String,
-    sources: Vec<String>,
+    payload: SearchModCatalogPayload,
 ) -> Result<ModCatalogSearchResult, String> {
+    let SearchModCatalogPayload { query, sources } = payload;
     run_blocking("搜索 Mod 目录任务失败", move || {
-        let sources = services::mod_catalog::parse_sources(&sources);
         Ok(services::mod_catalog::search_catalog(&query, &sources))
     })
     .await
@@ -19,10 +22,10 @@ pub async fn search_mod_catalog(
 
 #[tauri::command]
 pub async fn refresh_mod_catalog_cache(
-    sources: Vec<String>,
+    payload: RefreshModCatalogCachePayload,
 ) -> Result<ModCatalogSearchResult, String> {
+    let RefreshModCatalogCachePayload { sources } = payload;
     run_blocking("刷新 Mod 目录缓存任务失败", move || {
-        let sources = services::mod_catalog::parse_sources(&sources);
         Ok(services::mod_catalog::refresh_catalog_cache(&sources))
     })
     .await
@@ -30,11 +33,13 @@ pub async fn refresh_mod_catalog_cache(
 
 #[tauri::command]
 pub async fn resolve_mod_catalog_dependencies(
-    dependencies: Vec<Dependency>,
-    sources: Vec<String>,
+    payload: ResolveModCatalogDependenciesPayload,
 ) -> Result<ModCatalogDependencyResolutionResult, String> {
+    let ResolveModCatalogDependenciesPayload {
+        dependencies,
+        sources,
+    } = payload;
     run_blocking("解析 Mod 依赖目录任务失败", move || {
-        let sources = services::mod_catalog::parse_sources(&sources);
         Ok(services::mod_catalog::resolve_catalog_dependencies(
             &dependencies,
             &sources,
@@ -45,9 +50,12 @@ pub async fn resolve_mod_catalog_dependencies(
 
 #[tauri::command]
 pub async fn check_mod_updates(
-    celeste_path: String,
-    sources: Vec<String>,
+    payload: CheckModUpdatesPayload,
 ) -> Result<ModUpdateCheckResult, String> {
+    let CheckModUpdatesPayload {
+        celeste_path,
+        sources,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "检查 Mod 更新任务失败",
@@ -58,7 +66,6 @@ pub async fn check_mod_updates(
                 &state.protected_record_ids,
                 &state.selected_save_files,
             );
-            let sources = services::mod_catalog::parse_sources(&sources);
             let records = scan
                 .maps
                 .iter()
@@ -73,9 +80,12 @@ pub async fn check_mod_updates(
 
 #[tauri::command]
 pub async fn preview_mod_update_metadata(
-    celeste_path: String,
-    entry: crate::domain::ModCatalogEntry,
+    payload: PreviewModUpdateMetadataPayload,
 ) -> Result<ModMetadata, String> {
+    let PreviewModUpdateMetadataPayload {
+        celeste_path,
+        entry,
+    } = payload;
     run_with_celeste_path(
         celeste_path,
         "预览 Mod 更新依赖任务失败",

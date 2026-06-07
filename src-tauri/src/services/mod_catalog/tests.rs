@@ -4,7 +4,9 @@ use super::loaders::{
     CATALOG_REQUEST_TIMEOUT,
 };
 use super::*;
-use crate::domain::{CompletionStatus, ModDownloadProgress, ModKind, ModMetadata};
+use crate::domain::{
+    CompletionStatus, ModDownloadPhase, ModDownloadProgress, ModKind, ModMetadata,
+};
 use crate::services::download::DownloadProgressThrottle;
 use crate::services::mod_catalog_cache::{read_valid_catalog_cache, write_catalog_cache};
 use crate::storage::mod_catalog_cache_path;
@@ -623,7 +625,7 @@ fn download_url_to_file_emits_progress_during_local_slow_download() {
     let events = events.lock().unwrap();
     let downloading_events = events
         .iter()
-        .filter(|event| event.phase == "downloading" && event.downloaded > 0)
+        .filter(|event| event.phase == ModDownloadPhase::Downloading && event.downloaded > 0)
         .collect::<Vec<_>>();
     assert!(downloading_events.len() > 3);
     assert!(downloading_events
@@ -677,7 +679,7 @@ fn progress_event_includes_speed_and_task_position() {
             task_total: 4,
         },
         "Helper",
-        "downloading",
+        ModDownloadPhase::Downloading,
         512,
         Some(1024),
         2048.0,

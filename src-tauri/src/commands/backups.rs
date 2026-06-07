@@ -1,4 +1,8 @@
-use crate::domain::BackupInfo;
+use crate::api_contract::{
+    BackupIdPayload, CreateBackupPayload, OpenBackupFolderPayload, OpenBackupLocationPayload,
+    RestoreBackupPayload,
+};
+use crate::domain::{BackupInfo, BackupKind};
 use crate::services;
 use crate::storage::{
     load_state, resolve_required_celeste_path, resolve_required_celeste_path_from_state,
@@ -7,13 +11,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[tauri::command]
-pub async fn create_backup(celeste_path: String, kind: String) -> Result<BackupInfo, String> {
+pub async fn create_backup(payload: CreateBackupPayload) -> Result<BackupInfo, String> {
+    let CreateBackupPayload { celeste_path, kind } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve_required_celeste_path(&celeste_path)?;
-        match kind.as_str() {
-            "manual" => services::backup::create_manual_backup(&path),
-            "auto" => services::backup::create_auto_backup(&path),
-            _ => Err("备份类型无效".to_string()),
+        match kind {
+            BackupKind::Manual => services::backup::create_manual_backup(&path),
+            BackupKind::Auto => services::backup::create_auto_backup(&path),
         }
     })
     .await
@@ -31,17 +35,19 @@ pub async fn list_backups() -> Result<Vec<BackupInfo>, String> {
 }
 
 #[tauri::command]
-pub async fn restore_backup(backup_id: String, scope: String) -> Result<BackupInfo, String> {
+pub async fn restore_backup(payload: RestoreBackupPayload) -> Result<BackupInfo, String> {
+    let RestoreBackupPayload { backup_id, scope } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve_required_celeste_path("")?;
-        services::backup::restore_backup(&path, &backup_id, &scope)
+        services::backup::restore_backup(&path, &backup_id, scope.as_str())
     })
     .await
     .map_err(|error| format!("还原任务失败：{error}"))?
 }
 
 #[tauri::command]
-pub async fn delete_backup(backup_id: String) -> Result<(), String> {
+pub async fn delete_backup(payload: BackupIdPayload) -> Result<(), String> {
+    let BackupIdPayload { backup_id } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve_required_celeste_path("")?;
         services::backup::delete_backup(&path, &backup_id)
@@ -66,7 +72,8 @@ pub async fn cleanup_auto_backups() -> Result<Vec<BackupInfo>, String> {
 }
 
 #[tauri::command]
-pub async fn open_backup_folder(celeste_path: String) -> Result<(), String> {
+pub async fn open_backup_folder(payload: OpenBackupFolderPayload) -> Result<(), String> {
+    let OpenBackupFolderPayload { celeste_path } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve_required_celeste_path(&celeste_path)?;
         let backups_path = services::backup::backups_dir(&path);
@@ -79,7 +86,8 @@ pub async fn open_backup_folder(celeste_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_backup_location(backup_path: String) -> Result<(), String> {
+pub async fn open_backup_location(payload: OpenBackupLocationPayload) -> Result<(), String> {
+    let OpenBackupLocationPayload { backup_path } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let celeste_path = resolve_required_celeste_path("")?;
         let path = resolve_backup_location_path(&celeste_path, Path::new(&backup_path))?;

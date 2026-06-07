@@ -1,9 +1,11 @@
+use crate::api_contract::CelestePathPayload;
 use crate::domain::ScanResult;
 use crate::services;
 use crate::storage::{load_state, resolve_input_path_from_state};
 
 #[tauri::command]
-pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
+pub async fn scan_celeste(payload: CelestePathPayload) -> Result<ScanResult, String> {
+    let CelestePathPayload { celeste_path } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let path = resolve_input_path_from_state(&celeste_path, &state);
@@ -19,7 +21,8 @@ pub async fn scan_celeste(celeste_path: String) -> Result<ScanResult, String> {
 }
 
 #[tauri::command]
-pub async fn rescan_celeste(celeste_path: String) -> Result<ScanResult, String> {
+pub async fn rescan_celeste(payload: CelestePathPayload) -> Result<ScanResult, String> {
+    let CelestePathPayload { celeste_path } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let path = resolve_input_path_from_state(&celeste_path, &state);

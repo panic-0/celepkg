@@ -1,4 +1,6 @@
-use crate::domain::{BackupFileEntry, BackupInfo, BackupModEntry, ModMetadata};
+use crate::domain::{
+    BackupFileCategory, BackupFileEntry, BackupInfo, BackupKind, BackupModEntry, ModMetadata,
+};
 use crate::parsers::everest::parse_metadata;
 use crate::storage::{read_json, write_json};
 use crate::utils::normalize_slash;
@@ -9,8 +11,6 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zip::ZipArchive;
 
-const BACKUP_KIND_AUTO: &str = "auto";
-const BACKUP_KIND_MANUAL: &str = "manual";
 const RESTORE_SCOPE_ALL: &str = "all";
 const RESTORE_SCOPE_GAME: &str = "game";
 
@@ -19,7 +19,7 @@ const RESTORE_SCOPE_GAME: &str = "game";
 struct BackupManifest {
     id: String,
     created_at: String,
-    kind: String,
+    kind: BackupKind,
     celeste_path: String,
     files: Vec<BackupFileEntry>,
     #[serde(default)]
@@ -27,11 +27,11 @@ struct BackupManifest {
 }
 
 pub fn create_manual_backup(celeste_path: &Path) -> Result<BackupInfo, String> {
-    create_backup(celeste_path, BACKUP_KIND_MANUAL)
+    create_backup(celeste_path, BackupKind::Manual)
 }
 
 pub fn create_auto_backup(celeste_path: &Path) -> Result<BackupInfo, String> {
-    create_backup(celeste_path, BACKUP_KIND_AUTO)
+    create_backup(celeste_path, BackupKind::Auto)
 }
 
 pub fn create_auto_backup_if_enabled(
@@ -82,16 +82,15 @@ pub fn cleanup_auto_backups(
     cleanup_auto_backups_in(&backups_dir(celeste_path), keep_count)
 }
 
-fn create_backup(celeste_path: &Path, kind: &str) -> Result<BackupInfo, String> {
+fn create_backup(celeste_path: &Path, kind: BackupKind) -> Result<BackupInfo, String> {
     create_backup_in(&backups_dir(celeste_path), celeste_path, kind)
 }
 
 fn create_backup_in(
     backups_root: &Path,
     celeste_path: &Path,
-    kind: &str,
+    kind: BackupKind,
 ) -> Result<BackupInfo, String> {
-    let kind = normalize_backup_kind(kind)?;
     let now = backup_timestamp();
     let id = now.clone();
     let backup_path = backups_root.join(&id);
@@ -105,7 +104,7 @@ fn create_backup_in(
     let manifest = BackupManifest {
         id: id.clone(),
         created_at: now,
-        kind: kind.to_string(),
+        kind,
         celeste_path: celeste_path.to_string_lossy().to_string(),
         files,
         mods: collect_installed_mods(celeste_path),
@@ -117,13 +116,13 @@ fn create_backup_in(
 fn backup_sources(celeste_path: &Path) -> Vec<BackupSource> {
     vec![
         BackupSource {
-            category: "game",
+            category: BackupFileCategory::Game,
             label: "Mods/blacklist.txt",
             target: celeste_path.join("Mods").join("blacklist.txt"),
             backup_relative: PathBuf::from("game").join("Mods").join("blacklist.txt"),
         },
         BackupSource {
-            category: "game",
+            category: BackupFileCategory::Game,
             label: "Mods/favorites.txt",
             target: celeste_path.join("Mods").join("favorites.txt"),
             backup_relative: PathBuf::from("game").join("Mods").join("favorites.txt"),
@@ -142,7 +141,7 @@ fn copy_backup_source(backup_path: &Path, source: BackupSource) -> Result<Backup
             .map_err(|error| format!("复制备份文件失败：{error}"))?;
     }
     Ok(BackupFileEntry {
-        category: source.category.to_string(),
+        category: source.category,
         label: source.label.to_string(),
         target_path: source.target.to_string_lossy().to_string(),
         backup_path: normalize_slash(&source.backup_relative.to_string_lossy()),
@@ -250,7 +249,7 @@ fn cleanup_auto_backups_in(
     let backups = list_backups_in(backups_root);
     let mut auto_backups: Vec<_> = backups
         .iter()
-        .filter(|backup| backup.kind == BACKUP_KIND_AUTO)
+        .filter(|backup| backup.kind == BackupKind::Auto)
         .cloned()
         .collect();
     auto_backups.sort_by(|left, right| right.created_at.cmp(&left.created_at));
@@ -282,14 +281,6 @@ fn list_backups_in(backups_root: &Path) -> Vec<BackupInfo> {
 fn should_restore_file(file: &BackupFileEntry, scope: &str) -> bool {
     file.category == RESTORE_SCOPE_GAME
         && (scope == RESTORE_SCOPE_ALL || scope == RESTORE_SCOPE_GAME)
-}
-
-fn normalize_backup_kind(kind: &str) -> Result<&'static str, String> {
-    match kind {
-        BACKUP_KIND_AUTO => Ok(BACKUP_KIND_AUTO),
-        BACKUP_KIND_MANUAL => Ok(BACKUP_KIND_MANUAL),
-        _ => Err("备份类型无效".to_string()),
-    }
 }
 
 fn normalize_restore_scope(scope: &str) -> Result<&'static str, String> {
@@ -469,7 +460,7 @@ fn is_everest_yaml_entry(entry: &str) -> bool {
 }
 
 struct BackupSource {
-    category: &'static str,
+    category: BackupFileCategory,
     label: &'static str,
     target: PathBuf,
     backup_relative: PathBuf,
@@ -480,6 +471,9 @@ mod tests {
     use super::*;
     use std::io::Write;
     use zip::write::SimpleFileOptions;
+
+    const BACKUP_KIND_AUTO: BackupKind = BackupKind::Auto;
+    const BACKUP_KIND_MANUAL: BackupKind = BackupKind::Manual;
 
     #[test]
     fn manual_backup_copies_game_files() {
@@ -597,7 +591,7 @@ mod tests {
             Path::new(&backup.backup_path),
             &backup.id,
             &backup.created_at,
-            &backup.kind,
+            backup.kind,
             &celeste,
             files,
         );
@@ -628,7 +622,7 @@ mod tests {
             Path::new(&backup.backup_path),
             &backup.id,
             &backup.created_at,
-            &backup.kind,
+            backup.kind,
             &celeste,
             files,
         );
@@ -643,7 +637,7 @@ mod tests {
     #[test]
     fn restore_all_ignores_state_entries_from_old_backups() {
         let entry = BackupFileEntry {
-            category: "state".to_string(),
+            category: BackupFileCategory::State,
             label: "state.json".to_string(),
             target_path: "state.json".to_string(),
             backup_path: "state/state.json".to_string(),
@@ -881,7 +875,12 @@ mod tests {
         zip.finish().expect("finish zip");
     }
 
-    fn create_manifest_backup(backups_root: &Path, celeste_path: &Path, id: &str, kind: &str) {
+    fn create_manifest_backup(
+        backups_root: &Path,
+        celeste_path: &Path,
+        id: &str,
+        kind: BackupKind,
+    ) {
         let backup_path = backups_root.join(id);
         fs::create_dir_all(&backup_path).expect("backup dir");
         write_json(
@@ -889,7 +888,7 @@ mod tests {
             &BackupManifest {
                 id: id.to_string(),
                 created_at: id.to_string(),
-                kind: kind.to_string(),
+                kind,
                 celeste_path: celeste_path.to_string_lossy().to_string(),
                 files: vec![],
                 mods: vec![],
@@ -902,7 +901,7 @@ mod tests {
         backup_path: &Path,
         id: &str,
         created_at: &str,
-        kind: &str,
+        kind: BackupKind,
         celeste_path: &Path,
         files: Vec<BackupFileEntry>,
     ) {
@@ -911,7 +910,7 @@ mod tests {
             &BackupManifest {
                 id: id.to_string(),
                 created_at: created_at.to_string(),
-                kind: kind.to_string(),
+                kind,
                 celeste_path: celeste_path.to_string_lossy().to_string(),
                 files,
                 mods: vec![],

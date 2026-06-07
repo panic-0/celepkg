@@ -1,7 +1,8 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum CompletionStatus {
     Completed,
@@ -10,28 +11,103 @@ pub enum CompletionStatus {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ModKind {
     Map,
     Mod,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ProfileType {
     Maps,
     Mods,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum BackupKind {
+    Manual,
+    Auto,
+}
+
+impl BackupKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl PartialEq<&str> for BackupKind {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum RestoreScope {
+    Game,
+}
+
+impl RestoreScope {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Game => "game",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum BackupFileCategory {
+    State,
+    Game,
+}
+
+impl BackupFileCategory {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::State => "state",
+            Self::Game => "game",
+        }
+    }
+}
+
+impl PartialEq<&str> for BackupFileCategory {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum StagedDownloadKind {
+    Mod,
+    Everest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ModDownloadPhase {
+    Downloading,
+    Verifying,
+    Installing,
+    Done,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Dependency {
     pub name: String,
     pub version: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModMetadata {
     pub name: String,
@@ -42,7 +118,7 @@ pub struct ModMetadata {
     pub optional_dependencies: Vec<Dependency>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MapStats {
     pub deaths: u64,
@@ -60,7 +136,7 @@ pub struct MapStats {
     pub save_files: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveFileInfo {
     pub name: String,
@@ -69,7 +145,7 @@ pub struct SaveFileInfo {
     pub last_modified: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubMapInfo {
     pub id: String,
@@ -92,7 +168,7 @@ pub struct SubMapInfo {
     pub current_strawberry_ids_complete: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModRecord {
     pub id: String,
@@ -120,7 +196,7 @@ pub struct ModRecord {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
     pub id: String,
@@ -133,7 +209,7 @@ pub struct Profile {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfilesState {
     pub active_map_profile_id: String,
@@ -141,13 +217,13 @@ pub struct ProfilesState {
     pub profiles: Vec<Profile>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub celeste_path: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigResponse {
     pub celeste_path: String,
@@ -164,14 +240,14 @@ pub struct ConfigResponse {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanTiming {
     pub stage: String,
     pub ms: u128,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanResult {
     pub celeste_path: String,
@@ -189,7 +265,7 @@ pub struct ScanResult {
     pub timings: Vec<ScanTiming>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileInput {
     pub id: Option<String>,
@@ -201,7 +277,7 @@ pub struct ProfileInput {
     pub created_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LaunchResult {
     pub launched: bool,
@@ -210,17 +286,17 @@ pub struct LaunchResult {
     pub mod_profile_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupFileEntry {
-    pub category: String,
+    pub category: BackupFileCategory,
     pub label: String,
     pub target_path: String,
     pub backup_path: String,
     pub existed: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupModEntry {
     pub name: String,
@@ -232,19 +308,19 @@ pub struct BackupModEntry {
     pub is_archive: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupInfo {
     pub id: String,
     pub created_at: String,
-    pub kind: String,
+    pub kind: BackupKind,
     pub celeste_path: String,
     pub backup_path: String,
     pub files: Vec<BackupFileEntry>,
     pub mods: Vec<BackupModEntry>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ModCatalogSourceKind {
     Everest,
@@ -252,7 +328,7 @@ pub enum ModCatalogSourceKind {
     Wegfan,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModCatalogEntry {
     pub source: ModCatalogSourceKind,
@@ -273,7 +349,7 @@ pub struct ModCatalogEntry {
     pub xx_hash: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModCatalogSearchResult {
     pub sources: Vec<ModCatalogSourceKind>,
@@ -281,14 +357,14 @@ pub struct ModCatalogSearchResult {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModCatalogDependencyResolution {
     pub dependency: Dependency,
     pub entry: Option<ModCatalogEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModCatalogDependencyResolutionResult {
     pub sources: Vec<ModCatalogSourceKind>,
@@ -296,7 +372,7 @@ pub struct ModCatalogDependencyResolutionResult {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledModMatch {
     pub record_id: String,
@@ -308,7 +384,7 @@ pub struct InstalledModMatch {
     pub hash: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModUpdateCandidate {
     pub entry: ModCatalogEntry,
@@ -317,7 +393,7 @@ pub struct ModUpdateCandidate {
     pub reason: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModUpdateCheckResult {
     pub sources: Vec<ModCatalogSourceKind>,
@@ -326,7 +402,7 @@ pub struct ModUpdateCheckResult {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModInstallResult {
     pub entry: ModCatalogEntry,
@@ -336,29 +412,29 @@ pub struct ModInstallResult {
     pub scan: ScanResult,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StagedDownload {
     pub staged_id: String,
     pub name: String,
-    pub kind: String,
+    pub kind: StagedDownloadKind,
     pub size: Option<u64>,
     pub hash: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModPreviewStaging {
     pub staged: StagedDownload,
     pub metadata: ModMetadata,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ModDownloadProgress {
     pub operation_id: String,
     pub mod_name: String,
-    pub phase: String,
+    pub phase: ModDownloadPhase,
     pub downloaded: u64,
     pub total: Option<u64>,
     pub speed_bytes_per_sec: f64,
@@ -367,7 +443,7 @@ pub struct ModDownloadProgress {
     pub url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EverestRelease {
     pub branch: String,
@@ -380,14 +456,14 @@ pub struct EverestRelease {
     pub is_native: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EverestReleaseList {
     pub releases: Vec<EverestRelease>,
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EverestInstallResult {
     pub release: EverestRelease,

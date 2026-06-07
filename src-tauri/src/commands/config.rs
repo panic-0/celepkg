@@ -1,4 +1,10 @@
-use crate::domain::{AppConfig, ConfigResponse, ModCatalogSourceKind};
+use crate::api_contract::{
+    SetAutoBackupCleanupEnabledPayload, SetAutoBackupEnabledPayload,
+    SetAutoBackupRetentionCountPayload, SetAutoCheckAppUpdatesOnStartupPayload,
+    SetAutoCheckModUpdatesOnStartupPayload, SetAutoRefreshModCatalogCacheOnStartupPayload,
+    SetCelestePathPayload, SetModCatalogSourcesPayload, SetSelectedSaveFilesPayload,
+};
+use crate::domain::{AppConfig, ConfigResponse};
 use crate::services;
 use crate::storage::{
     load_state, normalize_configured_celeste_path, normalize_mod_catalog_source_settings,
@@ -14,7 +20,8 @@ pub fn get_config() -> Result<ConfigResponse, String> {
 }
 
 #[tauri::command]
-pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
+pub fn set_celeste_path(payload: SetCelestePathPayload) -> Result<AppConfig, String> {
+    let SetCelestePathPayload { celeste_path } = payload;
     update_state(|state| {
         let path = resolve_required_celeste_path_from_state(&celeste_path, state)?;
         state.celeste_path = path.to_string_lossy().to_string();
@@ -25,7 +32,12 @@ pub fn set_celeste_path(celeste_path: String) -> Result<AppConfig, String> {
 }
 
 #[tauri::command]
-pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigResponse, String> {
+pub fn set_auto_backup_enabled(
+    payload: SetAutoBackupEnabledPayload,
+) -> Result<ConfigResponse, String> {
+    let SetAutoBackupEnabledPayload {
+        auto_backup_enabled,
+    } = payload;
     update_state(|state| {
         state.auto_backup_enabled = auto_backup_enabled;
         Ok(config_response(state, vec![]))
@@ -34,8 +46,11 @@ pub fn set_auto_backup_enabled(auto_backup_enabled: bool) -> Result<ConfigRespon
 
 #[tauri::command]
 pub fn set_auto_backup_cleanup_enabled(
-    auto_backup_cleanup_enabled: bool,
+    payload: SetAutoBackupCleanupEnabledPayload,
 ) -> Result<ConfigResponse, String> {
+    let SetAutoBackupCleanupEnabledPayload {
+        auto_backup_cleanup_enabled,
+    } = payload;
     update_state(|state| {
         state.auto_backup_cleanup_enabled = auto_backup_cleanup_enabled;
         Ok(config_response(state, vec![]))
@@ -44,8 +59,11 @@ pub fn set_auto_backup_cleanup_enabled(
 
 #[tauri::command]
 pub fn set_auto_backup_retention_count(
-    auto_backup_retention_count: usize,
+    payload: SetAutoBackupRetentionCountPayload,
 ) -> Result<ConfigResponse, String> {
+    let SetAutoBackupRetentionCountPayload {
+        auto_backup_retention_count,
+    } = payload;
     if !(1..=100).contains(&auto_backup_retention_count) {
         return Err("自动备份保留数量必须在 1 到 100 之间".to_string());
     }
@@ -57,9 +75,12 @@ pub fn set_auto_backup_retention_count(
 
 #[tauri::command]
 pub fn set_mod_catalog_sources(
-    mod_catalog_source_order: Vec<ModCatalogSourceKind>,
-    mod_catalog_source_enabled_count: usize,
+    payload: SetModCatalogSourcesPayload,
 ) -> Result<ConfigResponse, String> {
+    let SetModCatalogSourcesPayload {
+        mod_catalog_source_order,
+        mod_catalog_source_enabled_count,
+    } = payload;
     if mod_catalog_source_order.is_empty() {
         return Err("至少保留一个 Mod 数据源".to_string());
     }
@@ -76,8 +97,11 @@ pub fn set_mod_catalog_sources(
 
 #[tauri::command]
 pub fn set_auto_check_mod_updates_on_startup(
-    auto_check_mod_updates_on_startup: bool,
+    payload: SetAutoCheckModUpdatesOnStartupPayload,
 ) -> Result<ConfigResponse, String> {
+    let SetAutoCheckModUpdatesOnStartupPayload {
+        auto_check_mod_updates_on_startup,
+    } = payload;
     update_state(|state| {
         state.auto_check_mod_updates_on_startup = auto_check_mod_updates_on_startup;
         Ok(config_response(state, vec![]))
@@ -86,8 +110,11 @@ pub fn set_auto_check_mod_updates_on_startup(
 
 #[tauri::command]
 pub fn set_auto_check_app_updates_on_startup(
-    auto_check_app_updates_on_startup: bool,
+    payload: SetAutoCheckAppUpdatesOnStartupPayload,
 ) -> Result<ConfigResponse, String> {
+    let SetAutoCheckAppUpdatesOnStartupPayload {
+        auto_check_app_updates_on_startup,
+    } = payload;
     update_state(|state| {
         state.auto_check_app_updates_on_startup = auto_check_app_updates_on_startup;
         Ok(config_response(state, vec![]))
@@ -96,8 +123,11 @@ pub fn set_auto_check_app_updates_on_startup(
 
 #[tauri::command]
 pub fn set_auto_refresh_mod_catalog_cache_on_startup(
-    auto_refresh_mod_catalog_cache_on_startup: bool,
+    payload: SetAutoRefreshModCatalogCacheOnStartupPayload,
 ) -> Result<ConfigResponse, String> {
+    let SetAutoRefreshModCatalogCacheOnStartupPayload {
+        auto_refresh_mod_catalog_cache_on_startup,
+    } = payload;
     update_state(|state| {
         state.auto_refresh_mod_catalog_cache_on_startup = auto_refresh_mod_catalog_cache_on_startup;
         Ok(config_response(state, vec![]))
@@ -105,7 +135,10 @@ pub fn set_auto_refresh_mod_catalog_cache_on_startup(
 }
 
 #[tauri::command]
-pub fn set_selected_save_files(save_files: Vec<String>) -> Result<ConfigResponse, String> {
+pub fn set_selected_save_files(
+    payload: SetSelectedSaveFilesPayload,
+) -> Result<ConfigResponse, String> {
+    let SetSelectedSaveFilesPayload { save_files } = payload;
     let snapshot = load_state()?;
     let path = resolve_input_path_from_state("", &snapshot);
     let available = services::scan::list_available_save_files(&path);

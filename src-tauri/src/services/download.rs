@@ -1,4 +1,4 @@
-use crate::domain::ModDownloadProgress;
+use crate::domain::{ModDownloadPhase, ModDownloadProgress};
 use crate::utils::stable_id;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -139,7 +139,15 @@ pub fn download_url_to_file(
         .error_for_status()
         .map_err(|error| format!("服务器返回错误：{error}"))?;
     let total = response.content_length().or(fallback_total);
-    emit_progress(reporter, item_name, "downloading", 0, total, 0.0, url);
+    emit_progress(
+        reporter,
+        item_name,
+        ModDownloadPhase::Downloading,
+        0,
+        total,
+        0.0,
+        url,
+    );
     let mut file =
         File::create(destination).map_err(|error| format!("创建下载文件失败：{error}"))?;
     let mut downloaded = 0;
@@ -161,7 +169,7 @@ pub fn download_url_to_file(
             emit_progress(
                 reporter,
                 item_name,
-                "downloading",
+                ModDownloadPhase::Downloading,
                 downloaded,
                 total,
                 download_speed(downloaded, started),
@@ -172,7 +180,7 @@ pub fn download_url_to_file(
     emit_progress(
         reporter,
         item_name,
-        "downloading",
+        ModDownloadPhase::Downloading,
         downloaded,
         total,
         download_speed(downloaded, started),
@@ -194,7 +202,7 @@ pub fn ensure_not_cancelled(reporter: ModDownloadReporter<'_>) -> Result<(), Str
 pub fn emit_progress(
     reporter: ModDownloadReporter<'_>,
     mod_name: &str,
-    phase: &str,
+    phase: ModDownloadPhase,
     downloaded: u64,
     total: Option<u64>,
     speed_bytes_per_sec: f64,
@@ -204,7 +212,7 @@ pub fn emit_progress(
         progress(ModDownloadProgress {
             operation_id: reporter.operation_id.to_string(),
             mod_name: mod_name.to_string(),
-            phase: phase.to_string(),
+            phase,
             downloaded,
             total,
             speed_bytes_per_sec,

@@ -1,3 +1,6 @@
+use crate::api_contract::{
+    OpenModLocationPayload, SetRecordFavoritePayload, SetRecordProtectedPayload,
+};
 use crate::domain::ScanResult;
 use crate::services;
 use crate::storage::{load_state, resolve_required_celeste_path_from_state, update_state};
@@ -5,11 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[tauri::command]
-pub async fn set_record_favorite(
-    celeste_path: String,
-    record_id: String,
-    favorite: bool,
-) -> Result<ScanResult, String> {
+pub async fn set_record_favorite(payload: SetRecordFavoritePayload) -> Result<ScanResult, String> {
+    let SetRecordFavoritePayload {
+        celeste_path,
+        record_id,
+        favorite,
+    } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
@@ -36,10 +40,13 @@ pub async fn set_record_favorite(
 
 #[tauri::command]
 pub async fn set_record_protected(
-    celeste_path: String,
-    record_id: String,
-    protected: bool,
+    payload: SetRecordProtectedPayload,
 ) -> Result<ScanResult, String> {
+    let SetRecordProtectedPayload {
+        celeste_path,
+        record_id,
+        protected,
+    } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
@@ -70,7 +77,8 @@ pub async fn set_record_protected(
 }
 
 #[tauri::command]
-pub async fn open_mod_location(absolute_path: String) -> Result<(), String> {
+pub async fn open_mod_location(payload: OpenModLocationPayload) -> Result<(), String> {
+    let OpenModLocationPayload { absolute_path } = payload;
     tauri::async_runtime::spawn_blocking(move || {
         let state = load_state()?;
         let celeste_path = resolve_required_celeste_path_from_state("", &state)?;

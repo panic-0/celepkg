@@ -1,3 +1,4 @@
+pub mod api_contract;
 mod commands;
 mod dependency_rules;
 mod domain;

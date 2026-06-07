@@ -1,5 +1,5 @@
 use crate::dependency_rules::version_too_low;
-use crate::domain::{Dependency, StagedDownload};
+use crate::domain::{Dependency, ModDownloadPhase, StagedDownload, StagedDownloadKind};
 use crate::domain::{
     ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult, ModCatalogEntry,
     ModCatalogSearchResult, ModCatalogSourceKind, ModInstallResult, ModMetadata, ModRecord,
@@ -35,34 +35,9 @@ pub struct ModInstallContext<'a> {
     pub reporter: Option<ModDownloadReporter<'a>>,
 }
 
-pub fn parse_sources(sources: &[String]) -> Vec<ModCatalogSourceKind> {
-    if sources.is_empty() {
-        return vec![
-            ModCatalogSourceKind::EverestMirror,
-            ModCatalogSourceKind::Wegfan,
-        ];
-    }
-    let mut parsed = vec![];
-    for source in sources {
-        let kind = match source.trim().to_ascii_lowercase().as_str() {
-            "everest" | "official" => Some(ModCatalogSourceKind::Everest),
-            "everestmirror" | "everest-mirror" | "mirror" => {
-                Some(ModCatalogSourceKind::EverestMirror)
-            }
-            "wegfan" | "weg-fan" => Some(ModCatalogSourceKind::Wegfan),
-            _ => None,
-        };
-        if let Some(kind) = kind {
-            if !parsed.contains(&kind) {
-                parsed.push(kind);
-            }
-        }
-    }
-    parsed
-}
-
 pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatalogSearchResult {
-    let load = load_catalogs(sources);
+    let sources = normalize_sources(sources);
+    let load = load_catalogs(&sources);
     let normalized_query = normalize_dependency_name(query);
     let can_match_page_url = query_looks_like_url_or_domain(query);
     let mut entries = load.entries;
@@ -78,7 +53,8 @@ pub fn search_catalog(query: &str, sources: &[ModCatalogSourceKind]) -> ModCatal
 }
 
 pub fn refresh_catalog_cache(sources: &[ModCatalogSourceKind]) -> ModCatalogSearchResult {
-    let load = load_catalogs_fresh(sources);
+    let sources = normalize_sources(sources);
+    let load = load_catalogs_fresh(&sources);
     let mut entries = load.entries;
     sort_catalog_entries(&mut entries);
     ModCatalogSearchResult {
@@ -92,7 +68,8 @@ pub fn resolve_catalog_dependencies(
     dependencies: &[Dependency],
     sources: &[ModCatalogSourceKind],
 ) -> ModCatalogDependencyResolutionResult {
-    let load = load_catalogs(sources);
+    let sources = normalize_sources(sources);
+    let load = load_catalogs(&sources);
     let mut entries = load.entries;
     sort_catalog_entries(&mut entries);
     let resolutions = dependencies
@@ -117,7 +94,8 @@ pub fn check_updates(
     records: &[ModRecord],
     sources: &[ModCatalogSourceKind],
 ) -> ModUpdateCheckResult {
-    let load = load_catalogs(sources);
+    let sources = normalize_sources(sources);
+    let load = load_catalogs(&sources);
     let installed = InstalledModIndex::new(records);
     let mut matched = vec![];
     let mut seen_installed_paths = HashSet::new();
@@ -168,6 +146,26 @@ pub fn check_updates(
     }
 }
 
+fn normalize_sources(sources: &[ModCatalogSourceKind]) -> Vec<ModCatalogSourceKind> {
+    if sources.is_empty() {
+        return default_sources();
+    }
+    let mut normalized = vec![];
+    for source in sources {
+        if !normalized.contains(source) {
+            normalized.push(*source);
+        }
+    }
+    normalized
+}
+
+fn default_sources() -> Vec<ModCatalogSourceKind> {
+    vec![
+        ModCatalogSourceKind::EverestMirror,
+        ModCatalogSourceKind::Wegfan,
+    ]
+}
+
 pub fn xxh64_file(path: &Path) -> Result<String, String> {
     let mut file = File::open(path).map_err(|error| format!("打开文件失败：{error}"))?;
     let mut hasher = Xxh64::new(0);
@@ -214,7 +212,7 @@ pub fn download_to_staging(
     Ok(StagedDownload {
         staged_id: staged_id_from_path(&temp_path)?,
         name: entry.name.clone(),
-        kind: "mod".to_string(),
+        kind: StagedDownloadKind::Mod,
         size,
         hash: Some(hash),
     })
@@ -281,7 +279,15 @@ pub fn install_staged(
     }
     read_zip_metadata(&temp_path)?;
     if let Some(reporter) = context.reporter {
-        emit_download_progress(reporter, &entry.name, "installing", 0, None, 0.0, "");
+        emit_download_progress(
+            reporter,
+            &entry.name,
+            ModDownloadPhase::Installing,
+            0,
+            None,
+            0.0,
+            "",
+        );
     }
 
     if let Some(parent) = destination.parent() {
@@ -302,7 +308,15 @@ pub fn install_staged(
     }
     crate::services::scan::write_scan_cache(celeste_path, &scan);
     if let Some(reporter) = context.reporter {
-        emit_download_progress(reporter, &entry.name, "done", 1, Some(1), 0.0, "");
+        emit_download_progress(
+            reporter,
+            &entry.name,
+            ModDownloadPhase::Done,
+            1,
+            Some(1),
+            0.0,
+            "",
+        );
     }
     Ok(ModInstallResult {
         entry,
@@ -343,7 +357,15 @@ fn download_entry(
             reporter,
         ) {
             Ok(()) => {
-                emit_download_progress(reporter, &entry.name, "verifying", 0, None, 0.0, &url);
+                emit_download_progress(
+                    reporter,
+                    &entry.name,
+                    ModDownloadPhase::Verifying,
+                    0,
+                    None,
+                    0.0,
+                    &url,
+                );
                 let hash = xxh64_file(staging.path())?;
                 if !entry.xx_hash.is_empty()
                     && !entry
