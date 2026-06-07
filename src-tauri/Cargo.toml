@@ -1,6 +1,6 @@
 [package]
 name = "celepkg"
-version = "0.7.1"
+version = "0.8.0"
 description = "A Celeste map manager"
 authors = ["celepkg"]
 repository = "https://github.com/panic-0/celepkg"

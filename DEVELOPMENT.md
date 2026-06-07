@@ -171,6 +171,23 @@ git push origin vX.Y.Z --force
 
 只强制更新 tag，不强推 `main`。如 GitHub Release 已经生成，需要确认 release 产物来自更新后的 tag run。
 
+本机没有 updater 私钥时，`npm run build` 会在生成安装包后停在 updater artifact 签名步骤。只需要本地检查安装包时，可以临时关闭 updater artifact：
+
+```bash
+npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}' --ci
+```
+
+发布仍必须使用默认配置，由 Release workflow 读取 `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 生成签名产物。
+
+API 契约由 Rust 边界类型导出，生成物提交到 `src/generated/`。修改 Tauri command 参数、返回值、事件 payload 或相关 DTO 后，先运行：
+
+```bash
+npm run generate:contract
+npm run check:contract
+```
+
+生成文件不要手改；提交前用 `npm run check:contract` 确认没有过期。
+
 ## 项目结构
 
 ```text
