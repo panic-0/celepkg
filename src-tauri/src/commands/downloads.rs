@@ -1,9 +1,9 @@
+use super::common::run_with_celeste_path;
 use crate::domain::{
     EverestInstallResult, EverestRelease, ModDownloadProgress, ModInstallResult, ModMetadata,
     ModPreviewStaging, StagedDownload,
 };
 use crate::services;
-use crate::storage::{load_state, resolve_required_celeste_path_from_state};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{
@@ -22,32 +22,33 @@ pub async fn download_everest_to_staging(
     release: EverestRelease,
     operation_id: String,
 ) -> Result<StagedDownload, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        let app_for_progress = app.clone();
-        let emit_progress = move |progress: ModDownloadProgress| {
-            let _ = app_for_progress.emit("mod-download-progress", progress);
-        };
-        let download_guard = register_mod_download(&operation_id);
-        let result = services::everest::download_to_staging(
-            &path,
-            &release,
-            services::mod_catalog::ModDownloadReporter {
-                operation_id: &operation_id,
-                progress: Some(&emit_progress),
-                cancel_token: Some(download_guard.cancel_flag()),
-                task_index: 1,
-                task_total: 1,
-            },
-        );
-        if result.is_err() {
-            emit_download_error(&app, operation_id, "Everest".to_string(), 1, 1);
-        }
-        result
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "下载 Everest 任务失败",
+        move |path, _state| {
+            let app_for_progress = app.clone();
+            let emit_progress = move |progress: ModDownloadProgress| {
+                let _ = app_for_progress.emit("mod-download-progress", progress);
+            };
+            let download_guard = register_mod_download(&operation_id);
+            let result = services::everest::download_to_staging(
+                &path,
+                &release,
+                services::mod_catalog::ModDownloadReporter {
+                    operation_id: &operation_id,
+                    progress: Some(&emit_progress),
+                    cancel_token: Some(download_guard.cancel_flag()),
+                    task_index: 1,
+                    task_total: 1,
+                },
+            );
+            if result.is_err() {
+                emit_download_error(&app, operation_id, "Everest".to_string(), 1, 1);
+            }
+            result
+        },
+    )
     .await
-    .map_err(|error| format!("下载 Everest 任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -56,21 +57,22 @@ pub async fn install_staged_everest(
     staged_id: String,
     release: EverestRelease,
 ) -> Result<EverestInstallResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        services::everest::install_staged_release(
-            &path,
-            &staged_id,
-            release,
-            state.profiles_state(),
-            &state.protected_record_ids,
-            &state.selected_save_files,
-            None,
-        )
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "安装 staged Everest 任务失败",
+        move |path, state| {
+            services::everest::install_staged_release(
+                &path,
+                &staged_id,
+                release,
+                state.profiles_state(),
+                &state.protected_record_ids,
+                &state.selected_save_files,
+                None,
+            )
+        },
+    )
     .await
-    .map_err(|error| format!("安装 staged Everest 任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -82,32 +84,33 @@ pub async fn download_mod_to_staging(
     task_index: usize,
     task_total: usize,
 ) -> Result<StagedDownload, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        let app_for_progress = app.clone();
-        let emit_progress = move |progress: ModDownloadProgress| {
-            let _ = app_for_progress.emit("mod-download-progress", progress);
-        };
-        let download_guard = register_mod_download(&operation_id);
-        let result = services::mod_catalog::download_to_staging(
-            &path,
-            &entry,
-            services::mod_catalog::ModDownloadReporter {
-                operation_id: &operation_id,
-                progress: Some(&emit_progress),
-                cancel_token: Some(download_guard.cancel_flag()),
-                task_index,
-                task_total,
-            },
-        );
-        if result.is_err() {
-            emit_download_error(&app, operation_id, entry.name, task_index, task_total);
-        }
-        result
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "下载 Mod 任务失败",
+        move |path, _state| {
+            let app_for_progress = app.clone();
+            let emit_progress = move |progress: ModDownloadProgress| {
+                let _ = app_for_progress.emit("mod-download-progress", progress);
+            };
+            let download_guard = register_mod_download(&operation_id);
+            let result = services::mod_catalog::download_to_staging(
+                &path,
+                &entry,
+                services::mod_catalog::ModDownloadReporter {
+                    operation_id: &operation_id,
+                    progress: Some(&emit_progress),
+                    cancel_token: Some(download_guard.cancel_flag()),
+                    task_index,
+                    task_total,
+                },
+            );
+            if result.is_err() {
+                emit_download_error(&app, operation_id, entry.name, task_index, task_total);
+            }
+            result
+        },
+    )
     .await
-    .map_err(|error| format!("下载 Mod 任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -117,32 +120,33 @@ pub async fn stage_mod_preview(
     entry: crate::domain::ModCatalogEntry,
     operation_id: String,
 ) -> Result<ModPreviewStaging, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        let app_for_progress = app.clone();
-        let emit_progress = move |progress: ModDownloadProgress| {
-            let _ = app_for_progress.emit("mod-download-progress", progress);
-        };
-        let download_guard = register_mod_download(&operation_id);
-        let result = services::mod_catalog::stage_preview(
-            &path,
-            &entry,
-            services::mod_catalog::ModDownloadReporter {
-                operation_id: &operation_id,
-                progress: Some(&emit_progress),
-                cancel_token: Some(download_guard.cancel_flag()),
-                task_index: 1,
-                task_total: 1,
-            },
-        );
-        if result.is_err() {
-            emit_download_error(&app, operation_id, entry.name, 1, 1);
-        }
-        result
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "预览 Mod 依赖任务失败",
+        move |path, _state| {
+            let app_for_progress = app.clone();
+            let emit_progress = move |progress: ModDownloadProgress| {
+                let _ = app_for_progress.emit("mod-download-progress", progress);
+            };
+            let download_guard = register_mod_download(&operation_id);
+            let result = services::mod_catalog::stage_preview(
+                &path,
+                &entry,
+                services::mod_catalog::ModDownloadReporter {
+                    operation_id: &operation_id,
+                    progress: Some(&emit_progress),
+                    cancel_token: Some(download_guard.cancel_flag()),
+                    task_index: 1,
+                    task_total: 1,
+                },
+            );
+            if result.is_err() {
+                emit_download_error(&app, operation_id, entry.name, 1, 1);
+            }
+            result
+        },
+    )
     .await
-    .map_err(|error| format!("预览 Mod 依赖任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -150,13 +154,12 @@ pub async fn read_staged_mod_metadata(
     celeste_path: String,
     staged_id: String,
 ) -> Result<ModMetadata, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        services::mod_catalog::read_staged_metadata(&path, &staged_id)
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "读取 staged Mod 元数据任务失败",
+        move |path, _state| services::mod_catalog::read_staged_metadata(&path, &staged_id),
+    )
     .await
-    .map_err(|error| format!("读取 staged Mod 元数据任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -164,13 +167,12 @@ pub async fn delete_staged_download(
     celeste_path: String,
     staged_id: String,
 ) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        services::mod_catalog::delete_staged_download(&path, &staged_id)
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "清理 staged 下载任务失败",
+        move |path, _state| services::mod_catalog::delete_staged_download(&path, &staged_id),
+    )
     .await
-    .map_err(|error| format!("清理 staged 下载任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -180,24 +182,25 @@ pub async fn install_staged_mod(
     entry: crate::domain::ModCatalogEntry,
     installed_path: Option<String>,
 ) -> Result<ModInstallResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = load_state()?;
-        let path = resolve_required_celeste_path_from_state(&celeste_path, &state)?;
-        services::mod_catalog::install_staged(
-            &path,
-            &staged_id,
-            entry,
-            installed_path.as_deref().map(Path::new),
-            services::mod_catalog::ModInstallContext {
-                profiles: state.profiles_state(),
-                protected_record_ids: &state.protected_record_ids,
-                selected_save_files: &state.selected_save_files,
-                reporter: None,
-            },
-        )
-    })
+    run_with_celeste_path(
+        celeste_path,
+        "安装 staged Mod 任务失败",
+        move |path, state| {
+            services::mod_catalog::install_staged(
+                &path,
+                &staged_id,
+                entry,
+                installed_path.as_deref().map(Path::new),
+                services::mod_catalog::ModInstallContext {
+                    profiles: state.profiles_state(),
+                    protected_record_ids: &state.protected_record_ids,
+                    selected_save_files: &state.selected_save_files,
+                    reporter: None,
+                },
+            )
+        },
+    )
     .await
-    .map_err(|error| format!("安装 staged Mod 任务失败：{error}"))?
 }
 
 #[tauri::command]
