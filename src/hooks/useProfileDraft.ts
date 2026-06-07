@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { applyProfile, deleteProfile, launchGame, saveProfile } from "../api";
-import type { AppNotifier, Profile, ScanResult } from "../types";
+import type { AppNotifier, Profile, ProfilesState, ScanResult } from "../types";
 import { notifyError } from "../utils/notify";
 import {
   inferDependencyMods,
@@ -22,6 +22,45 @@ type ProfileDraftOptions = {
 
 export type ProfileOverwriteMode = "enabled" | "all";
 
+type ProfileDraftContent = {
+  enabledMapIds?: string[];
+  enabledModIds: string[];
+  launchArgs?: string;
+};
+
+type ProfileDraftController = {
+  activeProfileId: (profiles: ProfilesState) => string;
+  applyContent: (content: ProfileDraftContent) => void;
+  autoSaveReadyRef: MutableRefObject<boolean>;
+  copyMessage: string;
+  createMessage: string;
+  defaultId: string;
+  dirty: boolean;
+  draftName: string;
+  duplicateNameMessage: string;
+  emptyNameBase: string;
+  emptyContent: () => ProfileDraftContent;
+  currentContent: () => ProfileDraftContent;
+  currentGameContent: () => ProfileDraftContent;
+  overwriteCurrentMessage: string;
+  overwriteProfileMessage: (mode: ProfileOverwriteMode) => string;
+  profileType: Profile["profileType"];
+  profiles: Profile[];
+  renameMessage: string;
+  resolveContent: (profile?: Profile) => ProfileDraftContent;
+  savePayload: (options: {
+    content: ProfileDraftContent;
+    createdAt?: string;
+    id?: string;
+    name: string;
+  }) => Parameters<typeof saveProfile>[0];
+  selectedId: string;
+  selectedProfile: Profile | undefined;
+  setDirty: Dispatch<SetStateAction<boolean>>;
+  setDraftName: Dispatch<SetStateAction<string>>;
+  setSelectedId: Dispatch<SetStateAction<string>>;
+};
+
 export function useProfileDraft({ celestePath, notifier, scan, setLoading, setScan }: ProfileDraftOptions) {
   const [enabledMapDraft, setEnabledMapDraft] = useState<Set<string>>(new Set());
   const [enabledMapModDraft, setEnabledMapModDraft] = useState<Set<string>>(new Set());
@@ -36,7 +75,16 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   const initializedRef = useRef(false);
   const mapAutoSaveReadyRef = useRef(false);
   const modAutoSaveReadyRef = useRef(false);
+  const enabledMapDraftRef = useRef(enabledMapDraft);
+  const enabledMapModDraftRef = useRef(enabledMapModDraft);
+  const enabledExplicitModDraftRef = useRef(enabledExplicitModDraft);
+  const launchArgsRef = useRef(launchArgs);
   const profileSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  enabledMapDraftRef.current = enabledMapDraft;
+  enabledMapModDraftRef.current = enabledMapModDraft;
+  enabledExplicitModDraftRef.current = enabledExplicitModDraft;
+  launchArgsRef.current = launchArgs;
 
   const enqueueProfileSave = useCallback(<T>(task: () => Promise<T>) => {
     const next = profileSaveQueueRef.current.then(task, task);
@@ -63,123 +111,190 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     [enabledExplicitModDraft, enabledMapModDraft, inferredDependencyModDraft]
   );
 
-  const hydrateMapDraft = useCallback(
-    (profile: Profile | undefined) => {
-      mapAutoSaveReadyRef.current = false;
-      setSelectedMapProfileId(profile?.id ?? "default-maps");
-      setLaunchArgs(profile?.launchArgs ?? "");
-      const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
-      const mapIds = [
-        ...new Set([...(profile?.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)), ...readOnlyMapIds])
-      ];
-      const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
-      const modIds = profile?.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
-      setEnabledMapDraft(new Set(mapIds));
-      setEnabledMapModDraft(new Set(modIds));
-      setMapDirty(false);
-      if (profile && (!profile.enabledMapIds || !profile.enabledModIds)) {
-        void enqueueProfileSave(() =>
-          saveProfile({
-            id: profile.id,
-            name: profile.name || "Main Profile",
-            profileType: "maps",
-            enabledMapIds: mapIds,
-            enabledModIds: modIds,
-            launchArgs: profile.launchArgs,
-            createdAt: profile.createdAt
-          })
-        )
-          .then((profiles) => setScan((value) => ({ ...value, profiles })))
-          .catch((error) => notifyError(notifier, error));
-      }
-    },
-    [enqueueProfileSave, notifier, scan.maps, scan.otherMods, setScan]
+  const mapDraftController = useMemo<ProfileDraftController>(
+    () => ({
+      activeProfileId: (profiles) => profiles.activeMapProfileId,
+      applyContent: (content) => {
+        setEnabledMapDraft(new Set(content.enabledMapIds ?? []));
+        setEnabledMapModDraft(new Set(content.enabledModIds));
+        setLaunchArgs(content.launchArgs ?? "");
+      },
+      autoSaveReadyRef: mapAutoSaveReadyRef,
+      copyMessage: "地图 Profile 已克隆。",
+      createMessage: "已新建空地图 Profile。",
+      currentContent: () => ({
+        enabledMapIds: [...enabledMapDraftRef.current],
+        enabledModIds: [...enabledMapModDraftRef.current],
+        launchArgs: launchArgsRef.current
+      }),
+      currentGameContent: () => ({
+        enabledMapIds: scan.maps
+          .filter((map) => map.readOnly || (map.protected ? enabledMapDraftRef.current.has(map.id) : map.enabled))
+          .map((map) => map.id),
+        enabledModIds: scan.otherMods
+          .filter(
+            (modItem) => modItem.subMaps.length > 0 && (modItem.protected ? enabledMapModDraftRef.current.has(modItem.id) : modItem.enabled)
+          )
+          .map((modItem) => modItem.id),
+        launchArgs: launchArgsRef.current
+      }),
+      defaultId: "default-maps",
+      dirty: mapDirty,
+      draftName: mapProfileName,
+      duplicateNameMessage: "同名地图 Profile 已存在。",
+      emptyContent: () => ({
+        enabledMapIds: scan.maps.filter((map) => map.readOnly).map((map) => map.id),
+        enabledModIds: [],
+        launchArgs: ""
+      }),
+      emptyNameBase: "New Map Profile",
+      overwriteCurrentMessage: "已用当前游戏启用情况覆盖地图 Profile，始终启用条目已保留原 Profile 选择。",
+      overwriteProfileMessage: (mode) =>
+        mode === "all" ? "已用来源 Profile 覆盖地图 Profile 全部内容。" : "已用来源 Profile 覆盖地图 Profile 启用情况。",
+      profiles: mapProfiles,
+      profileType: "maps",
+      renameMessage: "地图 Profile 已重命名。",
+      resolveContent: (profile) => {
+        if (profile) return { ...resolveMapProfileContent(profile, scan), launchArgs: profile.launchArgs };
+        const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
+        const enabledMapIds = [...new Set([...scan.maps.filter((map) => map.enabled).map((map) => map.id), ...readOnlyMapIds])];
+        const enabledModIds = scan.otherMods
+          .filter((modItem) => modItem.subMaps.length > 0 && modItem.enabled)
+          .map((modItem) => modItem.id);
+        return { enabledMapIds, enabledModIds, launchArgs: "" };
+      },
+      savePayload: ({ content, createdAt, id, name }) => ({
+        ...(id ? { id } : {}),
+        name,
+        profileType: "maps",
+        enabledMapIds: content.enabledMapIds ?? [],
+        enabledModIds: content.enabledModIds,
+        launchArgs: content.launchArgs ?? "",
+        ...(createdAt ? { createdAt } : {})
+      }),
+      selectedId: selectedMapProfileId,
+      selectedProfile: selectedMapProfile,
+      setDirty: setMapDirty,
+      setDraftName: setMapProfileName,
+      setSelectedId: setSelectedMapProfileId
+    }),
+    [mapDirty, mapProfileName, mapProfiles, scan, selectedMapProfile, selectedMapProfileId]
   );
 
-  const hydrateModDraft = useCallback(
-    (profile: Profile | undefined) => {
-      modAutoSaveReadyRef.current = false;
-      setSelectedModProfileId(profile?.id ?? "default-mods");
-      const modIds = profile?.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
-      setEnabledExplicitModDraft(new Set(modIds));
-      setModDirty(false);
-      if (profile && !profile.enabledModIds) {
+  const modDraftController = useMemo<ProfileDraftController>(
+    () => ({
+      activeProfileId: (profiles) => profiles.activeModProfileId,
+      applyContent: (content) => setEnabledExplicitModDraft(new Set(content.enabledModIds)),
+      autoSaveReadyRef: modAutoSaveReadyRef,
+      copyMessage: "Mod Profile 已克隆。",
+      createMessage: "已新建空 Mod Profile。",
+      currentContent: () => ({ enabledModIds: [...enabledExplicitModDraftRef.current] }),
+      currentGameContent: () => ({
+        enabledModIds: scan.otherMods
+          .filter((modItem) => (modItem.protected ? enabledExplicitModDraftRef.current.has(modItem.id) : modItem.enabled))
+          .map((modItem) => modItem.id)
+      }),
+      defaultId: "default-mods",
+      dirty: modDirty,
+      draftName: modProfileName,
+      duplicateNameMessage: "同名 Mod Profile 已存在。",
+      emptyContent: () => ({ enabledModIds: [] }),
+      emptyNameBase: "New Mod Profile",
+      overwriteCurrentMessage: "已用当前游戏启用情况覆盖 Mod Profile，始终启用条目已保留原 Profile 选择。",
+      overwriteProfileMessage: (mode) =>
+        mode === "all" ? "已用来源 Profile 覆盖 Mod Profile 全部内容。" : "已用来源 Profile 覆盖 Mod Profile 启用情况。",
+      profiles: modProfiles,
+      profileType: "mods",
+      renameMessage: "Mod Profile 已重命名。",
+      resolveContent: (profile) =>
+        profile
+          ? resolveModProfileContent(profile, scan)
+          : { enabledModIds: scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id) },
+      savePayload: ({ content, createdAt, id, name }) => ({
+        ...(id ? { id } : {}),
+        name,
+        profileType: "mods",
+        enabledModIds: content.enabledModIds,
+        ...(createdAt ? { createdAt } : {})
+      }),
+      selectedId: selectedModProfileId,
+      selectedProfile: selectedModProfile,
+      setDirty: setModDirty,
+      setDraftName: setModProfileName,
+      setSelectedId: setSelectedModProfileId
+    }),
+    [modDirty, modProfileName, modProfiles, scan, selectedModProfile, selectedModProfileId]
+  );
+
+  const hydrateProfileDraft = useCallback(
+    (controller: ProfileDraftController, profile: Profile | undefined) => {
+      controller.autoSaveReadyRef.current = false;
+      controller.setSelectedId(profile?.id ?? controller.defaultId);
+      const content = controller.resolveContent(profile);
+      controller.applyContent(content);
+      controller.setDirty(false);
+      if (profile && shouldNormalizeProfileContent(controller, profile)) {
         void enqueueProfileSave(() =>
-          saveProfile({
-            id: profile.id,
-            name: profile.name || "Main Profile",
-            profileType: "mods",
-            enabledModIds: modIds,
-            createdAt: profile.createdAt
-          })
+          saveProfile(
+            controller.savePayload({
+              content,
+              createdAt: profile.createdAt,
+              id: profile.id,
+              name: profile.name || "Main Profile"
+            })
+          )
         )
           .then((profiles) => setScan((value) => ({ ...value, profiles })))
           .catch((error) => notifyError(notifier, error));
       }
     },
-    [enqueueProfileSave, notifier, scan.otherMods, setScan]
+    [enqueueProfileSave, notifier, setScan]
   );
 
   useEffect(() => {
     const activeMap = mapProfiles.find((profile) => profile.id === scan.profiles.activeMapProfileId) ?? mapProfiles[0];
     const activeMod = modProfiles.find((profile) => profile.id === scan.profiles.activeModProfileId) ?? modProfiles[0];
     if (!initializedRef.current || !mapDirty) {
-      hydrateMapDraft(activeMap);
+      hydrateProfileDraft(mapDraftController, activeMap);
     }
     if (!initializedRef.current || !modDirty) {
-      hydrateModDraft(activeMod);
+      hydrateProfileDraft(modDraftController, activeMod);
     }
     initializedRef.current = true;
   }, [
-    hydrateMapDraft,
-    hydrateModDraft,
+    hydrateProfileDraft,
+    mapDraftController,
     mapDirty,
     mapProfiles,
+    modDraftController,
     modDirty,
     modProfiles,
     scan.profiles.activeMapProfileId,
     scan.profiles.activeModProfileId
   ]);
 
-  const persistMapProfile = useCallback(async () => {
-    const current = selectedMapProfile;
-    if (!current) return selectedMapProfileId;
-    const profiles = await enqueueProfileSave(() =>
-      saveProfile({
-        id: current.id,
-        name: current.name || "Main Profile",
-        profileType: "maps",
-        enabledMapIds: [...enabledMapDraft],
-        enabledModIds: [...enabledMapModDraft],
-        launchArgs,
-        createdAt: current.createdAt
-      })
-    );
-    const nextId = current.id || profiles.activeMapProfileId;
-    setMapDirty(false);
-    setSelectedMapProfileId(nextId);
-    setScan((value) => ({ ...value, profiles }));
-    return nextId;
-  }, [enabledMapDraft, enabledMapModDraft, enqueueProfileSave, launchArgs, selectedMapProfile, selectedMapProfileId, setScan]);
-
-  const persistModProfile = useCallback(async () => {
-    const current = selectedModProfile;
-    if (!current) return selectedModProfileId;
-    const profiles = await enqueueProfileSave(() =>
-      saveProfile({
-        id: current.id,
-        name: current.name || "Main Profile",
-        profileType: "mods",
-        enabledModIds: [...enabledExplicitModDraft],
-        createdAt: current.createdAt
-      })
-    );
-    const nextId = current.id || profiles.activeModProfileId;
-    setModDirty(false);
-    setSelectedModProfileId(nextId);
-    setScan((value) => ({ ...value, profiles }));
-    return nextId;
-  }, [enabledExplicitModDraft, enqueueProfileSave, selectedModProfile, selectedModProfileId, setScan]);
+  const persistProfile = useCallback(
+    async (controller: ProfileDraftController) => {
+      const current = controller.selectedProfile;
+      if (!current) return controller.selectedId;
+      const profiles = await enqueueProfileSave(() =>
+        saveProfile(
+          controller.savePayload({
+            content: controller.currentContent(),
+            createdAt: current.createdAt,
+            id: current.id,
+            name: current.name || "Main Profile"
+          })
+        )
+      );
+      const nextId = current.id || controller.activeProfileId(profiles);
+      controller.setDirty(false);
+      controller.setSelectedId(nextId);
+      setScan((value) => ({ ...value, profiles }));
+      return nextId;
+    },
+    [enqueueProfileSave, setScan]
+  );
 
   useEffect(() => {
     if (!initializedRef.current || !selectedMapProfile) return;
@@ -190,10 +305,10 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     if (!mapAutoSaveReadyRef.current) return;
     const timer = window.setTimeout(() => {
       if (!mapAutoSaveReadyRef.current) return;
-      void persistMapProfile().catch((error) => notifyError(notifier, error));
+      void persistProfile(mapDraftController).catch((error) => notifyError(notifier, error));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, notifier, persistMapProfile, selectedMapProfile]);
+  }, [enabledMapDraft, enabledMapModDraft, launchArgs, mapDirty, mapDraftController, notifier, persistProfile, selectedMapProfile]);
 
   useEffect(() => {
     if (!initializedRef.current || !selectedModProfile) return;
@@ -204,19 +319,19 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     if (!modAutoSaveReadyRef.current) return;
     const timer = window.setTimeout(() => {
       if (!modAutoSaveReadyRef.current) return;
-      void persistModProfile().catch((error) => notifyError(notifier, error));
+      void persistProfile(modDraftController).catch((error) => notifyError(notifier, error));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabledExplicitModDraft, modDirty, notifier, persistModProfile, selectedModProfile]);
+  }, [enabledExplicitModDraft, modDirty, modDraftController, notifier, persistProfile, selectedModProfile]);
 
   function setMapProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
-    hydrateMapDraft(profile);
+    hydrateProfileDraft(mapDraftController, profile);
   }
 
   function setModProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
-    hydrateModDraft(profile);
+    hydrateProfileDraft(modDraftController, profile);
   }
 
   const updateEnabledMapDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
@@ -247,234 +362,126 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     setModProfileName(value);
   }
 
-  async function copyMapProfile(sourceProfile = selectedMapProfile) {
+  async function copyProfile(controller: ProfileDraftController, sourceProfile = controller.selectedProfile) {
     await runProfileTask(async () => {
-      mapAutoSaveReadyRef.current = false;
+      controller.autoSaveReadyRef.current = false;
       const source = sourceProfile;
       if (!source) return;
-      if (mapDirty) await persistMapProfile();
-      const isSelectedSource = source.id === selectedMapProfileId;
+      if (controller.dirty) await persistProfile(controller);
+      const content = source.id === controller.selectedId ? controller.currentContent() : controller.resolveContent(source);
       const sourceName = source.name || "Main Profile";
-      const sourceLaunchArgs = isSelectedSource ? launchArgs : source.launchArgs;
-      const content = isSelectedSource
-        ? {
-            enabledMapIds: [...enabledMapDraft],
-            enabledModIds: [...enabledMapModDraft]
-          }
-        : resolveMapProfileContent(source, scan);
       const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          name: nextCopyName(sourceName, mapProfiles),
-          profileType: "maps",
-          enabledMapIds: content.enabledMapIds,
-          enabledModIds: content.enabledModIds,
-          launchArgs: sourceLaunchArgs
-        })
+        saveProfile(controller.savePayload({ content, name: nextCopyName(sourceName, controller.profiles) }))
       );
-      setMapDirty(false);
-      mapAutoSaveReadyRef.current = true;
+      controller.setDirty(false);
+      controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setSelectedMapProfileId(profiles.activeMapProfileId);
-      setLaunchArgs(sourceLaunchArgs);
-      setEnabledMapDraft(new Set(content.enabledMapIds));
-      setEnabledMapModDraft(new Set(content.enabledModIds));
-      notifier.showSuccess("地图 Profile 已克隆。");
+      controller.setSelectedId(controller.activeProfileId(profiles));
+      controller.applyContent(content);
+      notifier.showSuccess(controller.copyMessage);
     });
   }
 
+  async function copyMapProfile(sourceProfile = selectedMapProfile) {
+    await copyProfile(mapDraftController, sourceProfile);
+  }
+
   async function copyModProfile(sourceProfile = selectedModProfile) {
+    await copyProfile(modDraftController, sourceProfile);
+  }
+
+  async function createEmptyProfile(controller: ProfileDraftController) {
     await runProfileTask(async () => {
-      modAutoSaveReadyRef.current = false;
-      const source = sourceProfile;
-      if (!source) return;
-      if (modDirty) await persistModProfile();
-      const isSelectedSource = source.id === selectedModProfileId;
-      const sourceName = source.name || "Main Profile";
-      const content = isSelectedSource
-        ? {
-            enabledModIds: [...enabledExplicitModDraft]
-          }
-        : resolveModProfileContent(source, scan);
-      const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          name: nextCopyName(sourceName, modProfiles),
-          profileType: "mods",
-          enabledModIds: content.enabledModIds
-        })
-      );
-      setModDirty(false);
-      modAutoSaveReadyRef.current = true;
+      controller.autoSaveReadyRef.current = false;
+      const content = controller.emptyContent();
+      const nextName = controller.draftName.trim() || nextNewProfileName(controller.emptyNameBase, controller.profiles);
+      const profiles = await enqueueProfileSave(() => saveProfile(controller.savePayload({ content, name: nextName })));
+      controller.setDirty(false);
+      controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setSelectedModProfileId(profiles.activeModProfileId);
-      setEnabledExplicitModDraft(new Set(content.enabledModIds));
-      notifier.showSuccess("Mod Profile 已克隆。");
+      controller.setSelectedId(controller.activeProfileId(profiles));
+      controller.setDraftName("");
+      controller.applyContent(content);
+      notifier.showSuccess(controller.createMessage);
     });
   }
 
   async function createEmptyMapProfile() {
-    await runProfileTask(async () => {
-      mapAutoSaveReadyRef.current = false;
-      const enabledMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
-      const nextName = mapProfileName.trim() || nextNewProfileName("New Map Profile", mapProfiles);
-      const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          name: nextName,
-          profileType: "maps",
-          enabledMapIds,
-          enabledModIds: [],
-          launchArgs: ""
-        })
-      );
-      setMapDirty(false);
-      mapAutoSaveReadyRef.current = true;
-      setScan((value) => ({ ...value, profiles }));
-      setSelectedMapProfileId(profiles.activeMapProfileId);
-      setMapProfileName("");
-      setLaunchArgs("");
-      setEnabledMapDraft(new Set(enabledMapIds));
-      setEnabledMapModDraft(new Set());
-      notifier.showSuccess("已新建空地图 Profile。");
-    });
+    await createEmptyProfile(mapDraftController);
   }
 
   async function createEmptyModProfile() {
+    await createEmptyProfile(modDraftController);
+  }
+
+  async function renameProfile(controller: ProfileDraftController, profile: Profile, name: string) {
     await runProfileTask(async () => {
-      modAutoSaveReadyRef.current = false;
-      const nextName = modProfileName.trim() || nextNewProfileName("New Mod Profile", modProfiles);
+      const nextName = name.trim();
+      if (!nextName) {
+        notifier.showWarning("Profile 名称不能为空。");
+        return;
+      }
+      if (profileNameExists(controller.profiles, nextName, profile.id)) {
+        notifier.showWarning(controller.duplicateNameMessage);
+        return;
+      }
+
+      controller.autoSaveReadyRef.current = false;
+      const isSelectedProfile = profile.id === controller.selectedId;
+      const content = isSelectedProfile ? controller.currentContent() : controller.resolveContent(profile);
       const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          name: nextName,
-          profileType: "mods",
-          enabledModIds: []
-        })
+        saveProfile(controller.savePayload({ content, createdAt: profile.createdAt, id: profile.id, name: nextName }))
       );
-      setModDirty(false);
-      modAutoSaveReadyRef.current = true;
+
+      if (isSelectedProfile) {
+        controller.setDirty(false);
+        controller.setSelectedId(profile.id);
+        controller.applyContent(content);
+      }
+      controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      setSelectedModProfileId(profiles.activeModProfileId);
-      setModProfileName("");
-      setEnabledExplicitModDraft(new Set());
-      notifier.showSuccess("已新建空 Mod Profile。");
+      notifier.showSuccess(controller.renameMessage);
     });
   }
 
   async function renameMapProfile(profile: Profile, name: string) {
-    await runProfileTask(async () => {
-      const nextName = name.trim();
-      if (!nextName) {
-        notifier.showWarning("Profile 名称不能为空。");
-        return;
-      }
-      if (profileNameExists(mapProfiles, nextName, profile.id)) {
-        notifier.showWarning("同名地图 Profile 已存在。");
-        return;
-      }
-
-      mapAutoSaveReadyRef.current = false;
-      const isSelectedProfile = profile.id === selectedMapProfileId;
-      const content = isSelectedProfile
-        ? {
-            enabledMapIds: [...enabledMapDraft],
-            enabledModIds: [...enabledMapModDraft],
-            launchArgs
-          }
-        : {
-            ...resolveMapProfileContent(profile, scan),
-            launchArgs: profile.launchArgs
-          };
-      const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          id: profile.id,
-          name: nextName,
-          profileType: "maps",
-          enabledMapIds: content.enabledMapIds,
-          enabledModIds: content.enabledModIds,
-          launchArgs: content.launchArgs,
-          createdAt: profile.createdAt
-        })
-      );
-
-      if (isSelectedProfile) {
-        setMapDirty(false);
-        setSelectedMapProfileId(profile.id);
-        setLaunchArgs(content.launchArgs);
-        setEnabledMapDraft(new Set(content.enabledMapIds));
-        setEnabledMapModDraft(new Set(content.enabledModIds));
-      }
-      mapAutoSaveReadyRef.current = true;
-      setScan((value) => ({ ...value, profiles }));
-      notifier.showSuccess("地图 Profile 已重命名。");
-    });
+    await renameProfile(mapDraftController, profile, name);
   }
 
   async function renameModProfile(profile: Profile, name: string) {
+    await renameProfile(modDraftController, profile, name);
+  }
+
+  async function removeProfile(controller: ProfileDraftController, profile: Profile) {
     await runProfileTask(async () => {
-      const nextName = name.trim();
-      if (!nextName) {
-        notifier.showWarning("Profile 名称不能为空。");
-        return;
-      }
-      if (profileNameExists(modProfiles, nextName, profile.id)) {
-        notifier.showWarning("同名 Mod Profile 已存在。");
-        return;
-      }
-
-      modAutoSaveReadyRef.current = false;
-      const isSelectedProfile = profile.id === selectedModProfileId;
-      const content = isSelectedProfile ? { enabledModIds: [...enabledExplicitModDraft] } : resolveModProfileContent(profile, scan);
-      const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          id: profile.id,
-          name: nextName,
-          profileType: "mods",
-          enabledModIds: content.enabledModIds,
-          createdAt: profile.createdAt
-        })
-      );
-
-      if (isSelectedProfile) {
-        setModDirty(false);
-        setSelectedModProfileId(profile.id);
-        setEnabledExplicitModDraft(new Set(content.enabledModIds));
-      }
-      modAutoSaveReadyRef.current = true;
+      const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
+      controller.setDirty(false);
       setScan((value) => ({ ...value, profiles }));
-      notifier.showSuccess("Mod Profile 已重命名。");
+      controller.setSelectedId(controller.activeProfileId(profiles));
+      notifier.showSuccess(`${controller.profileType === "maps" ? "地图" : "Mod"} Profile 已删除。`);
     });
   }
 
   async function deleteMapProfile(profile: Profile) {
-    await runProfileTask(async () => {
-      const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
-      setMapDirty(false);
-      setScan((value) => ({ ...value, profiles }));
-      setSelectedMapProfileId(profiles.activeMapProfileId);
-      notifier.showSuccess("地图 Profile 已删除。");
-    });
+    await removeProfile(mapDraftController, profile);
   }
 
   async function deleteModProfile(profile: Profile) {
-    await runProfileTask(async () => {
-      const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
-      setModDirty(false);
-      setScan((value) => ({ ...value, profiles }));
-      setSelectedModProfileId(profiles.activeModProfileId);
-      notifier.showSuccess("Mod Profile 已删除。");
-    });
+    await removeProfile(modDraftController, profile);
   }
 
   async function applySelectedProfiles() {
     await runProfileTask(async () => {
-      const mapId = mapDirty ? await persistMapProfile() : selectedMapProfileId;
-      const modId = modDirty ? await persistModProfile() : selectedModProfileId;
+      const mapId = mapDirty ? await persistProfile(mapDraftController) : selectedMapProfileId;
+      const modId = modDirty ? await persistProfile(modDraftController) : selectedModProfileId;
       await applyProfiles(mapId, modId, "已应用地图和 Mod Profile。");
     });
   }
 
   async function launchSelectedProfiles() {
     await runProfileTask(async () => {
-      const mapId = mapDirty ? await persistMapProfile() : selectedMapProfileId;
-      const modId = modDirty ? await persistModProfile() : selectedModProfileId;
+      const mapId = mapDirty ? await persistProfile(mapDraftController) : selectedMapProfileId;
+      const modId = modDirty ? await persistProfile(modDraftController) : selectedModProfileId;
       const applied = await enqueueProfileSave(() => applyProfile(celestePath, mapId, modId));
       setScan(applied);
       const result = await launchGame(celestePath, launchArgs);
@@ -489,121 +496,72 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     });
   }
 
-  async function overwriteMapProfileFromCurrent() {
+  async function overwriteProfileFromCurrent(controller: ProfileDraftController) {
     await runProfileTask(async () => {
-      mapAutoSaveReadyRef.current = false;
-      const mapIds = scan.maps
-        .filter((map) => map.readOnly || (map.protected ? enabledMapDraft.has(map.id) : map.enabled))
-        .map((map) => map.id);
-      const modIds = scan.otherMods
-        .filter((modItem) => modItem.subMaps.length > 0 && (modItem.protected ? enabledMapModDraft.has(modItem.id) : modItem.enabled))
-        .map((modItem) => modItem.id);
-      setEnabledMapDraft(new Set(mapIds));
-      setEnabledMapModDraft(new Set(modIds));
-      setMapDirty(true);
-      const current = selectedMapProfile;
+      controller.autoSaveReadyRef.current = false;
+      const content = controller.currentGameContent();
+      controller.applyContent(content);
+      controller.setDirty(true);
+      const current = controller.selectedProfile;
       if (!current) return;
       const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          id: current.id,
-          name: current.name || "Main Profile",
-          profileType: "maps",
-          enabledMapIds: mapIds,
-          enabledModIds: modIds,
-          launchArgs,
-          createdAt: current.createdAt
-        })
+        saveProfile(
+          controller.savePayload({
+            content,
+            createdAt: current.createdAt,
+            id: current.id,
+            name: current.name || "Main Profile"
+          })
+        )
       );
-      setMapDirty(false);
-      mapAutoSaveReadyRef.current = true;
+      controller.setDirty(false);
+      controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      notifier.showSuccess("已用当前游戏启用情况覆盖地图 Profile，始终启用条目已保留原 Profile 选择。");
+      notifier.showSuccess(controller.overwriteCurrentMessage);
     });
   }
 
+  async function overwriteMapProfileFromCurrent() {
+    await overwriteProfileFromCurrent(mapDraftController);
+  }
+
   async function overwriteModProfileFromCurrent() {
+    await overwriteProfileFromCurrent(modDraftController);
+  }
+
+  async function overwriteProfileFromProfile(controller: ProfileDraftController, sourceProfileId: string, mode: ProfileOverwriteMode) {
     await runProfileTask(async () => {
-      modAutoSaveReadyRef.current = false;
-      const modIds = scan.otherMods
-        .filter((modItem) => (modItem.protected ? enabledExplicitModDraft.has(modItem.id) : modItem.enabled))
-        .map((modItem) => modItem.id);
-      setEnabledExplicitModDraft(new Set(modIds));
-      setModDirty(true);
-      const current = selectedModProfile;
-      if (!current) return;
+      controller.autoSaveReadyRef.current = false;
+      const current = controller.selectedProfile;
+      const source = controller.profiles.find((profile) => profile.id === sourceProfileId);
+      if (!current || !source || current.id === source.id) return;
+      const sourceContent = controller.resolveContent(source);
+      const content = mode === "all" ? sourceContent : { ...sourceContent, launchArgs: controller.currentContent().launchArgs };
+      const nextName = mode === "all" ? source.name : current.name || "Main Profile";
       const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          id: current.id,
-          name: current.name || "Main Profile",
-          profileType: "mods",
-          enabledModIds: modIds,
-          createdAt: current.createdAt
-        })
+        saveProfile(
+          controller.savePayload({
+            content,
+            createdAt: current.createdAt,
+            id: current.id,
+            name: nextName
+          })
+        )
       );
-      setModDirty(false);
-      modAutoSaveReadyRef.current = true;
+      controller.applyContent(content);
+      controller.setDirty(false);
+      controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
-      notifier.showSuccess("已用当前游戏启用情况覆盖 Mod Profile，始终启用条目已保留原 Profile 选择。");
+      notifier.showSuccess(controller.overwriteProfileMessage(mode));
     });
   }
 
   async function overwriteMapProfileFromProfile(sourceProfileId: string, mode: ProfileOverwriteMode) {
-    await runProfileTask(async () => {
-      mapAutoSaveReadyRef.current = false;
-      const current = selectedMapProfile;
-      const source = mapProfiles.find((profile) => profile.id === sourceProfileId);
-      if (!current || !source || current.id === source.id) return;
-      const content = resolveMapProfileContent(source, scan);
-      const nextName = mode === "all" ? source.name : current.name || "Main Profile";
-      const nextLaunchArgs = mode === "all" ? source.launchArgs : launchArgs;
-      const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          id: current.id,
-          name: nextName,
-          profileType: "maps",
-          enabledMapIds: content.enabledMapIds,
-          enabledModIds: content.enabledModIds,
-          launchArgs: nextLaunchArgs,
-          createdAt: current.createdAt
-        })
-      );
-      setLaunchArgs(nextLaunchArgs);
-      setEnabledMapDraft(new Set(content.enabledMapIds));
-      setEnabledMapModDraft(new Set(content.enabledModIds));
-      setMapDirty(false);
-      mapAutoSaveReadyRef.current = true;
-      setScan((value) => ({ ...value, profiles }));
-      notifier.showSuccess(
-        mode === "all" ? "已用来源 Profile 覆盖地图 Profile 全部内容。" : "已用来源 Profile 覆盖地图 Profile 启用情况。"
-      );
-    });
+    await overwriteProfileFromProfile(mapDraftController, sourceProfileId, mode);
   }
 
   async function overwriteModProfileFromProfile(sourceProfileId: string, mode: ProfileOverwriteMode) {
-    await runProfileTask(async () => {
-      modAutoSaveReadyRef.current = false;
-      const current = selectedModProfile;
-      const source = modProfiles.find((profile) => profile.id === sourceProfileId);
-      if (!current || !source || current.id === source.id) return;
-      const content = resolveModProfileContent(source, scan);
-      const nextName = mode === "all" ? source.name : current.name || "Main Profile";
-      const profiles = await enqueueProfileSave(() =>
-        saveProfile({
-          id: current.id,
-          name: nextName,
-          profileType: "mods",
-          enabledModIds: content.enabledModIds,
-          createdAt: current.createdAt
-        })
-      );
-      setEnabledExplicitModDraft(new Set(content.enabledModIds));
-      setModDirty(false);
-      modAutoSaveReadyRef.current = true;
-      setScan((value) => ({ ...value, profiles }));
-      notifier.showSuccess(
-        mode === "all" ? "已用来源 Profile 覆盖 Mod Profile 全部内容。" : "已用来源 Profile 覆盖 Mod Profile 启用情况。"
-      );
-    });
+    await overwriteProfileFromProfile(modDraftController, sourceProfileId, mode);
   }
 
   async function applyProfiles(mapProfileId: string, modProfileId: string, successMessage: string) {
@@ -624,6 +582,10 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     } finally {
       setLoading(false);
     }
+  }
+
+  function shouldNormalizeProfileContent(controller: ProfileDraftController, profile: Profile) {
+    return controller.profileType === "maps" ? !profile.enabledMapIds || !profile.enabledModIds : !profile.enabledModIds;
   }
 
   function toggleMap(id: string) {
