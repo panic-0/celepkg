@@ -45,6 +45,12 @@ export type DownloadTaskGroups = {
   installFailed: DownloadTaskItem[];
 };
 
+export type DownloadTaskProgressSummary = {
+  badge: string;
+  detail: string;
+  tone: "running" | "done" | "failed" | "cancelled";
+};
+
 export function createDownloadTask(
   id: string,
   items: DownloadTaskItem[],
@@ -152,6 +158,26 @@ export function summarizeDownloadTask(task: DownloadTask) {
   };
 }
 
+export function summarizeDownloadTaskProgress(task: DownloadTask | null): DownloadTaskProgressSummary | null {
+  if (!task || task.items.length === 0) return null;
+  const total = task.items.length;
+  const installedCount = task.items.filter((item) => item.status === "installed").length;
+  const downloadedCount = task.items.filter(isDownloadedTaskItem).length;
+  const summary = summarizeDownloadTask(task);
+  const failureCount = summary.downloadFailed + summary.installFailed;
+  const label = taskProgressLabel(task);
+  const badge = `${installedCount} / ${downloadedCount} / ${total}`;
+  const detailParts = [`${label} · 安装完成 ${installedCount} · 下载完成 ${downloadedCount} · 总数 ${total}`];
+  if (summary.downloading > 0) detailParts.push(`下载 ${summary.downloading}`);
+  if (summary.waitingInstall > 0) detailParts.push(`安装 ${summary.waitingInstall}`);
+  if (failureCount > 0) detailParts.push(`失败 ${failureCount}`);
+  return {
+    badge,
+    detail: detailParts.join(" · "),
+    tone: task.status === "failed" ? "failed" : task.status === "cancelled" ? "cancelled" : task.status === "done" ? "done" : "running"
+  };
+}
+
 export function isRetriableTaskItem(item: DownloadTaskItem) {
   return item.status === "downloadFailed" || item.status === "installFailed" || item.status === "skipped" || item.status === "cancelled";
 }
@@ -159,4 +185,27 @@ export function isRetriableTaskItem(item: DownloadTaskItem) {
 export function canRetryFailedTask(task: DownloadTask) {
   if (!task.items.some(isRetriableTaskItem)) return false;
   return !task.items.some((item) => item.status === "downloading" || item.status === "installing");
+}
+
+function taskProgressLabel(task: DownloadTask) {
+  if (task.status === "done") return "已完成";
+  if (task.status === "failed") return "有失败";
+  if (task.status === "cancelled") return "已取消";
+  if (task.items.some((item) => item.status === "installing")) return task.installPaused ? "安装暂停" : "安装中";
+  if (task.items.some((item) => item.status === "downloaded" || item.status === "waitingInstall")) {
+    return task.installPaused ? "安装暂停" : "待安装";
+  }
+  if (task.items.some((item) => item.status === "downloading" || item.status === "queued"))
+    return task.downloadPaused ? "下载暂停" : "下载中";
+  return "处理中";
+}
+
+function isDownloadedTaskItem(item: DownloadTaskItem) {
+  return (
+    item.status === "downloaded" ||
+    item.status === "waitingInstall" ||
+    item.status === "installing" ||
+    item.status === "installed" ||
+    item.status === "installFailed"
+  );
 }

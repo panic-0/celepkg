@@ -10,6 +10,7 @@ import {
   selectQueuedItemsForDownload,
   skipItemsWithFailedDependencies,
   summarizeDownloadTask,
+  summarizeDownloadTaskProgress,
   type DownloadTaskItem
 } from "./downloadTask";
 
@@ -113,6 +114,48 @@ describe("download task model", () => {
       waitingInstall: 0,
       installed: 0,
       installFailed: 2
+    });
+  });
+
+  it("summarizes task counts for navigation badges", () => {
+    const task = createDownloadTask("task", [
+      item("installed", "installed"),
+      {
+        ...item("downloading", "downloading"),
+        progress: {
+          downloaded: 50,
+          modName: "downloading",
+          operationId: "op",
+          phase: "downloading",
+          speedBytesPerSec: 10,
+          taskIndex: 2,
+          taskTotal: 3,
+          total: 100,
+          url: "https://example.invalid/mod.zip"
+        }
+      },
+      item("queued", "queued")
+    ]);
+
+    expect(summarizeDownloadTaskProgress(task)).toMatchObject({
+      badge: "1 / 1 / 3",
+      detail: "下载中 · 安装完成 1 · 下载完成 1 · 总数 3 · 下载 2",
+      tone: "running"
+    });
+  });
+
+  it("reports install and terminal progress states", () => {
+    const installing = createDownloadTask("task", [item("installed", "installed"), item("installing", "installing")]);
+    expect(summarizeDownloadTaskProgress(installing)).toMatchObject({
+      badge: "1 / 2 / 2",
+      detail: "安装中 · 安装完成 1 · 下载完成 2 · 总数 2 · 安装 1",
+      tone: "running"
+    });
+
+    expect(summarizeDownloadTaskProgress({ ...installing, status: "done", items: [item("installed", "installed")] })).toMatchObject({
+      badge: "1 / 1 / 1",
+      detail: "已完成 · 安装完成 1 · 下载完成 1 · 总数 1",
+      tone: "done"
     });
   });
 });
