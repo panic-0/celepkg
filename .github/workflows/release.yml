@@ -70,14 +70,27 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build desktop app
+      - name: Build desktop app (Unix)
         if: runner.os != 'Windows'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build --ci
+        run: |
+          status=0
+          for attempt in 1 2 3; do
+            npx tauri build --ci && exit 0
+            status=$?
 
-      - name: Build desktop app
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((15 * attempt))
+              echo "Desktop bundle build failed with exit code $status. Retrying in $delay seconds..."
+              sleep "$delay"
+            fi
+          done
+
+          exit "$status"
+
+      - name: Build desktop app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
