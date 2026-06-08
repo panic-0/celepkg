@@ -67,6 +67,55 @@ test("profile manager keeps manually selected profiles before apply", async ({ p
   await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
 });
 
+test("profile draft shortcuts undo and redo local edits", async ({ page }) => {
+  await openMock(page);
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Galactica");
+
+  const row = page.locator("tbody tr", { hasText: "Galactica" });
+  await expect(row).toHaveCount(1);
+  const initialTitle = (await row.getByTitle("禁用地图").isVisible()) ? "禁用地图" : "启用地图";
+  const toggledTitle = initialTitle === "禁用地图" ? "启用地图" : "禁用地图";
+  await row.getByTitle(initialTitle).click();
+  await expect(row.getByTitle(toggledTitle)).toBeVisible();
+  await page.waitForTimeout(400);
+
+  await page.keyboard.press("Control+Z");
+  await expect(row.getByTitle(initialTitle)).toBeVisible();
+
+  await page.keyboard.press("Control+Y");
+  await expect(row.getByTitle(toggledTitle)).toBeVisible();
+
+  const bulkAction = toggledTitle === "禁用地图" ? "禁用当前结果" : "启用当前结果";
+  const afterBulkTitle = toggledTitle === "禁用地图" ? "启用地图" : "禁用地图";
+  await page.getByRole("button", { name: bulkAction }).click();
+  const bulkDialog = page.locator(".confirm-dialog", { hasText: `确认${bulkAction.replace("当前结果", "当前结果")}` });
+  await expect(bulkDialog).toBeVisible();
+  await bulkDialog.getByRole("button", { name: bulkAction }).click();
+  await expect(row.getByTitle(afterBulkTitle)).toBeVisible();
+
+  await page.keyboard.press("Control+Z");
+  await expect(row.getByTitle(toggledTitle)).toBeVisible();
+
+  await page.keyboard.press("Control+Shift+Z");
+  await expect(row.getByTitle(afterBulkTitle)).toBeVisible();
+
+  await openNav(page, "Profile");
+  const launchArgs = page.getByLabel("启动参数");
+  await launchArgs.fill("");
+  await launchArgs.click();
+  await page.keyboard.type("-console");
+  await expect(launchArgs).toHaveValue("-console");
+  await page.keyboard.press("Control+Z");
+  await expect(page.getByLabel("启动参数")).toBeFocused();
+
+  await page
+    .locator(".workspace-nav")
+    .getByRole("button", { name: /本地内容/ })
+    .click();
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Galactica");
+  await expect(page.locator("tbody tr", { hasText: "Galactica" }).getByTitle(afterBulkTitle)).toBeVisible();
+});
+
 test("workspace navigation groups content around profile state", async ({ page }) => {
   await openMock(page);
 

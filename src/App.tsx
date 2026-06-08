@@ -161,6 +161,24 @@ export function App() {
     setLoading,
     setScan
   });
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || isEditableShortcutTarget(event.target)) return;
+      const key = event.key.toLowerCase();
+      const undoRequested = key === "z" && !event.shiftKey;
+      const redoRequested = key === "y" || (key === "z" && event.shiftKey);
+      if (!undoRequested && !redoRequested) return;
+      const handled = undoRequested ? profileDraft.undoProfileDraft() : profileDraft.redoProfileDraft();
+      if (handled) event.preventDefault();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileDraft]);
+
   const dependencyReferences = useMemo(
     () => findDependencyReferencesByModId([...scan.maps, ...scan.otherMods], scan.otherMods),
     [scan.maps, scan.otherMods]
@@ -218,14 +236,12 @@ export function App() {
     notifier,
     requiredReferencesByModId: dependencyReferences.requiredReferencesByModId,
     scan,
-    setEnabledExplicitModDraft: profileDraft.setEnabledExplicitModDraft,
-    setEnabledMapDraft: profileDraft.setEnabledMapDraft,
-    setEnabledMapModDraft: profileDraft.setEnabledMapModDraft,
     setLoading,
     setScan,
     toggleMap: profileDraft.toggleMap,
     toggleMapMod: profileDraft.toggleMapMod,
-    toggleMod: profileDraft.toggleMod
+    toggleMod: profileDraft.toggleMod,
+    updateProfileDraft: profileDraft.updateProfileDraft
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
   const showingModRecords = workspaceView.activeView === "mods";
@@ -570,4 +586,10 @@ function isManagementView(view: ActiveView) {
 
 function isWorkspaceLoadingMessage(message: string) {
   return message.includes("扫描") || message.includes("缓存") || message.includes("存档统计");
+}
+
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return Boolean(target.closest("input, textarea, select"));
 }

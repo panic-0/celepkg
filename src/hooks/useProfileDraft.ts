@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { applyProfile, deleteProfile, launchGame, saveProfile } from "../api";
 import type { AppNotifier, LaunchResult, Profile, ProfilesState, ScanResult } from "../types";
 import { notifyError } from "../utils/notify";
+import { createProfileDraftHistory, profileDraftSnapshotsEqual, type ProfileDraftSnapshot } from "../utils/profileDraftHistory";
 import {
   inferDependencyMods,
   nextCopyName,
@@ -27,6 +28,13 @@ type ProfileDraftContent = {
   enabledMapIds?: string[];
   enabledModIds: string[];
   launchArgs?: string;
+};
+
+export type ProfileDraftBatchUpdate = {
+  enabledExplicitModDraft?: SetStateAction<Set<string>>;
+  enabledMapDraft?: SetStateAction<Set<string>>;
+  enabledMapModDraft?: SetStateAction<Set<string>>;
+  launchArgs?: SetStateAction<string>;
 };
 
 type ProfileDraftController = {
@@ -81,12 +89,71 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   const enabledExplicitModDraftRef = useRef(enabledExplicitModDraft);
   const launchArgsRef = useRef(launchArgs);
   const profileSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const profileDraftHistoryRef = useRef(createProfileDraftHistory());
   const lastSyncedActiveProfileIdsRef = useRef({ map: "", mod: "" });
 
   enabledMapDraftRef.current = enabledMapDraft;
   enabledMapModDraftRef.current = enabledMapModDraft;
   enabledExplicitModDraftRef.current = enabledExplicitModDraft;
   launchArgsRef.current = launchArgs;
+
+  function profileDraftSnapshot(): ProfileDraftSnapshot {
+    return {
+      enabledExplicitModIds: [...enabledExplicitModDraftRef.current],
+      enabledMapIds: [...enabledMapDraftRef.current],
+      enabledMapModIds: [...enabledMapModDraftRef.current],
+      launchArgs: launchArgsRef.current
+    };
+  }
+
+  const resetProfileDraftHistory = useCallback(() => {
+    profileDraftHistoryRef.current.reset();
+  }, []);
+
+  function applyProfileDraftSnapshot(snapshot: ProfileDraftSnapshot) {
+    const current = profileDraftSnapshot();
+    setEnabledMapDraft(new Set(snapshot.enabledMapIds));
+    setEnabledMapModDraft(new Set(snapshot.enabledMapModIds));
+    setEnabledExplicitModDraft(new Set(snapshot.enabledExplicitModIds));
+    setLaunchArgs(snapshot.launchArgs);
+    if (
+      current.launchArgs !== snapshot.launchArgs ||
+      !sameStringArray(current.enabledMapIds, snapshot.enabledMapIds) ||
+      !sameStringArray(current.enabledMapModIds, snapshot.enabledMapModIds)
+    ) {
+      setMapDirty(true);
+    }
+    if (!sameStringArray(current.enabledExplicitModIds, snapshot.enabledExplicitModIds)) {
+      setModDirty(true);
+    }
+  }
+
+  function updateProfileDraft(update: ProfileDraftBatchUpdate) {
+    const current = profileDraftSnapshot();
+    const next: ProfileDraftSnapshot = {
+      enabledExplicitModIds: [...resolveSetAction(enabledExplicitModDraftRef.current, update.enabledExplicitModDraft)],
+      enabledMapIds: [...resolveSetAction(enabledMapDraftRef.current, update.enabledMapDraft)],
+      enabledMapModIds: [...resolveSetAction(enabledMapModDraftRef.current, update.enabledMapModDraft)],
+      launchArgs: resolveValueAction(launchArgsRef.current, update.launchArgs)
+    };
+    if (profileDraftSnapshotsEqual(current, next)) return;
+    profileDraftHistoryRef.current.push(current);
+    applyProfileDraftSnapshot(next);
+  }
+
+  function undoProfileDraft() {
+    const snapshot = profileDraftHistoryRef.current.undo(profileDraftSnapshot());
+    if (!snapshot) return false;
+    applyProfileDraftSnapshot(snapshot);
+    return true;
+  }
+
+  function redoProfileDraft() {
+    const snapshot = profileDraftHistoryRef.current.redo(profileDraftSnapshot());
+    if (!snapshot) return false;
+    applyProfileDraftSnapshot(snapshot);
+    return true;
+  }
 
   const enqueueProfileSave = useCallback(<T>(task: () => Promise<T>) => {
     const next = profileSaveQueueRef.current.then(task, task);
@@ -231,6 +298,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   const hydrateProfileDraft = useCallback(
     (controller: ProfileDraftController, profile: Profile | undefined) => {
       controller.autoSaveReadyRef.current = false;
+      resetProfileDraftHistory();
       controller.setSelectedId(profile?.id ?? controller.defaultId);
       const content = controller.resolveContent(profile);
       controller.applyContent(content);
@@ -250,7 +318,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
           .catch((error) => notifyError(notifier, error));
       }
     },
-    [enqueueProfileSave, notifier, setScan]
+    [enqueueProfileSave, notifier, resetProfileDraftHistory, setScan]
   );
 
   useEffect(() => {
@@ -342,23 +410,19 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   }
 
   const updateEnabledMapDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
-    setMapDirty(true);
-    setEnabledMapDraft(action);
+    updateProfileDraft({ enabledMapDraft: action });
   };
 
   const updateEnabledMapModDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
-    setMapDirty(true);
-    setEnabledMapModDraft(action);
+    updateProfileDraft({ enabledMapModDraft: action });
   };
 
   const updateEnabledExplicitModDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
-    setModDirty(true);
-    setEnabledExplicitModDraft(action);
+    updateProfileDraft({ enabledExplicitModDraft: action });
   };
 
   function updateLaunchArgs(value: string) {
-    setMapDirty(true);
-    setLaunchArgs(value);
+    updateProfileDraft({ launchArgs: value });
   }
 
   function updateMapProfileName(value: string) {
@@ -385,6 +449,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       setScan((value) => ({ ...value, profiles }));
       controller.setSelectedId(controller.activeProfileId(profiles));
       controller.applyContent(content);
+      resetProfileDraftHistory();
       notifier.showSuccess(controller.copyMessage);
     });
   }
@@ -409,6 +474,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       controller.setSelectedId(controller.activeProfileId(profiles));
       controller.setDraftName("");
       controller.applyContent(content);
+      resetProfileDraftHistory();
       notifier.showSuccess(controller.createMessage);
     });
   }
@@ -447,6 +513,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       }
       controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
+      resetProfileDraftHistory();
       notifier.showSuccess(controller.renameMessage);
     });
   }
@@ -465,6 +532,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       controller.setDirty(false);
       setScan((value) => ({ ...value, profiles }));
       controller.setSelectedId(controller.activeProfileId(profiles));
+      resetProfileDraftHistory();
       notifier.showSuccess(`${controller.profileType === "maps" ? "地图" : "Mod"} Profile 已删除。`);
     });
   }
@@ -526,6 +594,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       controller.setDirty(false);
       controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
+      resetProfileDraftHistory();
       notifier.showSuccess(controller.overwriteCurrentMessage);
     });
   }
@@ -561,6 +630,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       controller.setDirty(false);
       controller.autoSaveReadyRef.current = true;
       setScan((value) => ({ ...value, profiles }));
+      resetProfileDraftHistory();
       notifier.showSuccess(controller.overwriteProfileMessage(mode));
     });
   }
@@ -578,6 +648,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     setMapDirty(false);
     setModDirty(false);
     setScan(result);
+    resetProfileDraftHistory();
     notifier.showSuccess(successMessage);
   }
 
@@ -601,18 +672,15 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   }
 
   function toggleMap(id: string) {
-    setMapDirty(true);
-    setEnabledMapDraft((current) => toggleSetValue(current, id));
+    updateProfileDraft({ enabledMapDraft: (current) => toggleSetValue(current, id) });
   }
 
   function toggleMapMod(id: string) {
-    setMapDirty(true);
-    setEnabledMapModDraft((current) => toggleSetValue(current, id));
+    updateProfileDraft({ enabledMapModDraft: (current) => toggleSetValue(current, id) });
   }
 
   function toggleMod(id: string) {
-    setModDirty(true);
-    setEnabledExplicitModDraft((current) => toggleSetValue(current, id));
+    updateProfileDraft({ enabledExplicitModDraft: (current) => toggleSetValue(current, id) });
   }
 
   return {
@@ -641,6 +709,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     createEmptyModProfile,
     renameMapProfile,
     renameModProfile,
+    redoProfileDraft,
     selectedMapProfileId,
     selectedModProfileId,
     setEnabledExplicitModDraft: updateEnabledExplicitModDraft,
@@ -653,6 +722,22 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     setModProfileName: updateModProfileName,
     toggleMap,
     toggleMapMod,
-    toggleMod
+    toggleMod,
+    undoProfileDraft,
+    updateProfileDraft
   };
+}
+
+function resolveSetAction(current: Set<string>, action: SetStateAction<Set<string>> | undefined) {
+  if (action === undefined) return current;
+  return typeof action === "function" ? action(current) : action;
+}
+
+function resolveValueAction(current: string, action: SetStateAction<string> | undefined) {
+  if (action === undefined) return current;
+  return typeof action === "function" ? action(current) : action;
+}
+
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }

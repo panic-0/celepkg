@@ -4,6 +4,7 @@ import type { AppNotifier, ModRecord, ScanResult } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
 import { isDraftEnabled } from "../utils/format";
 import { notifyError } from "../utils/notify";
+import type { ProfileDraftBatchUpdate } from "./useProfileDraft";
 import type { ActiveView } from "../viewTypes";
 
 type RecordActionsOptions = {
@@ -19,14 +20,12 @@ type RecordActionsOptions = {
   notifier: AppNotifier;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
   scan: ScanResult;
-  setEnabledExplicitModDraft: Dispatch<SetStateAction<Set<string>>>;
-  setEnabledMapDraft: Dispatch<SetStateAction<Set<string>>>;
-  setEnabledMapModDraft: Dispatch<SetStateAction<Set<string>>>;
   setLoading: (loading: boolean) => void;
   setScan: Dispatch<SetStateAction<ScanResult>>;
   toggleMap: (id: string) => void;
   toggleMapMod: (id: string) => void;
   toggleMod: (id: string) => void;
+  updateProfileDraft: (update: ProfileDraftBatchUpdate) => void;
 };
 
 export function useRecordActions({
@@ -42,14 +41,12 @@ export function useRecordActions({
   notifier,
   requiredReferencesByModId,
   scan,
-  setEnabledExplicitModDraft,
-  setEnabledMapDraft,
-  setEnabledMapModDraft,
   setLoading,
   setScan,
   toggleMap,
   toggleMapMod,
-  toggleMod
+  toggleMod,
+  updateProfileDraft
 }: RecordActionsOptions) {
   const dependentNamesByModId = useMemo(
     () => findDependentNamesByModId(scan, enabledMapDraft, enabledModDraft, requiredReferencesByModId),
@@ -74,10 +71,14 @@ export function useRecordActions({
       return;
     }
     if (enabledExplicitModDraft.has(record.id)) {
-      setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => id !== record.id)));
-    }
-    if (enabledMapModDraft.has(record.id)) {
-      setEnabledMapModDraft((current) => new Set([...current].filter((id) => id !== record.id)));
+      updateProfileDraft({
+        enabledExplicitModDraft: (current) => new Set([...current].filter((id) => id !== record.id)),
+        enabledMapModDraft: (current) => new Set([...current].filter((id) => id !== record.id))
+      });
+    } else if (enabledMapModDraft.has(record.id)) {
+      updateProfileDraft({
+        enabledMapModDraft: (current) => new Set([...current].filter((id) => id !== record.id))
+      });
     }
   }
 
@@ -86,7 +87,7 @@ export function useRecordActions({
       enableVisibleMaps();
     } else if (activeView === "mods") {
       const modIds = filteredMods.map((modItem) => modItem.id);
-      setEnabledExplicitModDraft((current) => new Set([...current, ...modIds]));
+      updateProfileDraft({ enabledExplicitModDraft: (current) => new Set([...current, ...modIds]) });
     }
   }
 
@@ -100,10 +101,10 @@ export function useRecordActions({
       const modIds = new Set(
         filteredMods.filter((modItem) => !modItem.readOnly && !blockedModIds.has(modItem.id)).map((modItem) => modItem.id)
       );
-      setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-      if ([...modIds].some((id) => enabledMapModDraft.has(id))) {
-        setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-      }
+      updateProfileDraft({
+        enabledExplicitModDraft: (current) => new Set([...current].filter((id) => !modIds.has(id))),
+        enabledMapModDraft: (current) => new Set([...current].filter((id) => !modIds.has(id)))
+      });
       showBlockedDisableWarning(blockedMods, disabledRecordIds);
     }
   }
@@ -151,8 +152,10 @@ export function useRecordActions({
   function enableVisibleMaps() {
     const mapIds = filteredMaps.filter((record) => record.kind === "map").map((record) => record.id);
     const modIds = filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id);
-    setEnabledMapDraft((current) => new Set([...current, ...mapIds]));
-    setEnabledMapModDraft((current) => new Set([...current, ...modIds]));
+    updateProfileDraft({
+      enabledMapDraft: (current) => new Set([...current, ...mapIds]),
+      enabledMapModDraft: (current) => new Set([...current, ...modIds])
+    });
   }
 
   function disableVisibleMaps() {
@@ -163,8 +166,10 @@ export function useRecordActions({
     const blockedMods = blockedVisibleMods(visibleMods, disabledRecordIds);
     const blockedModIds = new Set(blockedMods.map((modItem) => modItem.id));
     const modIds = new Set(visibleMods.filter((record) => !record.readOnly && !blockedModIds.has(record.id)).map((record) => record.id));
-    setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
-    setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+    updateProfileDraft({
+      enabledMapDraft: (current) => new Set([...current].filter((id) => !mapIds.has(id))),
+      enabledMapModDraft: (current) => new Set([...current].filter((id) => !modIds.has(id)))
+    });
     showBlockedDisableWarning(blockedMods, disabledRecordIds);
   }
 
