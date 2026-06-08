@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.8.1 - 2026-06-08
+
+### 新增
+
+- 本地 Mod 更新检查新增按更新状态分组，可把可更新、未知状态和已是最新的 Mod 分区展示。
+- 工具栏新增 Celeste 启动阶段展示，区分 Steam 启动中、Celeste 进程启动中、Everest 准备中和正式运行。
+
+### 改进
+
+- Steam 版 Celeste 默认通过 `steam://rungameid/504230` 启动，并在启动观察窗口内持续检测 Steam、Everest 和 Celeste 的阶段变化。
+- 后台运行状态检测改为常驻轻量轮询，CelePkg 打开后用户手动启动 Celeste 也能自动识别并禁用写入游戏目录的操作。
+- Everest 准备阶段会识别 `EverestSplash` 浮窗进程和窗口标题，能展示“Everest 正在准备”或可读取到的加载进度信息。
+- Mock 更新失败和下载重试流程增加可见状态与回归覆盖，便于验证失败后重试、安装失败提示和记录列表反馈。
+
+### 修复
+
+- 修复从 CelePkg 启动 Celeste 后进程很晚才出现时不会提示运行状态的问题，启动观察窗口延长到 120 秒。
+- 修复 Celeste 运行或 Everest 准备时仍可能允许备份还原、安装 Everest、安装 Mod 等写游戏目录操作的问题。
+- 修复 Steam / Everest 链路中 `EverestSplash/EverestSplash-win64.exe` 未被识别，导致准备阶段被误判为普通启动中的问题。
+- 修复停止游戏时只处理 Celeste 进程、不覆盖 Everest 浮窗准备进程的问题；停止操作不会关闭 Steam 本体。
+
 ## v0.8.0 - 2026-06-07
 
 ### 新增
