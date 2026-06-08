@@ -67,6 +67,26 @@ test("profile manager keeps manually selected profiles before apply", async ({ p
   await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
 });
 
+test("profile manager keeps selection when deleting another profile", async ({ page }) => {
+  await openMock(page);
+  await openNav(page, "Profile");
+
+  const mapColumn = profileColumn(page, "地图 Profile");
+  await createEmptyProfile(mapColumn, "新建地图 Profile 名称", "保留选中 Profile");
+  await createEmptyProfile(mapColumn, "新建地图 Profile 名称", "待删除 Profile");
+
+  await mapColumn.locator(".profile-row", { hasText: "保留选中 Profile" }).first().locator("button.profile").click();
+  await expect(mapColumn.locator(".profile-row.active")).toContainText("保留选中 Profile");
+
+  await mapColumn.locator(".profile-row", { hasText: "待删除 Profile" }).first().getByTitle("删除 Profile").click();
+  const deleteDialog = page.locator(".confirm-dialog", { hasText: "确认删除 Profile" });
+  await expect(deleteDialog).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "删除" }).click();
+
+  await expect(mapColumn.locator(".profile-row", { hasText: "待删除 Profile" })).toHaveCount(0);
+  await expect(mapColumn.locator(".profile-row.active")).toContainText("保留选中 Profile");
+});
+
 test("profile draft shortcuts undo and redo local edits", async ({ page }) => {
   await openMock(page);
   await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Galactica");

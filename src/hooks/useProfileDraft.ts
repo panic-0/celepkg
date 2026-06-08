@@ -529,9 +529,16 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   async function removeProfile(controller: ProfileDraftController, profile: Profile) {
     await runProfileTask(async () => {
       const profiles = await enqueueProfileSave(() => deleteProfile(profile.id));
+      const nextActiveProfileId = controller.activeProfileId(profiles);
       controller.setDirty(false);
       setScan((value) => ({ ...value, profiles }));
-      controller.setSelectedId(controller.activeProfileId(profiles));
+      if (profile.id === controller.selectedId) {
+        controller.setSelectedId(nextActiveProfileId);
+      } else if (controller.profileType === "maps") {
+        lastSyncedActiveProfileIdsRef.current.map = nextActiveProfileId;
+      } else {
+        lastSyncedActiveProfileIdsRef.current.mod = nextActiveProfileId;
+      }
       resetProfileDraftHistory();
       notifier.showSuccess(`${controller.profileType === "maps" ? "地图" : "Mod"} Profile 已删除。`);
     });
