@@ -71,10 +71,35 @@ jobs:
         run: npm ci
 
       - name: Build desktop app
+        if: runner.os != 'Windows'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npx tauri build --ci
+
+      - name: Build desktop app
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $exitCode = 0
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            npx tauri build --ci
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -eq 0) {
+              exit 0
+            }
+
+            if ($attempt -lt 3) {
+              $delay = 15 * $attempt
+              Write-Host "Windows bundle build failed with exit code $exitCode. Retrying in $delay seconds..."
+              Start-Sleep -Seconds $delay
+            }
+          }
+
+          exit $exitCode
 
       - name: Upload release bundle
         uses: actions/upload-artifact@v4
