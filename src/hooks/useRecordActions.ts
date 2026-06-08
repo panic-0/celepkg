@@ -9,7 +9,9 @@ import type { ActiveView } from "../viewTypes";
 type RecordActionsOptions = {
   activeView: ActiveView;
   celestePath: string;
+  enabledExplicitModDraft: Set<string>;
   enabledMapDraft: Set<string>;
+  enabledMapModDraft: Set<string>;
   enabledModDraft: Set<string>;
   dependencyModDraft: Set<string>;
   filteredMaps: ModRecord[];
@@ -31,7 +33,9 @@ export function useRecordActions({
   activeView,
   celestePath,
   dependencyModDraft,
+  enabledExplicitModDraft,
   enabledMapDraft,
+  enabledMapModDraft,
   enabledModDraft,
   filteredMaps,
   filteredMods,
@@ -60,7 +64,17 @@ export function useRecordActions({
 
   function toggleModRecord(record: ModRecord) {
     if (!canToggleProfileRecord(record)) return;
-    toggleMod(record.id);
+    const enabled = isDraftEnabled(record, enabledMapDraft, enabledModDraft);
+    if (!enabled) {
+      toggleMod(record.id);
+      return;
+    }
+    if (enabledExplicitModDraft.has(record.id)) {
+      setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => id !== record.id)));
+    }
+    if (enabledMapModDraft.has(record.id)) {
+      setEnabledMapModDraft((current) => new Set([...current].filter((id) => id !== record.id)));
+    }
   }
 
   function enableAllInCurrentView() {
@@ -82,6 +96,9 @@ export function useRecordActions({
         filteredMods.filter((modItem) => !modItem.readOnly && !blockedModIds.has(modItem.id)).map((modItem) => modItem.id)
       );
       setEnabledExplicitModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+      if ([...modIds].some((id) => enabledMapModDraft.has(id))) {
+        setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
+      }
       showBlockedDisableWarning(blockedMods);
     }
   }

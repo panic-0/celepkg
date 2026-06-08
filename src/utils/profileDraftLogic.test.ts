@@ -3,6 +3,7 @@ import type { ModRecord, Profile, ScanResult } from "../types";
 import {
   inferDependencyMods,
   nextCopyName,
+  profileContentNeedsSave,
   profileNameExists,
   resolveMapProfileContent,
   resolveModProfileContent,
@@ -29,6 +30,19 @@ describe("profile draft logic", () => {
       enabledMapIds: ["map-a", "official"],
       enabledModIds: ["helper"]
     });
+  });
+
+  it("removes regular mods from map profile content", () => {
+    const scan = scanWithRecords({
+      otherMods: [
+        record("helper-map", "Helper Map", "mod", { subMaps: [subMap("helper-map/test")] }),
+        record("regular-helper", "Regular Helper", "mod")
+      ]
+    });
+    const content = resolveMapProfileContent(profile({ enabledModIds: ["helper-map", "regular-helper"] }), scan);
+
+    expect(content.enabledModIds).toEqual(["helper-map"]);
+    expect(profileContentNeedsSave(profile({ enabledModIds: ["helper-map", "regular-helper"] }), content)).toBe(true);
   });
 
   it("fills legacy mod profile content from enabled mods", () => {

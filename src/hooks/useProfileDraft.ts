@@ -6,6 +6,7 @@ import {
   inferDependencyMods,
   nextCopyName,
   nextNewProfileName,
+  profileContentNeedsSave,
   profileNameExists,
   resolveMapProfileContent,
   resolveModProfileContent,
@@ -233,7 +234,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       const content = controller.resolveContent(profile);
       controller.applyContent(content);
       controller.setDirty(false);
-      if (profile && shouldNormalizeProfileContent(controller, profile)) {
+      if (profile && profileContentNeedsSave(profile, content)) {
         void enqueueProfileSave(() =>
           saveProfile(
             controller.savePayload({
@@ -585,10 +586,6 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     } finally {
       setLoading(false);
     }
-  }
-
-  function shouldNormalizeProfileContent(controller: ProfileDraftController, profile: Profile) {
-    return controller.profileType === "maps" ? !profile.enabledMapIds || !profile.enabledModIds : !profile.enabledModIds;
   }
 
   function showLaunchResult(result: LaunchResult) {

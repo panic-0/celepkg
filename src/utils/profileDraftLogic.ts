@@ -14,8 +14,20 @@ export function resolveMapProfileContent(profile: Profile, scan: ScanResult) {
     ...new Set([...(profile.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)), ...readOnlyMapIds])
   ];
   const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
-  const enabledModIds = profile.enabledModIds ?? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
+  const helperMapModIds = new Set(helperMapMods.map((modItem) => modItem.id));
+  const enabledModIds = profile.enabledModIds
+    ? profile.enabledModIds.filter((id) => helperMapModIds.has(id))
+    : helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
   return { enabledMapIds, enabledModIds };
+}
+
+export function profileContentNeedsSave(profile: Profile, content: { enabledMapIds?: string[]; enabledModIds: string[] }) {
+  if (profile.profileType === "maps") {
+    return (
+      !sameStringArray(profile.enabledMapIds, content.enabledMapIds ?? []) || !sameStringArray(profile.enabledModIds, content.enabledModIds)
+    );
+  }
+  return !sameStringArray(profile.enabledModIds, content.enabledModIds);
 }
 
 export function resolveModProfileContent(profile: Profile, scan: ScanResult) {
@@ -52,4 +64,9 @@ function nextAvailableProfileName(base: string, profiles: Profile[]) {
     const candidate = `${base} ${index}`;
     if (!names.has(candidate)) return candidate;
   }
+}
+
+function sameStringArray(left: string[] | null | undefined, right: string[]) {
+  if (!left || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
 }

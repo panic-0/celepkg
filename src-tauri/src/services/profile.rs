@@ -9,6 +9,7 @@ use crate::storage::{
     update_state, update_state_at,
 };
 use crate::utils::{now_string, stable_id};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -287,7 +288,7 @@ fn apply_profile_to_blacklist_at(
             .map(|map| map.id.clone())
             .collect()
     });
-    let mut enabled_mod_ids = map_profile.enabled_mod_ids.clone().unwrap_or_else(Vec::new);
+    let mut enabled_mod_ids = resolve_map_profile_mod_ids(&scan, &map_profile);
     let mod_profile_mod_ids = mod_profile.enabled_mod_ids.clone().unwrap_or_else(|| {
         scan.other_mods
             .iter()
@@ -340,6 +341,27 @@ fn resolve_required_mod_ids(
     })
 }
 
+fn resolve_map_profile_mod_ids(scan: &ScanResult, map_profile: &Profile) -> Vec<String> {
+    let helper_map_mod_ids: HashSet<&str> = scan
+        .other_mods
+        .iter()
+        .filter(|mod_item| !mod_item.sub_maps.is_empty())
+        .map(|mod_item| mod_item.id.as_str())
+        .collect();
+    if let Some(ids) = &map_profile.enabled_mod_ids {
+        return ids
+            .iter()
+            .filter(|id| helper_map_mod_ids.contains(id.as_str()))
+            .cloned()
+            .collect();
+    }
+    scan.other_mods
+        .iter()
+        .filter(|mod_item| !mod_item.sub_maps.is_empty() && mod_item.enabled)
+        .map(|mod_item| mod_item.id.clone())
+        .collect()
+}
+
 impl ProfileType {
     fn as_str(self) -> &'static str {
         match self {
@@ -352,7 +374,9 @@ impl ProfileType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{CompletionStatus, Dependency, ModKind, ModMetadata, ModRecord};
+    use crate::domain::{
+        CompletionStatus, Dependency, ModKind, ModMetadata, ModRecord, SubMapInfo,
+    };
     use std::fs;
 
     #[test]
@@ -483,6 +507,60 @@ mod tests {
     }
 
     #[test]
+    fn map_profile_mod_ids_ignore_regular_mods() {
+        let mut helper_map = record(
+            "helper-map",
+            "HelperMap.zip",
+            ModKind::Mod,
+            "HelperMap",
+            &[],
+        );
+        helper_map.sub_maps = vec![sub_map("helper-map/test")];
+        let scan = ScanResult {
+            celeste_path: String::new(),
+            mods_path: String::new(),
+            blacklist_path: String::new(),
+            blacklist_entries: vec![],
+            game_executable: String::new(),
+            maps: vec![],
+            other_mods: vec![
+                helper_map,
+                record(
+                    "regular-helper",
+                    "RegularHelper.zip",
+                    ModKind::Mod,
+                    "RegularHelper",
+                    &[],
+                ),
+            ],
+            profiles: ProfilesState {
+                active_map_profile_id: "maps".to_string(),
+                active_mod_profile_id: "mods".to_string(),
+                profiles: vec![],
+            },
+            available_save_files: vec![],
+            selected_save_files: vec![],
+            warnings: vec![],
+            timings: vec![],
+        };
+        let profile = Profile {
+            id: "maps".to_string(),
+            name: "Maps".to_string(),
+            profile_type: ProfileType::Maps,
+            enabled_map_ids: Some(vec![]),
+            enabled_mod_ids: Some(vec!["helper-map".to_string(), "regular-helper".to_string()]),
+            launch_args: String::new(),
+            created_at: "1".to_string(),
+            updated_at: "1".to_string(),
+        };
+
+        assert_eq!(
+            resolve_map_profile_mod_ids(&scan, &profile),
+            vec!["helper-map".to_string()]
+        );
+    }
+
+    #[test]
     fn applied_profile_scan_uses_returned_state_snapshot() {
         let root = temp_celeste_root("snapshot");
         let state_root = temp_celeste_root("snapshot-state");
@@ -594,6 +672,25 @@ mod tests {
             optional_dependencies: vec![],
             stats: None,
             warnings: vec![],
+        }
+    }
+
+    fn sub_map(id: &str) -> SubMapInfo {
+        SubMapInfo {
+            id: id.to_string(),
+            sid: id.to_string(),
+            mode_index: None,
+            display_name: id.to_string(),
+            chapter: String::new(),
+            file_path: format!("{id}.bin"),
+            difficulty: String::new(),
+            strawberry_count: 0,
+            strawberry_total_count: 0,
+            completion_status: CompletionStatus::Unknown,
+            stats: None,
+            current_visible_strawberry_ids: HashSet::new(),
+            current_total_strawberry_ids: HashSet::new(),
+            current_strawberry_ids_complete: false,
         }
     }
 
