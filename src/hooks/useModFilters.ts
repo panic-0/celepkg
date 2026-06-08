@@ -6,9 +6,11 @@ import { isDraftEnabled } from "../utils/format";
 import { createSearchMatcher, matchSearchFields, type SearchField, type SearchMatch } from "../utils/search";
 
 type ModFiltersOptions = {
+  availableUpdateRecordOrder: Map<string, number>;
   enabledMapDraft: Set<string>;
   enabledModDraft: Set<string>;
   downloadableUpdateRecordOrder: Map<string, number>;
+  latestUpdateRecordOrder: Map<string, number>;
   optionalReferencesByModId: Map<string, DependencyReference[]>;
   optionalReferencedModIds: Set<string>;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
@@ -17,9 +19,11 @@ type ModFiltersOptions = {
 };
 
 export function useModFilters({
+  availableUpdateRecordOrder,
   enabledMapDraft,
   enabledModDraft,
   downloadableUpdateRecordOrder,
+  latestUpdateRecordOrder,
   optionalReferencesByModId,
   optionalReferencedModIds,
   requiredReferencesByModId,
@@ -29,10 +33,12 @@ export function useModFilters({
   const [query, setQuery] = useState("");
   const [mapEnabledFilter, setMapEnabledFilter] = useState<EnabledFilter>("all");
   const [mapProgressFilter, setMapProgressFilter] = useState<ProgressFilter>("all");
+  const [mapGroupByUpdateStatus, setMapGroupByUpdateStatus] = useState(false);
   const [mapSortKey, setMapSortKey] = useState<SortKey>("name");
   const [showHelperMaps, setShowHelperMaps] = useState(false);
   const [modEnabledFilter, setModEnabledFilter] = useState<EnabledFilter>("all");
   const [modProgressFilter, setModProgressFilter] = useState<ProgressFilter>("all");
+  const [modGroupByUpdateStatus, setModGroupByUpdateStatus] = useState(false);
   const [modReferenceFilter, setModReferenceFilter] = useState<ReferenceFilter>("all");
 
   const helperMapMods = useMemo(() => scan.otherMods.filter((modItem) => modItem.subMaps.length > 0), [scan.otherMods]);
@@ -58,6 +64,15 @@ export function useModFilters({
       });
     return [...maps]
       .sort((a, b) => {
+        if (mapGroupByUpdateStatus) {
+          const updateStatusSort = compareUpdateStatusRecords(
+            a.record.id,
+            b.record.id,
+            availableUpdateRecordOrder,
+            latestUpdateRecordOrder
+          );
+          if (updateStatusSort !== 0) return updateStatusSort;
+        }
         if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
         if (mapProgressFilter === "updates") {
           return (downloadableUpdateRecordOrder.get(a.record.id) ?? 0) - (downloadableUpdateRecordOrder.get(b.record.id) ?? 0);
@@ -66,10 +81,13 @@ export function useModFilters({
       })
       .map((item) => item.record);
   }, [
+    availableUpdateRecordOrder,
     downloadableUpdateRecordOrder,
     enabledMapDraft,
     enabledModDraft,
+    latestUpdateRecordOrder,
     mapEnabledFilter,
+    mapGroupByUpdateStatus,
     mapProgressFilter,
     mapSortKey,
     searchMatcher,
@@ -99,6 +117,15 @@ export function useModFilters({
       });
     return [...mods]
       .sort((a, b) => {
+        if (modGroupByUpdateStatus) {
+          const updateStatusSort = compareUpdateStatusRecords(
+            a.record.id,
+            b.record.id,
+            availableUpdateRecordOrder,
+            latestUpdateRecordOrder
+          );
+          if (updateStatusSort !== 0) return updateStatusSort;
+        }
         if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
         if (modProgressFilter === "updates") {
           return (downloadableUpdateRecordOrder.get(a.record.id) ?? 0) - (downloadableUpdateRecordOrder.get(b.record.id) ?? 0);
@@ -107,9 +134,12 @@ export function useModFilters({
       })
       .map((item) => item.record);
   }, [
+    availableUpdateRecordOrder,
     enabledModDraft,
     downloadableUpdateRecordOrder,
+    latestUpdateRecordOrder,
     modEnabledFilter,
+    modGroupByUpdateStatus,
     modProgressFilter,
     modReferenceFilter,
     optionalReferencesByModId,
@@ -141,19 +171,23 @@ export function useModFilters({
     filteredMaps,
     filteredMods,
     helperMapMods,
+    mapGroupByUpdateStatus,
     mapEnabledFilter,
     mapProgressFilter,
     mapSortKey,
     modEnabledFilter,
+    modGroupByUpdateStatus,
     modProgressFilter,
     modReferenceFilter,
     query,
     recordSearchMatches,
     referencedModIds,
     setMapEnabledFilter,
+    setMapGroupByUpdateStatus,
     setMapProgressFilter,
     setMapSortKey,
     setModEnabledFilter,
+    setModGroupByUpdateStatus,
     setModProgressFilter,
     setModReferenceFilter,
     setQuery,
@@ -161,6 +195,34 @@ export function useModFilters({
     showHelperMaps,
     visibleMapRecords
   };
+}
+
+function updateStatusGroupRank(
+  recordId: string,
+  availableUpdateRecordOrder: Map<string, number>,
+  latestUpdateRecordOrder: Map<string, number>
+) {
+  if (availableUpdateRecordOrder.has(recordId)) return 0;
+  if (latestUpdateRecordOrder.has(recordId)) return 2;
+  return 1;
+}
+
+function compareUpdateStatusRecords(
+  leftRecordId: string,
+  rightRecordId: string,
+  availableUpdateRecordOrder: Map<string, number>,
+  latestUpdateRecordOrder: Map<string, number>
+) {
+  const leftGroup = updateStatusGroupRank(leftRecordId, availableUpdateRecordOrder, latestUpdateRecordOrder);
+  const rightGroup = updateStatusGroupRank(rightRecordId, availableUpdateRecordOrder, latestUpdateRecordOrder);
+  if (leftGroup !== rightGroup) return leftGroup - rightGroup;
+  if (leftGroup === 0) {
+    return (availableUpdateRecordOrder.get(leftRecordId) ?? 0) - (availableUpdateRecordOrder.get(rightRecordId) ?? 0);
+  }
+  if (leftGroup === 2) {
+    return (latestUpdateRecordOrder.get(leftRecordId) ?? 0) - (latestUpdateRecordOrder.get(rightRecordId) ?? 0);
+  }
+  return 0;
 }
 
 function strawberrySortValue(record: { stats: { strawberries: number; strawberriesKnown: boolean } | null }) {

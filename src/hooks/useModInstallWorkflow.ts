@@ -89,6 +89,13 @@ export function useModInstallWorkflow({
     }
     return byRecordId;
   }, [modUpdateResult.updates]);
+  const latestModUpdatesByRecordId = useMemo(() => {
+    const byRecordId = new Map<string, ModUpdateCandidate>();
+    for (const candidate of modUpdateResult.matched) {
+      if (!candidate.updateAvailable) byRecordId.set(candidate.installed.recordId, candidate);
+    }
+    return byRecordId;
+  }, [modUpdateResult.matched]);
   const downloadableModUpdates = useMemo(
     () => modUpdateResult.updates.filter((candidate) => candidate.entry.downloadUrl.trim().length > 0),
     [modUpdateResult.updates]
@@ -390,6 +397,7 @@ export function useModInstallWorkflow({
     everestDependencyPrompt,
     installCatalogEntry,
     installEverestRelease,
+    latestModUpdatesByRecordId,
     modUpdateChecking,
     modUpdateResult,
     modUpdatesByRecordId,

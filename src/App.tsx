@@ -121,6 +121,7 @@ export function App() {
     everestDependencyPrompt,
     installCatalogEntry,
     installEverestRelease,
+    latestModUpdatesByRecordId,
     modUpdateChecking,
     modUpdatesByRecordId,
     requestAppConfirm,
@@ -170,10 +171,20 @@ export function App() {
     () => new Map(downloadableModUpdates.map((candidate, index) => [candidate.installed.recordId, index])),
     [downloadableModUpdates]
   );
+  const availableUpdateRecordOrder = useMemo(
+    () => new Map([...modUpdatesByRecordId.keys()].map((recordId, index) => [recordId, index])),
+    [modUpdatesByRecordId]
+  );
+  const latestUpdateRecordOrder = useMemo(
+    () => new Map([...latestModUpdatesByRecordId.keys()].map((recordId, index) => [recordId, index])),
+    [latestModUpdatesByRecordId]
+  );
   const filters = useModFilters({
+    availableUpdateRecordOrder,
     enabledMapDraft: profileDraft.enabledMapDraft,
     enabledModDraft: profileDraft.enabledModDraft,
     downloadableUpdateRecordOrder,
+    latestUpdateRecordOrder,
     optionalReferencesByModId: dependencyReferences.optionalReferencesByModId,
     optionalReferencedModIds,
     requiredReferencesByModId: dependencyReferences.requiredReferencesByModId,
@@ -445,6 +456,7 @@ export function App() {
             enabledFilter={showingModRecords ? filters.modEnabledFilter : filters.mapEnabledFilter}
             filteredMaps={filters.filteredMaps}
             filteredMods={filters.filteredMods}
+            groupByUpdateStatus={showingModRecords ? filters.modGroupByUpdateStatus : filters.mapGroupByUpdateStatus}
             helperMapCount={filters.helperMapMods.length}
             progressFilter={showingModRecords ? filters.modProgressFilter : filters.mapProgressFilter}
             query={filters.query}
@@ -462,6 +474,7 @@ export function App() {
             loadingMessage={loadingMessage}
             modUpdateChecking={modUpdateChecking}
             modUpdateCount={activeDownloadableModUpdates.length}
+            latestUpdatesByRecordId={latestModUpdatesByRecordId}
             modUpdatesByRecordId={modUpdatesByRecordId}
             recordSearchMatches={filters.recordSearchMatches}
             requiredReferencesByModId={dependencyReferences.requiredReferencesByModId}
@@ -470,6 +483,7 @@ export function App() {
             onEnableAll={recordActions.enableAllInCurrentView}
             onCheckModUpdates={checkUpdatesForMods}
             onEnabledFilterChange={showingModRecords ? filters.setModEnabledFilter : filters.setMapEnabledFilter}
+            onGroupByUpdateStatusChange={showingModRecords ? filters.setModGroupByUpdateStatus : filters.setMapGroupByUpdateStatus}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={workspaceView.selectMod}

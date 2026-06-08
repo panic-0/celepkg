@@ -322,6 +322,30 @@
   box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
+.record-table tbody tr.record-group-row,
+.record-table tbody tr.record-group-row:hover {
+  cursor: default;
+  background: #f7fafc;
+}
+
+.record-group-row td {
+  color: #526273;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+}
+
+.record-group-row span {
+  margin-right: 8px;
+}
+
+.record-group-row small {
+  color: #8795a1;
+  font-weight: 700;
+}
+
 .sub-map-table tbody tr.sub-map-inline-detail,
 .sub-map-table tbody tr.sub-map-inline-detail:hover {
   cursor: default;

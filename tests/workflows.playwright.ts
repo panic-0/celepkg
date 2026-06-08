@@ -189,6 +189,76 @@ test("mock dependency tree update opens the tree preview", async ({ page }) => {
   await previewDialog.getByRole("button", { name: "取消" }).click();
 });
 
+test("mod update status grouping separates update, unknown, and latest records", async ({ page }) => {
+  test.setTimeout(60_000);
+  await openMock(page);
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByRole("button", { name: "检查更新" }).click();
+  await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Mock Dependency Tree");
+  const statusFilter = page.locator(".mod-filters .field", { has: page.locator("span", { hasText: /^状态$/ }) }).locator("select");
+  await expect(statusFilter).toHaveCount(1);
+  await expect(statusFilter).toHaveValue("all");
+  const groupToggle = page.locator(".mod-filters .record-update-group-toggle input");
+  await expect(groupToggle).toHaveCount(1);
+  await groupToggle.check();
+
+  await expect(page.locator(".record-panel")).toContainText("可更新");
+  await expect(page.locator(".record-panel")).toContainText("未知状态");
+  await expect(page.locator(".record-panel")).toContainText("已是最新");
+  const order = await page.locator(".record-panel").evaluate((panel) => {
+    const text = panel.textContent ?? "";
+    return {
+      latest: text.indexOf("已是最新"),
+      latestRecord: text.indexOf("Mock Dependency Tree Outdated"),
+      unknown: text.indexOf("未知状态"),
+      unknownRecord: text.indexOf("Mock Dependency Tree Cycle A"),
+      update: text.indexOf("可更新"),
+      updateRecord: text.indexOf("Mock Dependency Tree Root")
+    };
+  });
+  expect(order.update).toBeLessThan(order.unknown);
+  expect(order.unknown).toBeLessThan(order.latest);
+  expect(order.updateRecord).toBeGreaterThan(order.update);
+  expect(order.updateRecord).toBeLessThan(order.unknown);
+  expect(order.unknownRecord).toBeGreaterThan(order.unknown);
+  expect(order.unknownRecord).toBeLessThan(order.latest);
+  expect(order.latestRecord).toBeGreaterThan(order.latest);
+});
+
+test("map update status grouping separates update, unknown, and latest records", async ({ page }) => {
+  test.setTimeout(60_000);
+  await openMock(page);
+  await page.getByRole("button", { name: "检查更新" }).click();
+  await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
+
+  const progressFilter = page.locator(".map-filters .field", { has: page.locator("span", { hasText: /^进度$/ }) }).locator("select");
+  await expect(progressFilter).toHaveCount(1);
+  await expect(progressFilter).toHaveValue("all");
+  const groupToggle = page.locator(".map-filters .record-update-group-toggle input");
+  await expect(groupToggle).toHaveCount(1);
+  await groupToggle.check();
+
+  await expect(page.locator(".record-panel")).toContainText("可更新");
+  await expect(page.locator(".record-panel")).toContainText("未知状态");
+  const initialOrder = await page.locator(".record-panel").evaluate((panel) => {
+    const text = panel.textContent ?? "";
+    return {
+      unknown: text.indexOf("未知状态"),
+      update: text.indexOf("可更新"),
+      updateRecord: text.indexOf("Galactica")
+    };
+  });
+  expect(initialOrder.update).toBeLessThan(initialOrder.unknown);
+  expect(initialOrder.updateRecord).toBeGreaterThan(initialOrder.update);
+  expect(initialOrder.updateRecord).toBeLessThan(initialOrder.unknown);
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Strawberry Jam");
+  await expect(page.locator(".record-panel")).toContainText("已是最新");
+  await expect(page.locator(".record-panel")).toContainText("Strawberry Jam Collab");
+});
+
 test("mod detail opens the local mod location from the header", async ({ page }) => {
   await openMock(page);
   await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
@@ -346,7 +416,9 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   expect(taskOrder.helper).toBeGreaterThan(taskOrder.downloadFailure);
   await expect(page.locator(".download-task-panel")).toContainText("安装失败 1", { timeout: 5000 });
   await expect(page.locator(".download-task-panel")).toContainText("下载失败 1", { timeout: 5000 });
-  await expect(page.locator(".download-task-panel")).toContainText("暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)");
+  await expect(page.locator(".download-task-panel")).toContainText(
+    "暂存旧 Mod 失败：另一个程序正在使用此文件，进程无法访问。 (os error 32)"
+  );
   await expect(page.locator(".download-task-panel")).toContainText("下载 Mod 失败：网络连接已中断，无法继续读取远端文件。");
   const installFailureMessage = page.locator(".download-task-group em.download-task-error", { hasText: "暂存旧 Mod 失败" });
   await expect(installFailureMessage).toHaveCSS("white-space", "normal");

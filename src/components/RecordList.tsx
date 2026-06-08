@@ -25,12 +25,16 @@ import { Pagination } from "./Pagination";
 import { HighlightedText, SearchBox, Select } from "./common";
 
 type RecordView = Extract<ActiveView, "maps" | "mods">;
+type UpdateStatusGroup = "available" | "latest" | "unknown";
+type UpdateStatusGroupCounts = Record<UpdateStatusGroup, number>;
+type UpdateStatusGroups = { counts: UpdateStatusGroupCounts; groups: Map<string, UpdateStatusGroup> };
 
 type RecordListProps = {
   activeView: RecordView;
   filteredMaps: ModRecord[];
   filteredMods: ModRecord[];
   enabledFilter: EnabledFilter;
+  groupByUpdateStatus: boolean;
   helperMapCount: number;
   progressFilter: ProgressFilter;
   query: string;
@@ -46,6 +50,7 @@ type RecordListProps = {
   loadingMessage: string;
   modUpdateChecking: boolean;
   modUpdateCount: number;
+  latestUpdatesByRecordId: Map<string, ModUpdateCandidate>;
   modUpdatesByRecordId: Map<string, ModUpdateCandidate>;
   recordSearchMatches: Map<string, SearchMatch>;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
@@ -56,6 +61,7 @@ type RecordListProps = {
   onEnableAll: () => void;
   onCheckModUpdates: () => void;
   onEnabledFilterChange: (value: EnabledFilter) => void;
+  onGroupByUpdateStatusChange: (value: boolean) => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
@@ -79,6 +85,7 @@ export function RecordList({
   filteredMaps,
   filteredMods,
   enabledFilter,
+  groupByUpdateStatus,
   helperMapCount,
   progressFilter,
   query,
@@ -94,6 +101,7 @@ export function RecordList({
   loadingMessage,
   modUpdateChecking,
   modUpdateCount,
+  latestUpdatesByRecordId,
   modUpdatesByRecordId,
   recordSearchMatches,
   requiredReferencesByModId,
@@ -104,6 +112,7 @@ export function RecordList({
   onEnableAll,
   onCheckModUpdates,
   onEnabledFilterChange,
+  onGroupByUpdateStatusChange,
   onMapSelect,
   onMapToggle,
   onModSelect,
@@ -129,6 +138,13 @@ export function RecordList({
   const pagedRecords = useMemo(() => paginateItems(records, page), [page, records]);
   const recordsKey = useMemo(() => records.map((record) => record.id).join("\n"), [records]);
   const tableScrollRef = useScrollMemory<HTMLDivElement>(`records:${activeView}`, scrollMemory);
+  const updateStatusGroups = useMemo(
+    () =>
+      groupByUpdateStatus
+        ? buildUpdateStatusGroups(activeView === "maps" ? filteredMaps : filteredMods, modUpdatesByRecordId, latestUpdatesByRecordId)
+        : null,
+    [activeView, filteredMaps, filteredMods, groupByUpdateStatus, latestUpdatesByRecordId, modUpdatesByRecordId]
+  );
 
   useEffect(() => {
     setPage(1);
@@ -207,12 +223,14 @@ export function RecordList({
         <RecordFilterBar
           activeView={activeView}
           enabledFilter={enabledFilter}
+          groupByUpdateStatus={groupByUpdateStatus}
           helperMapCount={helperMapCount}
           progressFilter={progressFilter}
           referenceFilter={referenceFilter}
           showHelperMaps={showHelperMaps}
           sortKey={sortKey}
           onEnabledFilterChange={onEnabledFilterChange}
+          onGroupByUpdateStatusChange={onGroupByUpdateStatusChange}
           onProgressFilterChange={onProgressFilterChange}
           onReferenceFilterChange={onReferenceFilterChange}
           onShowHelperMapsChange={onShowHelperMapsChange}
@@ -234,6 +252,7 @@ export function RecordList({
             isEnabled={isMapEnabled}
             searchMatches={recordSearchMatches}
             updatesByRecordId={modUpdatesByRecordId}
+            updateStatusGroups={updateStatusGroups}
             onUpdate={onModUpdate}
           />
         ) : (
@@ -248,6 +267,7 @@ export function RecordList({
             showWarningColumn={showWarningColumn}
             isEnabled={isModEnabled}
             updatesByRecordId={modUpdatesByRecordId}
+            updateStatusGroups={updateStatusGroups}
             requiredReferencesByModId={requiredReferencesByModId}
             searchMatches={recordSearchMatches}
             onUpdate={onModUpdate}
@@ -263,12 +283,14 @@ export function RecordList({
 function RecordFilterBar({
   activeView,
   enabledFilter,
+  groupByUpdateStatus,
   helperMapCount,
   progressFilter,
   referenceFilter,
   showHelperMaps,
   sortKey,
   onEnabledFilterChange,
+  onGroupByUpdateStatusChange,
   onProgressFilterChange,
   onReferenceFilterChange,
   onShowHelperMapsChange,
@@ -276,12 +298,14 @@ function RecordFilterBar({
 }: {
   activeView: RecordView;
   enabledFilter: EnabledFilter;
+  groupByUpdateStatus: boolean;
   helperMapCount: number;
   progressFilter: ProgressFilter;
   referenceFilter: ReferenceFilter;
   showHelperMaps: boolean;
   sortKey: SortKey;
   onEnabledFilterChange: (value: EnabledFilter) => void;
+  onGroupByUpdateStatusChange: (value: boolean) => void;
   onProgressFilterChange: (value: ProgressFilter) => void;
   onReferenceFilterChange: (value: ReferenceFilter) => void;
   onShowHelperMapsChange: (value: boolean) => void;
@@ -304,6 +328,7 @@ function RecordFilterBar({
             <option value="withStats">有存档统计</option>
             <option value="warnings">有依赖警告</option>
           </Select>
+          <UpdateStatusGroupToggle value={groupByUpdateStatus} onChange={onGroupByUpdateStatusChange} />
           <Select label="排序" value={sortKey} onChange={(value) => onSortKeyChange(value as SortKey)}>
             <option value="name">名称</option>
             <option value="deaths">死亡数</option>
@@ -333,9 +358,24 @@ function RecordFilterBar({
             <option value="updates">有更新</option>
             <option value="warnings">有警告</option>
           </Select>
+          <UpdateStatusGroupToggle value={groupByUpdateStatus} onChange={onGroupByUpdateStatusChange} />
         </>
       )}
     </div>
+  );
+}
+
+function UpdateStatusGroupToggle({ value, onChange }: { value: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className={`catalog-downloadable-toggle record-update-group-toggle ${value ? "active" : ""}`}>
+      <input
+        type="checkbox"
+        checked={value}
+        onChange={(event) => onChange(event.target.checked)}
+        title="按可更新、未知状态、已是最新分组"
+      />
+      <span>按更新状态分组</span>
+    </label>
   );
 }
 
@@ -386,6 +426,7 @@ function MapTable({
   strawberryDenominator,
   isEnabled,
   updatesByRecordId,
+  updateStatusGroups,
   searchMatches,
   onUpdate
 }: {
@@ -401,6 +442,7 @@ function MapTable({
   isEnabled: (record: ModRecord) => boolean;
   searchMatches: Map<string, SearchMatch>;
   updatesByRecordId: Map<string, ModUpdateCandidate>;
+  updateStatusGroups: UpdateStatusGroups | null;
   onUpdate: (candidate: ModUpdateCandidate) => void;
 }) {
   return (
@@ -437,11 +479,24 @@ function MapTable({
         </tr>
       </thead>
       <tbody>
-        {maps.map((map) => {
+        {maps.flatMap((map, index) => {
           const enabled = isEnabled(map);
           const searchMatch = searchMatches.get(map.id);
           const updateCandidate = updatesByRecordId.get(map.id);
-          return (
+          const updateStatus = updateStatusGroups?.groups.get(map.id) ?? null;
+          const previousUpdateStatus = index > 0 ? (updateStatusGroups?.groups.get(maps[index - 1].id) ?? null) : null;
+          const rows: React.ReactNode[] = [];
+          if (updateStatusGroups && updateStatus && updateStatus !== previousUpdateStatus) {
+            rows.push(
+              <UpdateStatusGroupRow
+                colSpan={showWarningColumn ? 8 : 7}
+                count={updateStatusGroups.counts[updateStatus]}
+                group={updateStatus}
+                key={`group:${updateStatus}:${map.id}`}
+              />
+            );
+          }
+          rows.push(
             <tr className={selectedMap?.id === map.id ? "active" : ""} key={map.id} onClick={() => onSelect(map.id)}>
               <RecordActionCell
                 enabled={enabled}
@@ -479,6 +534,7 @@ function MapTable({
               {showWarningColumn && <td>{map.warnings.length ? <span className="warning-pill">{map.warnings.length}</span> : "-"}</td>}
             </tr>
           );
+          return rows;
         })}
       </tbody>
     </table>
@@ -496,6 +552,7 @@ function ModTable({
   showWarningColumn,
   isEnabled,
   updatesByRecordId,
+  updateStatusGroups,
   requiredReferencesByModId,
   searchMatches,
   onUpdate
@@ -510,6 +567,7 @@ function ModTable({
   showWarningColumn: boolean;
   isEnabled: (id: string) => boolean;
   updatesByRecordId: Map<string, ModUpdateCandidate>;
+  updateStatusGroups: UpdateStatusGroups | null;
   requiredReferencesByModId: Map<string, DependencyReference[]>;
   searchMatches: Map<string, SearchMatch>;
   onUpdate: (candidate: ModUpdateCandidate) => void;
@@ -537,12 +595,25 @@ function ModTable({
         </tr>
       </thead>
       <tbody>
-        {mods.map((modItem) => {
+        {mods.flatMap((modItem, index) => {
           const enabled = isEnabled(modItem.id);
           const searchMatch = searchMatches.get(modItem.id);
           const updateCandidate = updatesByRecordId.get(modItem.id);
+          const updateStatus = updateStatusGroups?.groups.get(modItem.id) ?? null;
+          const previousUpdateStatus = index > 0 ? (updateStatusGroups?.groups.get(mods[index - 1].id) ?? null) : null;
           const requiredReferences = requiredReferencesByModId.get(modItem.id) ?? [];
-          return (
+          const rows: React.ReactNode[] = [];
+          if (updateStatusGroups && updateStatus && updateStatus !== previousUpdateStatus) {
+            rows.push(
+              <UpdateStatusGroupRow
+                colSpan={showWarningColumn ? 7 : 6}
+                count={updateStatusGroups.counts[updateStatus]}
+                group={updateStatus}
+                key={`group:${updateStatus}:${modItem.id}`}
+              />
+            );
+          }
+          rows.push(
             <tr className={selectedMod?.id === modItem.id ? "active" : ""} key={modItem.id} onClick={() => onSelect(modItem.id)}>
               <RecordActionCell
                 enabled={enabled}
@@ -571,10 +642,43 @@ function ModTable({
               )}
             </tr>
           );
+          return rows;
         })}
       </tbody>
     </table>
   );
+}
+
+function buildUpdateStatusGroups(
+  mods: ModRecord[],
+  updatesByRecordId: Map<string, ModUpdateCandidate>,
+  latestUpdatesByRecordId: Map<string, ModUpdateCandidate>
+) {
+  const groups = new Map<string, UpdateStatusGroup>();
+  const counts: UpdateStatusGroupCounts = { available: 0, latest: 0, unknown: 0 };
+  for (const modItem of mods) {
+    const group = updatesByRecordId.has(modItem.id) ? "available" : latestUpdatesByRecordId.has(modItem.id) ? "latest" : "unknown";
+    groups.set(modItem.id, group);
+    counts[group] += 1;
+  }
+  return { counts, groups };
+}
+
+function UpdateStatusGroupRow({ colSpan, count, group }: { colSpan: number; count: number; group: UpdateStatusGroup }) {
+  return (
+    <tr className="record-group-row">
+      <td colSpan={colSpan}>
+        <span>{updateStatusGroupLabel(group)}</span>
+        <small>{`${count} 个`}</small>
+      </td>
+    </tr>
+  );
+}
+
+function updateStatusGroupLabel(group: UpdateStatusGroup) {
+  if (group === "available") return "可更新";
+  if (group === "latest") return "已是最新";
+  return "未知状态";
 }
 
 function formatDependencyReferenceTitle(references: DependencyReference[]) {
