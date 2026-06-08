@@ -657,7 +657,11 @@ function buildUpdateStatusGroups(
   const groups = new Map<string, UpdateStatusGroup>();
   const counts: UpdateStatusGroupCounts = { available: 0, latest: 0, unknown: 0 };
   for (const modItem of mods) {
-    const group = updatesByRecordId.has(modItem.id) ? "available" : latestUpdatesByRecordId.has(modItem.id) ? "latest" : "unknown";
+    const group = updatesByRecordId.has(modItem.id)
+      ? "available"
+      : latestUpdatesByRecordId.has(modItem.id) || (modItem.kind === "map" && modItem.readOnly)
+        ? "latest"
+        : "unknown";
     groups.set(modItem.id, group);
     counts[group] += 1;
   }

@@ -257,6 +257,10 @@ test("map update status grouping separates update, unknown, and latest records",
   await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Strawberry Jam");
   await expect(page.locator(".record-panel")).toContainText("已是最新");
   await expect(page.locator(".record-panel")).toContainText("Strawberry Jam Collab");
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Celeste 官方地图");
+  await expect(page.locator(".record-panel")).toContainText("已是最新");
+  await expect(page.locator(".record-panel")).toContainText("Celeste 官方地图");
 });
 
 test("mod detail opens the local mod location from the header", async ({ page }) => {
