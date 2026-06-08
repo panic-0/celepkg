@@ -260,6 +260,39 @@ export function App() {
     if (result && shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch(result.launchMethod);
   }
 
+  async function enableAllInCurrentViewWithConfirm() {
+    const targetCount = showingModRecords ? filters.filteredMods.length : filters.filteredMaps.length;
+    const targetLabel = showingModRecords ? "Mod" : "地图";
+    const confirmed = await requestAppConfirm({
+      title: "确认启用当前结果",
+      description: "确认后会修改当前 Profile 草稿中的启用状态，实际写入游戏目录仍需应用 Profile。",
+      confirmLabel: "启用当前结果",
+      facts: [
+        { label: "目标列表", value: targetLabel },
+        { label: "结果数量", value: `${targetCount} 个` }
+      ]
+    });
+    if (!confirmed) return;
+    recordActions.enableAllInCurrentView();
+  }
+
+  async function disableAllInCurrentViewWithConfirm() {
+    const targetCount = showingModRecords ? filters.filteredMods.length : filters.filteredMaps.length;
+    const targetLabel = showingModRecords ? "Mod" : "地图";
+    const confirmed = await requestAppConfirm({
+      title: "确认禁用当前结果",
+      description: "确认后会修改当前 Profile 草稿中的启用状态；内置项目和被依赖保护的 Mod 仍会保留启用。",
+      confirmLabel: "禁用当前结果",
+      facts: [
+        { label: "目标列表", value: targetLabel },
+        { label: "结果数量", value: `${targetCount} 个` }
+      ],
+      variant: "danger"
+    });
+    if (!confirmed) return;
+    recordActions.disableAllInCurrentView();
+  }
+
   return (
     <main className="app-shell">
       <AppToolbar
@@ -479,8 +512,8 @@ export function App() {
             recordSearchMatches={filters.recordSearchMatches}
             requiredReferencesByModId={dependencyReferences.requiredReferencesByModId}
             writeActionsDisabled={writeActionsDisabled}
-            onDisableAll={recordActions.disableAllInCurrentView}
-            onEnableAll={recordActions.enableAllInCurrentView}
+            onDisableAll={disableAllInCurrentViewWithConfirm}
+            onEnableAll={enableAllInCurrentViewWithConfirm}
             onCheckModUpdates={checkUpdatesForMods}
             onEnabledFilterChange={showingModRecords ? filters.setModEnabledFilter : filters.setMapEnabledFilter}
             onGroupByUpdateStatusChange={showingModRecords ? filters.setModGroupByUpdateStatus : filters.setMapGroupByUpdateStatus}

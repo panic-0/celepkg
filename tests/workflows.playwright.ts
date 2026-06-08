@@ -189,6 +189,34 @@ test("mock dependency tree update opens the tree preview", async ({ page }) => {
   await previewDialog.getByRole("button", { name: "取消" }).click();
 });
 
+test("bulk enable and disable current results require confirmation", async ({ page }) => {
+  await openMock(page);
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("ChinaMirror");
+  const row = page.locator(".record-table tbody tr", { hasText: "ChinaMirror" });
+  await expect(row).toHaveCount(1);
+  await expect(row.getByTitle("启用地图")).toBeVisible();
+
+  await page.getByRole("button", { name: "启用当前结果" }).click();
+  const enableDialog = page.locator(".confirm-dialog", { hasText: "确认启用当前结果" });
+  await expect(enableDialog).toContainText("1 个");
+  await enableDialog.getByRole("button", { name: "取消" }).click();
+  await expect(row.getByTitle("启用地图")).toBeVisible();
+
+  await page.getByRole("button", { name: "启用当前结果" }).click();
+  await page.locator(".confirm-dialog", { hasText: "确认启用当前结果" }).getByRole("button", { name: "启用当前结果" }).click();
+  await expect(row.getByTitle("禁用地图")).toBeVisible();
+
+  await page.getByRole("button", { name: "禁用当前结果" }).click();
+  const disableDialog = page.locator(".confirm-dialog", { hasText: "确认禁用当前结果" });
+  await expect(disableDialog).toContainText("1 个");
+  await disableDialog.getByRole("button", { name: "取消" }).click();
+  await expect(row.getByTitle("禁用地图")).toBeVisible();
+
+  await page.getByRole("button", { name: "禁用当前结果" }).click();
+  await page.locator(".confirm-dialog", { hasText: "确认禁用当前结果" }).getByRole("button", { name: "禁用当前结果" }).click();
+  await expect(row.getByTitle("启用地图")).toBeVisible();
+});
+
 test("mod update status grouping separates update, unknown, and latest records", async ({ page }) => {
   test.setTimeout(60_000);
   await openMock(page);
