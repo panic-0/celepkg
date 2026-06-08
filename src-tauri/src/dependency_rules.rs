@@ -82,7 +82,7 @@ pub fn collect_transitive_required_dependency_mod_ids(
     target_mods: &[ModRecord],
     is_source_enabled: impl Fn(&ModRecord) -> bool,
 ) -> HashSet<String> {
-    let seed_mod_ids = dependency_closure_seed_mod_ids(base_mod_ids, target_mods);
+    let seed_mod_ids = dependency_closure_seed_mod_ids(base_mod_ids);
     collect_dependency_closure_inferred(
         source_records,
         target_mods,
@@ -97,7 +97,7 @@ pub fn collect_required_dependency_closure_mod_ids(
     target_mods: &[ModRecord],
     is_source_enabled: impl Fn(&ModRecord) -> bool,
 ) -> Vec<String> {
-    let seed_mod_ids = dependency_closure_seed_mod_ids(base_mod_ids, target_mods);
+    let seed_mod_ids = dependency_closure_seed_mod_ids(base_mod_ids);
     let inferred = collect_transitive_required_dependency_mod_ids(
         base_mod_ids,
         source_records,
@@ -125,20 +125,8 @@ fn catalog_aliases_for_record(record: &ModRecord) -> Vec<String> {
     ]
 }
 
-fn dependency_closure_seed_mod_ids(
-    base_mod_ids: &[String],
-    target_mods: &[ModRecord],
-) -> HashSet<String> {
-    base_mod_ids
-        .iter()
-        .cloned()
-        .chain(
-            target_mods
-                .iter()
-                .filter(|mod_item| mod_item.protected)
-                .map(|mod_item| mod_item.id.clone()),
-        )
-        .collect()
+fn dependency_closure_seed_mod_ids(base_mod_ids: &[String]) -> HashSet<String> {
+    base_mod_ids.iter().cloned().collect()
 }
 
 fn collect_dependency_closure_inferred(
@@ -307,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn dependency_closure_keeps_protected_mods_and_transitive_dependencies() {
+    fn dependency_closure_does_not_seed_protected_mods() {
         let mut protected_mod = record("protected", "Protected.zip", "Protected", &["Shared"]);
         protected_mod.protected = true;
         let maps = vec![record("map", "Adventure.zip", "Adventure", &["Helper One"])];
@@ -326,12 +314,7 @@ mod tests {
         assert_eq!(
             collect_required_dependency_closure_mod_ids(&[], &maps, &mods, |record| record.id
                 == "map"),
-            vec![
-                "core-helper".to_string(),
-                "helper-one".to_string(),
-                "protected".to_string(),
-                "shared".to_string()
-            ]
+            vec!["core-helper".to_string(), "helper-one".to_string()]
         );
     }
 

@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { ModRecord } from "../types";
 import type { DependencyReference } from "../utils/dependencies";
 import { createModRecord } from "../utils/testFixtures";
-import { enabledDependentReferencesForProfileDisable, findBlockedProfileDisableRecords } from "./useRecordActions";
+import {
+  editableProfileRecordIds,
+  enabledDependentReferencesForProfileDisable,
+  findBlockedProfileDisableRecords
+} from "./useRecordActions";
 
 describe("profile disable guards", () => {
   it("blocks disabling an enabled mod while an enabled dependent remains outside the batch", () => {
@@ -47,6 +51,12 @@ describe("profile disable guards", () => {
     expect(enabledDependentReferencesForProfileDisable(helper.id, { ...context, ignoreProtectedDependents: false })).toEqual([
       dependencyReference(root)
     ]);
+  });
+});
+
+describe("profile enable guards", () => {
+  it("keeps read-only records out of profile enable batches", () => {
+    expect(editableProfileRecordIds([mod("editable", "Editable"), mod("readonly", "Read Only", { readOnly: true })])).toEqual(["editable"]);
   });
 });
 

@@ -442,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn resolves_required_mods_from_always_enabled_records() {
+    fn resolves_required_mods_from_always_enabled_maps() {
         let mut always_enabled_map = record(
             "always-enabled-map",
             "AlwaysEnabledMap.zip",
@@ -496,14 +496,7 @@ mod tests {
 
         let resolved = resolve_required_mod_ids(&scan, &[], &[]);
 
-        assert_eq!(
-            resolved,
-            vec![
-                "always-enabled-mod".to_string(),
-                "map-helper".to_string(),
-                "mod-helper".to_string()
-            ]
-        );
+        assert_eq!(resolved, vec!["map-helper".to_string()]);
     }
 
     #[test]

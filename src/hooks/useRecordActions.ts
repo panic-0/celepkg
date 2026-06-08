@@ -86,7 +86,7 @@ export function useRecordActions({
     if (activeView === "maps") {
       enableVisibleMaps();
     } else if (activeView === "mods") {
-      const modIds = filteredMods.map((modItem) => modItem.id);
+      const modIds = editableProfileRecordIds(filteredMods);
       updateProfileDraft({ enabledExplicitModDraft: (current) => new Set([...current, ...modIds]) });
     }
   }
@@ -150,8 +150,8 @@ export function useRecordActions({
   }
 
   function enableVisibleMaps() {
-    const mapIds = filteredMaps.filter((record) => record.kind === "map").map((record) => record.id);
-    const modIds = filteredMaps.filter((record) => record.kind === "mod").map((record) => record.id);
+    const mapIds = editableProfileRecordIds(filteredMaps.filter((record) => record.kind === "map"));
+    const modIds = editableProfileRecordIds(filteredMaps.filter((record) => record.kind === "mod"));
     updateProfileDraft({
       enabledMapDraft: (current) => new Set([...current, ...mapIds]),
       enabledMapModDraft: (current) => new Set([...current, ...modIds])
@@ -293,4 +293,8 @@ export function enabledDependentReferencesForProfileDisable(modId: string, conte
     if (context.ignoreProtectedDependents && record.protected) return false;
     return record.protected || isDraftEnabled(record, context.enabledMapDraft, context.enabledModDraft);
   });
+}
+
+export function editableProfileRecordIds(records: ModRecord[]) {
+  return records.filter((record) => !record.readOnly).map((record) => record.id);
 }
