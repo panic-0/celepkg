@@ -217,6 +217,41 @@ test("bulk enable and disable current results require confirmation", async ({ pa
   await expect(row.getByTitle("启用地图")).toBeVisible();
 });
 
+test("bulk disable ignores dependents included in the same result set", async ({ page }) => {
+  await openMock(page);
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("MockDependencyTree");
+
+  await expect(page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" })).toHaveCount(1);
+  await expect(page.locator("tbody tr", { hasText: "Mock Dependency Tree Outdated" })).toHaveCount(1);
+  await page.getByRole("button", { name: "禁用当前结果" }).click();
+  await page.locator(".confirm-dialog", { hasText: "确认禁用当前结果" }).getByRole("button", { name: "禁用当前结果" }).click();
+
+  await expect(page.getByText("部分 Mod 未禁用：EverestCore 是内置项目。")).toBeVisible();
+  await expect(page.getByText(/部分 Mod 未禁用：.*被/)).toHaveCount(0);
+  await expect(page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" }).getByTitle("启用Mod")).toBeVisible();
+  await expect(page.locator("tbody tr", { hasText: "Mock Dependency Tree Outdated" }).getByTitle("启用Mod")).toBeVisible();
+});
+
+test("bulk disable ignores always-enabled dependents", async ({ page }) => {
+  await openMock(page);
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Mock Dependency Tree Root");
+  const rootRow = page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" });
+  await expect(rootRow).toHaveCount(1);
+  await rootRow.getByTitle("设为 始终启用").click();
+  await expect(page.getByText("已设为始终启用")).toBeVisible();
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("MockDependencyTreeOutdated");
+  const outdatedRow = page.locator("tbody tr", { hasText: "Mock Dependency Tree Outdated" });
+  await expect(outdatedRow).toHaveCount(1);
+  await page.getByRole("button", { name: "禁用当前结果" }).click();
+  await page.locator(".confirm-dialog", { hasText: "确认禁用当前结果" }).getByRole("button", { name: "禁用当前结果" }).click();
+
+  await expect(page.getByText("部分 Mod 未禁用")).toHaveCount(0);
+  await expect(outdatedRow.getByTitle("启用Mod")).toBeVisible();
+});
+
 test("mod update status grouping separates update, unknown, and latest records", async ({ page }) => {
   test.setTimeout(60_000);
   await openMock(page);

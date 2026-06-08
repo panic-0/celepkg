@@ -115,13 +115,19 @@ describe("app dependency resolution helpers", () => {
     });
     const library = modRecord({ id: "library", name: "Library" });
     const explicit = modRecord({ id: "explicit", name: "Explicit" });
-    const protectedMod = modRecord({ id: "protected", name: "Protected", protected: true });
+    const protectedMod = modRecord({
+      id: "protected",
+      name: "Protected",
+      protected: true,
+      dependencies: [{ name: "Protected Lib", version: "" }]
+    });
+    const protectedLib = modRecord({ id: "protected-lib", name: "Protected Lib" });
 
     const inferred = collectTransitiveRequiredDependencyModIds({
       baseModIds: new Set(["explicit"]),
       isSourceEnabled: (record) => record.id === "source",
       sourceRecords: [source],
-      targetMods: [helper, library, explicit, protectedMod]
+      targetMods: [helper, library, explicit, protectedMod, protectedLib]
     });
 
     expect([...inferred]).toEqual(["helper", "library"]);

@@ -42,7 +42,7 @@ export function collectTransitiveRequiredDependencyModIds({
   sourceRecords: ModRecord[];
   targetMods: ModRecord[];
 }) {
-  const seedModIds = dependencyClosureSeedModIds(baseModIds, targetMods);
+  const seedModIds = dependencyClosureSeedModIds(baseModIds);
   return collectDependencyClosure({ isSourceEnabled, seedModIds, sourceRecords, targetMods }).inferred;
 }
 
@@ -57,7 +57,7 @@ export function collectRequiredDependencyClosureModIds({
   sourceRecords: ModRecord[];
   targetMods: ModRecord[];
 }) {
-  const seedModIds = dependencyClosureSeedModIds(baseModIds, targetMods);
+  const seedModIds = dependencyClosureSeedModIds(baseModIds);
   const closure = collectDependencyClosure({ isSourceEnabled, seedModIds, sourceRecords, targetMods });
   return [...closure.enabled].sort();
 }
@@ -95,8 +95,8 @@ export function isBuiltinDependencyName(name: string) {
   );
 }
 
-function dependencyClosureSeedModIds(baseModIds: Set<string>, targetMods: ModRecord[]) {
-  return new Set([...baseModIds, ...targetMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id)]);
+function dependencyClosureSeedModIds(baseModIds: Set<string>) {
+  return new Set(baseModIds);
 }
 
 function collectDependencyClosure({

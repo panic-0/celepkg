@@ -57,7 +57,7 @@
     "enabledMapIds": ["map-main"],
     "baseModIds": ["visual-pack"],
     "expectedInferred": ["core-helper", "helper-one", "shared-lib"],
-    "expectedClosure": ["core-helper", "helper-one", "protected-helper", "shared-lib", "visual-pack"],
+    "expectedClosure": ["core-helper", "helper-one", "shared-lib", "visual-pack"],
     "maps": [
       {
         "id": "map-main",

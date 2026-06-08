@@ -55,6 +55,10 @@ export function useRecordActions({
     () => findDependentNamesByModId(scan, enabledMapDraft, enabledModDraft, requiredReferencesByModId),
     [enabledMapDraft, enabledModDraft, requiredReferencesByModId, scan]
   );
+  const recordsById = useMemo(
+    () => new Map([...scan.maps, ...scan.otherMods].map((record) => [record.id, record])),
+    [scan.maps, scan.otherMods]
+  );
 
   function toggleMapLikeRecord(record: ModRecord) {
     if (!canToggleProfileRecord(record)) return;
@@ -90,7 +94,8 @@ export function useRecordActions({
     if (activeView === "maps") {
       disableVisibleMaps();
     } else if (activeView === "mods") {
-      const blockedMods = blockedVisibleMods(filteredMods);
+      const disabledRecordIds = new Set(filteredMods.filter((modItem) => !modItem.readOnly).map((modItem) => modItem.id));
+      const blockedMods = blockedVisibleMods(filteredMods, disabledRecordIds);
       const blockedModIds = new Set(blockedMods.map((modItem) => modItem.id));
       const modIds = new Set(
         filteredMods.filter((modItem) => !modItem.readOnly && !blockedModIds.has(modItem.id)).map((modItem) => modItem.id)
@@ -99,7 +104,7 @@ export function useRecordActions({
       if ([...modIds].some((id) => enabledMapModDraft.has(id))) {
         setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
       }
-      showBlockedDisableWarning(blockedMods);
+      showBlockedDisableWarning(blockedMods, disabledRecordIds);
     }
   }
 
@@ -153,12 +158,14 @@ export function useRecordActions({
   function disableVisibleMaps() {
     const mapIds = new Set(filteredMaps.filter((record) => record.kind === "map" && !record.readOnly).map((record) => record.id));
     const visibleMods = filteredMaps.filter((record) => record.kind === "mod");
-    const blockedMods = blockedVisibleMods(visibleMods);
+    const visibleModIds = new Set(visibleMods.filter((record) => !record.readOnly).map((record) => record.id));
+    const disabledRecordIds = new Set([...mapIds, ...visibleModIds]);
+    const blockedMods = blockedVisibleMods(visibleMods, disabledRecordIds);
     const blockedModIds = new Set(blockedMods.map((modItem) => modItem.id));
     const modIds = new Set(visibleMods.filter((record) => !record.readOnly && !blockedModIds.has(record.id)).map((record) => record.id));
     setEnabledMapDraft((current) => new Set([...current].filter((id) => !mapIds.has(id))));
     setEnabledMapModDraft((current) => new Set([...current].filter((id) => !modIds.has(id))));
-    showBlockedDisableWarning(blockedMods);
+    showBlockedDisableWarning(blockedMods, disabledRecordIds);
   }
 
   function canToggleProfileRecord(record: ModRecord) {
@@ -181,18 +188,40 @@ export function useRecordActions({
     return names.length > 6 ? `${visible} 等 ${names.length} 个项目` : visible;
   }
 
-  function blockedVisibleMods(records: ModRecord[]) {
-    return records.filter((record) => record.readOnly || (enabledModDraft.has(record.id) && dependencyModDraft.has(record.id)));
+  function blockedVisibleMods(records: ModRecord[], disabledRecordIds: Set<string>) {
+    return findBlockedProfileDisableRecords(records, {
+      disabledRecordIds,
+      enabledMapDraft,
+      enabledModDraft,
+      ignoreProtectedDependents: true,
+      recordsById,
+      requiredReferencesByModId
+    });
   }
 
-  function showBlockedDisableWarning(records: ModRecord[]) {
+  function showBlockedDisableWarning(records: ModRecord[], disabledRecordIds: Set<string>) {
     if (!records.length) return;
     const reasons = records.slice(0, 4).map((record) => {
       if (record.readOnly) return `${record.name} 是内置项目`;
-      return `${record.name} 被 ${dependentSummary(record)} 依赖`;
+      return `${record.name} 被 ${batchDependentSummary(record, disabledRecordIds)} 依赖`;
     });
     const suffix = records.length > 4 ? `，另有 ${records.length - 4} 个 Mod` : "";
     notifier.showWarning(`部分 Mod 未禁用：${reasons.join("；")}${suffix}。`);
+  }
+
+  function batchDependentSummary(record: ModRecord, disabledRecordIds: Set<string>) {
+    const references = enabledDependentReferencesForProfileDisable(record.id, {
+      disabledRecordIds,
+      enabledMapDraft,
+      enabledModDraft,
+      ignoreProtectedDependents: true,
+      recordsById,
+      requiredReferencesByModId
+    });
+    if (!references.length) return "未知项目";
+    const names = references.map((reference) => reference.name);
+    const visible = names.slice(0, 6).join("、");
+    return names.length > 6 ? `${visible} 等 ${names.length} 个项目` : visible;
   }
 
   function setRecordFavoriteInScan(recordId: string, favorite: boolean) {
@@ -232,4 +261,31 @@ function findDependentNamesByModId(
       )
       .filter(([, names]) => names.length > 0)
   );
+}
+
+type ProfileDisableGuardContext = {
+  disabledRecordIds: Set<string>;
+  enabledMapDraft: Set<string>;
+  enabledModDraft: Set<string>;
+  ignoreProtectedDependents: boolean;
+  recordsById: Map<string, ModRecord>;
+  requiredReferencesByModId: Map<string, DependencyReference[]>;
+};
+
+export function findBlockedProfileDisableRecords(records: ModRecord[], context: ProfileDisableGuardContext) {
+  return records.filter((record) => {
+    if (record.readOnly) return true;
+    if (record.kind !== "mod" || !isDraftEnabled(record, context.enabledMapDraft, context.enabledModDraft)) return false;
+    return enabledDependentReferencesForProfileDisable(record.id, context).length > 0;
+  });
+}
+
+export function enabledDependentReferencesForProfileDisable(modId: string, context: ProfileDisableGuardContext) {
+  return (context.requiredReferencesByModId.get(modId) ?? []).filter((reference) => {
+    if (context.disabledRecordIds.has(reference.id)) return false;
+    const record = context.recordsById.get(reference.id);
+    if (!record) return true;
+    if (context.ignoreProtectedDependents && record.protected) return false;
+    return record.protected || isDraftEnabled(record, context.enabledMapDraft, context.enabledModDraft);
+  });
 }
