@@ -246,14 +246,6 @@ export function App() {
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
   const showingModRecords = workspaceView.activeView === "mods";
   const writeActionsDisabled = gameStatus.gameBusy;
-  const activeUpdateRecordIds = useMemo(
-    () => new Set((showingModRecords ? filters.filteredMods : filters.filteredMaps).map((record) => record.id)),
-    [filters.filteredMaps, filters.filteredMods, showingModRecords]
-  );
-  const activeDownloadableModUpdates = useMemo(
-    () => downloadableModUpdates.filter((candidate) => activeUpdateRecordIds.has(candidate.installed.recordId)),
-    [activeUpdateRecordIds, downloadableModUpdates]
-  );
 
   async function openRecordLocation(record: ModRecord) {
     try {
@@ -524,7 +516,7 @@ export function App() {
             loading={loading && !showWorkspaceLoading}
             loadingMessage={loadingMessage}
             modUpdateChecking={modUpdateChecking}
-            modUpdateCount={activeDownloadableModUpdates.length}
+            modUpdateCount={downloadableModUpdates.length}
             latestUpdatesByRecordId={latestModUpdatesByRecordId}
             modUpdatesByRecordId={modUpdatesByRecordId}
             recordSearchMatches={filters.recordSearchMatches}
@@ -546,7 +538,7 @@ export function App() {
             onReferenceFilterChange={filters.setModReferenceFilter}
             onShowHelperMapsChange={filters.setShowHelperMaps}
             onSortKeyChange={filters.setMapSortKey}
-            onUpdateAllMods={() => updateAllMods(activeDownloadableModUpdates)}
+            onUpdateAllMods={() => updateAllMods()}
             onFavoriteToggle={recordActions.updateRecordFavorite}
             onProtectedToggle={recordActions.updateRecordProtected}
             isMapEnabled={recordActions.isMapEnabled}

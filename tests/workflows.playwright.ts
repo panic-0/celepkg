@@ -418,6 +418,37 @@ test("map update status grouping separates update, unknown, and latest records",
   await expect(page.locator(".record-panel")).toContainText("Celeste 官方地图");
 });
 
+test("update all button uses every downloadable update from map and mod tabs", async ({ page }) => {
+  test.setTimeout(60_000);
+  await openMock(page);
+  await page.getByRole("button", { name: "检查更新" }).click();
+  await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
+
+  const updateAllButton = page.locator(".update-all-button");
+  const updateTitle = await updateAllButton.getAttribute("title");
+  const globalUpdateCount = Number(updateTitle?.match(/更新全部 (\d+) 个 Mod/)?.[1] ?? 0);
+  expect(globalUpdateCount).toBeGreaterThan(0);
+
+  const mapProgressFilter = page.locator(".map-filters .field", { has: page.locator("span", { hasText: /^进度$/ }) }).locator("select");
+  await mapProgressFilter.selectOption("updates");
+  const mapResultCount = await visibleRecordCount(page);
+  expect(globalUpdateCount).toBeGreaterThan(mapResultCount);
+  await updateAllButton.click();
+  const mapUpdateDialog = page.locator(".confirm-dialog", { hasText: "批量更新 Mod" });
+  await expect(mapUpdateDialog).toContainText("Mock Install Failure");
+  await mapUpdateDialog.getByRole("button", { name: "取消" }).click();
+
+  await page.locator(".record-view-switch").getByRole("button", { name: "其他 Mod", exact: true }).click();
+  const modUpdateFilter = page.locator(".mod-filters .field", { has: page.locator("span", { hasText: /^状态$/ }) }).locator("select");
+  await modUpdateFilter.selectOption("updates");
+  const modResultCount = await visibleRecordCount(page);
+  expect(globalUpdateCount).toBeGreaterThan(modResultCount);
+  await updateAllButton.click();
+  const modUpdateDialog = page.locator(".confirm-dialog", { hasText: "批量更新 Mod" });
+  await expect(modUpdateDialog).toContainText("Galactica");
+  await modUpdateDialog.getByRole("button", { name: "取消" }).click();
+});
+
 test("mod detail opens the local mod location from the header", async ({ page }) => {
   await openMock(page);
   await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
@@ -547,12 +578,13 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   await expect(page.locator(".record-panel")).toContainText("Mock Download Failure");
   const updateTitle = await page.locator(".update-all-button").getAttribute("title");
   const updateCount = Number(updateTitle?.match(/更新全部 (\d+) 个 Mod/)?.[1] ?? 0);
-  const shownUpdateCount = await page.locator(".record-list-title p").textContent();
-  expect(shownUpdateCount).toContain(`${updateCount} /`);
+  const shownUpdateCount = await visibleRecordCount(page);
+  expect(updateCount).toBeGreaterThan(shownUpdateCount);
 
   await page.getByRole("button", { name: /更新全部/ }).click();
   const updateDialog = page.locator(".confirm-dialog", { hasText: "批量更新 Mod" });
   await expect(updateDialog).toBeVisible();
+  await expect(updateDialog).toContainText("Galactica");
   await updateDialog.getByRole("button", { name: "更新全部" }).click();
 
   const downloadsNav = page.locator(".workspace-nav").getByRole("button", { name: "下载管理", exact: true });
@@ -605,3 +637,10 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
     "Mock Download Failure"
   );
 });
+
+async function visibleRecordCount(page: Page) {
+  const text = await page.locator(".record-list-title p").textContent();
+  const count = Number(text?.match(/^(\d+) \//)?.[1] ?? Number.NaN);
+  if (!Number.isFinite(count)) throw new Error(`Cannot parse visible record count from: ${text ?? ""}`);
+  return count;
+}
