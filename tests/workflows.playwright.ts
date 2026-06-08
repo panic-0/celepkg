@@ -44,6 +44,29 @@ test("profile manager creates, clones, renames, and applies mock profiles", asyn
   await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
 });
 
+test("profile manager keeps manually selected profiles before apply", async ({ page }) => {
+  await openMock(page);
+  await openNav(page, "Profile");
+
+  const mapColumn = profileColumn(page, "地图 Profile");
+  const modColumn = profileColumn(page, "其他 Mod Profile");
+
+  await createEmptyProfile(mapColumn, "新建地图 Profile 名称", "切换地图 Profile");
+  await createEmptyProfile(modColumn, "新建 Mod Profile 名称", "切换 Mod Profile");
+
+  await mapColumn.locator(".profile-row", { hasText: "主线推进" }).first().locator("button.profile").click();
+  await modColumn.locator(".profile-row", { hasText: "常用工具" }).first().locator("button.profile").click();
+
+  await expect(mapColumn.locator(".profile-row.active")).toContainText("主线推进");
+  await expect(modColumn.locator(".profile-row.active")).toContainText("常用工具");
+  await page.waitForTimeout(500);
+  await expect(mapColumn.locator(".profile-row.active")).toContainText("主线推进");
+  await expect(modColumn.locator(".profile-row.active")).toContainText("常用工具");
+
+  await page.getByRole("button", { name: "应用当前" }).click();
+  await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
+});
+
 test("workspace navigation groups content around profile state", async ({ page }) => {
   await openMock(page);
 

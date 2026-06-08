@@ -81,6 +81,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   const enabledExplicitModDraftRef = useRef(enabledExplicitModDraft);
   const launchArgsRef = useRef(launchArgs);
   const profileSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const lastSyncedActiveProfileIdsRef = useRef({ map: "", mod: "" });
 
   enabledMapDraftRef.current = enabledMapDraft;
   enabledMapModDraftRef.current = enabledMapModDraft;
@@ -253,13 +254,18 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   );
 
   useEffect(() => {
-    const activeMap = mapProfiles.find((profile) => profile.id === scan.profiles.activeMapProfileId) ?? mapProfiles[0];
-    const activeMod = modProfiles.find((profile) => profile.id === scan.profiles.activeModProfileId) ?? modProfiles[0];
-    if (!initializedRef.current || !mapDirty) {
+    const activeMapId = scan.profiles.activeMapProfileId;
+    const activeModId = scan.profiles.activeModProfileId;
+    const activeMap = mapProfiles.find((profile) => profile.id === activeMapId) ?? mapProfiles[0];
+    const activeMod = modProfiles.find((profile) => profile.id === activeModId) ?? modProfiles[0];
+    const initializing = !initializedRef.current;
+    if (initializing || (lastSyncedActiveProfileIdsRef.current.map !== activeMapId && !mapDirty)) {
       hydrateProfileDraft(mapDraftController, activeMap);
+      lastSyncedActiveProfileIdsRef.current.map = activeMapId;
     }
-    if (!initializedRef.current || !modDirty) {
+    if (initializing || (lastSyncedActiveProfileIdsRef.current.mod !== activeModId && !modDirty)) {
       hydrateProfileDraft(modDraftController, activeMod);
+      lastSyncedActiveProfileIdsRef.current.mod = activeModId;
     }
     initializedRef.current = true;
   }, [
