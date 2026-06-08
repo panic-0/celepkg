@@ -234,12 +234,30 @@ fn managed_executable_targets(celeste_path: &Path) -> HashMap<PathBuf, ManagedPr
     for path in game_executable_targets(celeste_path) {
         targets.insert(path, ManagedProcessKind::Celeste);
     }
-    for name in ["EverestSplash.exe", "EverestSplash"] {
-        if let Ok(path) = celeste_path.join(name).canonicalize() {
-            targets.insert(path, ManagedProcessKind::EverestSplash);
-        }
+    for path in everest_splash_executable_targets(celeste_path) {
+        targets.insert(path, ManagedProcessKind::EverestSplash);
     }
     targets
+}
+
+fn everest_splash_executable_targets(celeste_path: &Path) -> Vec<PathBuf> {
+    [
+        celeste_path.join("EverestSplash.exe"),
+        celeste_path.join("EverestSplash"),
+        celeste_path
+            .join("EverestSplash")
+            .join("EverestSplash-win.exe"),
+        celeste_path
+            .join("EverestSplash")
+            .join("EverestSplash-win64.exe"),
+        celeste_path
+            .join("EverestSplash")
+            .join("EverestSplash-linux"),
+        celeste_path.join("EverestSplash").join("EverestSplash-osx"),
+    ]
+    .into_iter()
+    .filter_map(|path| path.canonicalize().ok())
+    .collect()
 }
 
 fn first_window_title(process: &GameProcessSnapshot) -> String {
@@ -431,6 +449,7 @@ pub fn split_launch_args(args: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn process(pid: u32, kind: ManagedProcessKind, window_titles: &[&str]) -> GameProcessSnapshot {
         GameProcessSnapshot {
@@ -518,6 +537,32 @@ mod tests {
 
         assert_eq!(status.phase, GameStatusPhase::Running);
         assert!(status.running);
+    }
+
+    #[test]
+    fn managed_targets_include_nested_windows_everest_splash() {
+        let root = tempfile::tempdir().expect("temp celeste dir");
+        fs::write(root.path().join("Celeste.exe"), "").expect("write celeste");
+        let splash_dir = root.path().join("EverestSplash");
+        fs::create_dir_all(&splash_dir).expect("create splash dir");
+        fs::write(splash_dir.join("EverestSplash-win64.exe"), "").expect("write splash");
+
+        let targets = managed_executable_targets(root.path());
+        let celeste = root
+            .path()
+            .join("Celeste.exe")
+            .canonicalize()
+            .expect("canonical celeste");
+        let splash = splash_dir
+            .join("EverestSplash-win64.exe")
+            .canonicalize()
+            .expect("canonical splash");
+
+        assert_eq!(targets.get(&celeste), Some(&ManagedProcessKind::Celeste));
+        assert_eq!(
+            targets.get(&splash),
+            Some(&ManagedProcessKind::EverestSplash)
+        );
     }
 
     #[test]
