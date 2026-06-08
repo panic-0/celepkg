@@ -5,13 +5,18 @@ use super::loaders::{
 };
 use super::*;
 use crate::domain::{
-    CompletionStatus, ModDownloadPhase, ModDownloadProgress, ModKind, ModMetadata,
+    CompletionStatus, GameBananaCatalogStats, ModDownloadPhase, ModDownloadProgress, ModKind,
+    ModMetadata,
 };
 use crate::services::download::DownloadProgressThrottle;
-use crate::services::mod_catalog_cache::{read_valid_catalog_cache, write_catalog_cache};
-use crate::storage::mod_catalog_cache_path;
+use crate::services::mod_catalog_cache::{
+    game_banana_catalog_stats_cache_entry, read_game_banana_catalog_stats_cache,
+    read_valid_catalog_cache, write_catalog_cache, write_game_banana_catalog_stats_cache,
+};
+use crate::storage::{game_banana_catalog_stats_cache_path, mod_catalog_cache_path};
 use crate::storage::{read_json, write_json};
 use crate::utils::stable_id;
+use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Write};
 use std::net::TcpListener;
@@ -104,6 +109,28 @@ fn parses_wegfan_catalog_entries() {
 }
 
 #[test]
+fn parses_game_banana_catalog_stats_response() {
+    let stats = parse_game_banana_catalog_stats_response(504505, "[4263,5]").unwrap();
+
+    assert_eq!(stats.game_banana_id, 504505);
+    assert_eq!(stats.view_count, 4263);
+    assert_eq!(stats.like_count, 5);
+    assert!(
+        parse_game_banana_catalog_stats_response(504505, r#"{"error":"missing"}"#)
+            .unwrap_err()
+            .contains("响应不是数组")
+    );
+}
+
+#[test]
+fn game_banana_catalog_stats_ids_are_deduped_and_sorted() {
+    assert_eq!(
+        normalize_game_banana_ids(&[30, 0, 10, 30, 20]),
+        vec![10, 20, 30]
+    );
+}
+
+#[test]
 fn valid_catalog_cache_round_trips_entries() {
     let _guard = CATALOG_CACHE_TEST_LOCK.lock().unwrap();
     let entry = test_catalog_entry("helper", "Helper");
@@ -121,6 +148,34 @@ fn valid_catalog_cache_round_trips_entries() {
     } else {
         let _ = fs::remove_file(cache_path);
     }
+}
+
+#[test]
+fn game_banana_catalog_stats_cache_round_trips_entries() {
+    let _guard = CATALOG_CACHE_TEST_LOCK.lock().unwrap();
+    let cache_path = game_banana_catalog_stats_cache_path();
+    let previous = fs::read(&cache_path).ok();
+    let mut entries = HashMap::new();
+    entries.insert(
+        504505,
+        game_banana_catalog_stats_cache_entry(GameBananaCatalogStats {
+            game_banana_id: 504505,
+            view_count: 4263,
+            like_count: 5,
+        }),
+    );
+
+    write_game_banana_catalog_stats_cache(&entries);
+    let cached = read_game_banana_catalog_stats_cache();
+
+    if let Some(previous) = previous {
+        fs::write(cache_path, previous).expect("restore previous stats cache");
+    } else {
+        let _ = fs::remove_file(cache_path);
+    }
+
+    assert_eq!(cached[&504505].stats.view_count, 4263);
+    assert_eq!(cached[&504505].stats.like_count, 5);
 }
 
 #[test]

@@ -9,6 +9,7 @@ import type {
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
+  GameBananaCatalogStatsResult,
   GameStatus,
   LaunchResult,
   ModCatalogEntry,
@@ -124,6 +125,10 @@ export async function searchModCatalog(query: string, sources: ModCatalogSourceK
 
 export async function refreshModCatalogCache(sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
   return callApi(() => mockApi.refreshModCatalogCache(sources), "refresh_mod_catalog_cache", { sources });
+}
+
+export async function getModCatalogStats(gameBananaIds: number[]): Promise<GameBananaCatalogStatsResult> {
+  return callApi(() => mockApi.getModCatalogStats(gameBananaIds), "get_mod_catalog_stats", { gameBananaIds });
 }
 
 export async function resolveModCatalogDependencies(

@@ -1,9 +1,10 @@
 use crate::dependency_rules::version_too_low;
 use crate::domain::{Dependency, ModDownloadPhase, StagedDownload, StagedDownloadKind};
 use crate::domain::{
-    ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult, ModCatalogEntry,
-    ModCatalogSearchResult, ModCatalogSourceKind, ModInstallResult, ModMetadata, ModRecord,
-    ModUpdateCandidate, ModUpdateCheckResult, ProfilesState,
+    GameBananaCatalogStats, GameBananaCatalogStatsResult, ModCatalogDependencyResolution,
+    ModCatalogDependencyResolutionResult, ModCatalogEntry, ModCatalogSearchResult,
+    ModCatalogSourceKind, ModInstallResult, ModMetadata, ModRecord, ModUpdateCandidate,
+    ModUpdateCheckResult, ProfilesState,
 };
 pub use crate::services::download::ModDownloadReporter;
 use crate::services::download::{
@@ -13,9 +14,14 @@ use crate::services::download::{
 };
 mod hash_cache;
 mod loaders;
+use crate::services::mod_catalog_cache::{
+    cached_game_banana_catalog_stats_is_valid, game_banana_catalog_stats_cache_entry,
+    read_game_banana_catalog_stats_cache, write_game_banana_catalog_stats_cache,
+};
 use crate::utils::{normalize_dependency_name, normalize_slash};
 use hash_cache::InstalledModIndex;
 use loaders::{load_catalogs, load_catalogs_fresh};
+use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, Read};
@@ -27,6 +33,8 @@ use zip::ZipArchive;
 const HTTP_USER_AGENT: &str = concat!("celepkg/", env!("CARGO_PKG_VERSION"));
 const DOWNLOAD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DOWNLOAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+const GAME_BANANA_STATS_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const GAME_BANANA_STATS_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct ModInstallContext<'a> {
     pub profiles: ProfilesState,
@@ -64,6 +72,81 @@ pub fn refresh_catalog_cache(sources: &[ModCatalogSourceKind]) -> ModCatalogSear
     }
 }
 
+pub fn get_catalog_stats(game_banana_ids: &[u64]) -> GameBananaCatalogStatsResult {
+    let ids = normalize_game_banana_ids(game_banana_ids);
+    if ids.is_empty() {
+        return GameBananaCatalogStatsResult {
+            stats: vec![],
+            warnings: vec![],
+        };
+    }
+
+    let mut cache = read_game_banana_catalog_stats_cache();
+    let mut stats = vec![];
+    let mut missing_ids = vec![];
+    for id in ids {
+        match cache.get(&id) {
+            Some(entry) if cached_game_banana_catalog_stats_is_valid(entry) => {
+                stats.push(entry.stats.clone());
+            }
+            _ => missing_ids.push(id),
+        }
+    }
+
+    let mut warnings = vec![];
+    if !missing_ids.is_empty() {
+        match game_banana_stats_client() {
+            Ok(client) => {
+                for chunk in missing_ids.chunks(8) {
+                    let results = chunk
+                        .par_iter()
+                        .map(|id| {
+                            let client = client.clone();
+                            (*id, fetch_game_banana_catalog_stats(&client, *id))
+                        })
+                        .collect::<Vec<_>>();
+                    for (id, result) in results {
+                        match result {
+                            Ok(item) => {
+                                cache.insert(
+                                    id,
+                                    game_banana_catalog_stats_cache_entry(item.clone()),
+                                );
+                                stats.push(item);
+                            }
+                            Err(error) => {
+                                if let Some(entry) = cache.get(&id) {
+                                    stats.push(entry.stats.clone());
+                                    warnings.push(format!(
+                                        "读取 GameBanana 统计失败，已使用本地缓存：{id}：{error}"
+                                    ));
+                                } else {
+                                    warnings
+                                        .push(format!("读取 GameBanana 统计失败：{id}：{error}"));
+                                }
+                            }
+                        }
+                    }
+                }
+                write_game_banana_catalog_stats_cache(&cache);
+            }
+            Err(error) => {
+                for id in missing_ids {
+                    if let Some(entry) = cache.get(&id) {
+                        stats.push(entry.stats.clone());
+                    }
+                }
+                warnings.push(format!("初始化 GameBanana 统计客户端失败：{error}"));
+            }
+        }
+    }
+
+    stats.sort_by_key(|item| item.game_banana_id);
+    warnings.sort();
+    warnings.dedup();
+    GameBananaCatalogStatsResult { stats, warnings }
+}
+
 pub fn resolve_catalog_dependencies(
     dependencies: &[Dependency],
     sources: &[ModCatalogSourceKind],
@@ -88,6 +171,65 @@ pub fn resolve_catalog_dependencies(
 
 fn sort_catalog_entries(entries: &mut [ModCatalogEntry]) {
     entries.sort_by_key(|entry| entry.name.to_lowercase());
+}
+
+fn normalize_game_banana_ids(game_banana_ids: &[u64]) -> Vec<u64> {
+    let mut ids = game_banana_ids
+        .iter()
+        .copied()
+        .filter(|id| *id > 0)
+        .collect::<Vec<_>>();
+    ids.sort_unstable();
+    ids.dedup();
+    ids
+}
+
+fn game_banana_stats_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
+    reqwest::blocking::Client::builder()
+        .user_agent(HTTP_USER_AGENT)
+        .connect_timeout(GAME_BANANA_STATS_CONNECT_TIMEOUT)
+        .timeout(GAME_BANANA_STATS_REQUEST_TIMEOUT)
+        .build()
+}
+
+fn fetch_game_banana_catalog_stats(
+    client: &reqwest::blocking::Client,
+    game_banana_id: u64,
+) -> Result<GameBananaCatalogStats, String> {
+    let url = format!(
+        "https://api.gamebanana.com/Core/Item/Data?itemtype=Mod&itemid={game_banana_id}&fields=views,likes&format=json_min"
+    );
+    let text = client
+        .get(url)
+        .send()
+        .map_err(|error| error.to_string())?
+        .error_for_status()
+        .map_err(|error| error.to_string())?
+        .text()
+        .map_err(|error| error.to_string())?;
+    parse_game_banana_catalog_stats_response(game_banana_id, &text)
+}
+
+fn parse_game_banana_catalog_stats_response(
+    game_banana_id: u64,
+    text: &str,
+) -> Result<GameBananaCatalogStats, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|error| format!("解析响应失败：{error}"))?;
+    let items = value.as_array().ok_or_else(|| "响应不是数组".to_string())?;
+    let view_count = items
+        .first()
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "缺少浏览量".to_string())?;
+    let like_count = items
+        .get(1)
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "缺少点赞量".to_string())?;
+    Ok(GameBananaCatalogStats {
+        game_banana_id,
+        view_count,
+        like_count,
+    })
 }
 
 pub fn check_updates(

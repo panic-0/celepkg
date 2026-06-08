@@ -390,6 +390,21 @@ pub struct ModCatalogSearchResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct GameBananaCatalogStats {
+    pub game_banana_id: u64,
+    pub view_count: u64,
+    pub like_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GameBananaCatalogStatsResult {
+    pub stats: Vec<GameBananaCatalogStats>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ModCatalogDependencyResolution {
     pub dependency: Dependency,
     pub entry: Option<ModCatalogEntry>,

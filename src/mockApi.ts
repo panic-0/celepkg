@@ -6,6 +6,7 @@ import type {
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
+  GameBananaCatalogStatsResult,
   GameStatus,
   ModCatalogDependencyResolutionResult,
   ModCatalogEntry,
@@ -195,6 +196,19 @@ export const mockApi = {
   async refreshModCatalogCache(sources: ModCatalogSourceKind[]): Promise<ModCatalogSearchResult> {
     await delay(250);
     return mockApi.searchModCatalog("", sources);
+  },
+
+  async getModCatalogStats(gameBananaIds: number[]): Promise<GameBananaCatalogStatsResult> {
+    return clone({
+      stats: [...new Set(gameBananaIds)]
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .map((gameBananaId) => ({
+          gameBananaId,
+          viewCount: mockCatalogViewCount(gameBananaId),
+          likeCount: mockCatalogLikeCount(gameBananaId)
+        })),
+      warnings: []
+    });
   },
 
   async resolveModCatalogDependencies(
@@ -722,4 +736,12 @@ function mockGameStatus(celestePath: string, phase: GameStatus["phase"]): GameSt
 
 function delay(ms: number) {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+}
+
+function mockCatalogViewCount(gameBananaId: number) {
+  return (gameBananaId * 37) % 250_000;
+}
+
+function mockCatalogLikeCount(gameBananaId: number) {
+  return (gameBananaId * 17) % 8_000;
 }

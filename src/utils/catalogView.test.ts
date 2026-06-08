@@ -130,6 +130,28 @@ describe("catalog view model", () => {
     expect(sortCatalogEntryViews(views, "sizeDesc").map((view) => view.entry.name)).toEqual(["A", "C", "B"]);
   });
 
+  it("sorts by GameBanana views and likes with unknown stats last", () => {
+    const views = buildCatalogEntryViews(
+      [
+        entry("A", { gameBananaId: 1 }),
+        entry("B", { gameBananaId: 2 }),
+        entry("C", { gameBananaId: 3 }),
+        entry("D", { gameBananaId: null })
+      ],
+      [],
+      null,
+      ""
+    );
+    const stats = new Map([
+      [1, { viewCount: 200, likeCount: 10 }],
+      [2, { viewCount: 500, likeCount: 8 }],
+      [3, { viewCount: 200, likeCount: 40 }]
+    ]);
+
+    expect(sortCatalogEntryViews(views, "viewsDesc", stats).map((view) => view.entry.name)).toEqual(["B", "A", "C", "D"]);
+    expect(sortCatalogEntryViews(views, "likesDesc", stats).map((view) => view.entry.name)).toEqual(["C", "A", "B", "D"]);
+  });
+
   it("paginates catalog results after filtering and sorting", () => {
     const items = Array.from({ length: 101 }, (_, index) => index + 1);
 

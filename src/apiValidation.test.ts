@@ -5,6 +5,7 @@ import {
   validateConfigResponse,
   validateEverestInstallResult,
   validateEverestReleaseList,
+  validateGameBananaCatalogStatsResult,
   validateModCatalogDependencyResolutionResult,
   validateModCatalogSearchResult,
   validateModInstallResult,
@@ -297,6 +298,22 @@ describe("api validation", () => {
         warnings: []
       }).updates[0].entry.source
     ).toBe("everestMirror");
+  });
+
+  it("accepts mod catalog stats responses and rejects unknown fields", () => {
+    expect(
+      validateGameBananaCatalogStatsResult({
+        stats: [{ gameBananaId: 504505, viewCount: 4263, likeCount: 5 }],
+        warnings: []
+      }).stats[0].viewCount
+    ).toBe(4263);
+
+    expect(() =>
+      validateGameBananaCatalogStatsResult({
+        stats: [{ gameBananaId: 504505, viewCount: 4263, likeCount: 5, downloads: 308 }],
+        warnings: []
+      })
+    ).toThrow("downloads");
   });
 
   it("accepts mod catalog dependency resolution responses", () => {

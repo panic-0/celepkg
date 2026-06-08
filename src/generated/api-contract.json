@@ -1325,6 +1325,72 @@
       "title": "EverestReleaseList",
       "type": "object"
     },
+    "GameBananaCatalogStats": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "gameBananaId": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "likeCount": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "viewCount": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["gameBananaId", "viewCount", "likeCount"],
+      "title": "GameBananaCatalogStats",
+      "type": "object"
+    },
+    "GameBananaCatalogStatsResult": {
+      "$defs": {
+        "GameBananaCatalogStats": {
+          "properties": {
+            "gameBananaId": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "likeCount": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "viewCount": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": ["gameBananaId", "viewCount", "likeCount"],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "stats": {
+          "items": {
+            "$ref": "#/$defs/GameBananaCatalogStats"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["stats", "warnings"],
+      "title": "GameBananaCatalogStatsResult",
+      "type": "object"
+    },
     "GameStatus": {
       "$defs": {
         "GameStatusPhase": {
@@ -1363,6 +1429,23 @@
       },
       "required": ["running", "busy", "stopped", "executable", "pid", "phase", "detail", "windowTitle"],
       "title": "GameStatus",
+      "type": "object"
+    },
+    "GetModCatalogStatsPayload": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "gameBananaIds": {
+          "items": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["gameBananaIds"],
+      "title": "GetModCatalogStatsPayload",
       "type": "object"
     },
     "InstallStagedEverestPayload": {
@@ -4950,6 +5033,10 @@
       "payload": "CelestePathPayload",
       "response": "GameStatus"
     },
+    "get_mod_catalog_stats": {
+      "payload": "GetModCatalogStatsPayload",
+      "response": "GameBananaCatalogStatsResult"
+    },
     "install_staged_everest": {
       "payload": "InstallStagedEverestPayload",
       "response": "EverestInstallResult"
@@ -6410,6 +6497,72 @@
       "title": "EverestReleaseList",
       "type": "object"
     },
+    "GameBananaCatalogStats": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "gameBananaId": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "likeCount": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "viewCount": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["gameBananaId", "viewCount", "likeCount"],
+      "title": "GameBananaCatalogStats",
+      "type": "object"
+    },
+    "GameBananaCatalogStatsResult": {
+      "$defs": {
+        "GameBananaCatalogStats": {
+          "properties": {
+            "gameBananaId": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "likeCount": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "viewCount": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": ["gameBananaId", "viewCount", "likeCount"],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "stats": {
+          "items": {
+            "$ref": "#/$defs/GameBananaCatalogStats"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["stats", "warnings"],
+      "title": "GameBananaCatalogStatsResult",
+      "type": "object"
+    },
     "GameStatus": {
       "$defs": {
         "GameStatusPhase": {
@@ -6448,6 +6601,23 @@
       },
       "required": ["running", "busy", "stopped", "executable", "pid", "phase", "detail", "windowTitle"],
       "title": "GameStatus",
+      "type": "object"
+    },
+    "GetModCatalogStatsPayload": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "gameBananaIds": {
+          "items": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["gameBananaIds"],
+      "title": "GetModCatalogStatsPayload",
       "type": "object"
     },
     "InstallStagedEverestPayload": {

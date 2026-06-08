@@ -8,6 +8,8 @@ export type {
   EverestInstallResult,
   EverestRelease,
   EverestReleaseList,
+  GameBananaCatalogStats,
+  GameBananaCatalogStatsResult,
   GameStatus,
   GameStatusPhase,
   InstalledModMatch,

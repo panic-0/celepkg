@@ -1,12 +1,13 @@
 use crate::domain::{
     AppConfig, BackupFileCategory, BackupFileEntry, BackupInfo, BackupKind, BackupModEntry,
     CompletionStatus, ConfigResponse, Dependency, EverestInstallResult, EverestRelease,
-    EverestReleaseList, GameStatus, InstalledModMatch, LaunchResult, MapStats,
-    ModCatalogDependencyResolution, ModCatalogDependencyResolutionResult, ModCatalogEntry,
-    ModCatalogSearchResult, ModCatalogSourceKind, ModDownloadPhase, ModDownloadProgress,
-    ModInstallResult, ModKind, ModMetadata, ModPreviewStaging, ModRecord, ModUpdateCandidate,
-    ModUpdateCheckResult, Profile, ProfileInput, ProfileType, ProfilesState, RestoreScope,
-    SaveFileInfo, ScanResult, ScanTiming, StagedDownload, StagedDownloadKind, SubMapInfo,
+    EverestReleaseList, GameBananaCatalogStats, GameBananaCatalogStatsResult, GameStatus,
+    InstalledModMatch, LaunchResult, MapStats, ModCatalogDependencyResolution,
+    ModCatalogDependencyResolutionResult, ModCatalogEntry, ModCatalogSearchResult,
+    ModCatalogSourceKind, ModDownloadPhase, ModDownloadProgress, ModInstallResult, ModKind,
+    ModMetadata, ModPreviewStaging, ModRecord, ModUpdateCandidate, ModUpdateCheckResult, Profile,
+    ProfileInput, ProfileType, ProfilesState, RestoreScope, SaveFileInfo, ScanResult, ScanTiming,
+    StagedDownload, StagedDownloadKind, SubMapInfo,
 };
 use schemars::{
     generate::{SchemaGenerator, SchemaSettings},
@@ -87,6 +88,12 @@ pub struct SearchModCatalogPayload {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RefreshModCatalogCachePayload {
     pub sources: Vec<ModCatalogSourceKind>,
+}
+
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GetModCatalogStatsPayload {
+    pub game_banana_ids: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -291,6 +298,7 @@ pub const REGISTERED_COMMANDS: &[&str] = &[
     "rescan_celeste",
     "search_mod_catalog",
     "refresh_mod_catalog_cache",
+    "get_mod_catalog_stats",
     "resolve_mod_catalog_dependencies",
     "check_mod_updates",
     "preview_mod_update_metadata",
@@ -402,6 +410,11 @@ pub fn commands() -> Map<String, Value> {
         &mut commands,
         "refresh_mod_catalog_cache",
         Some("RefreshModCatalogCachePayload"),
+    );
+    command::<GameBananaCatalogStatsResult>(
+        &mut commands,
+        "get_mod_catalog_stats",
+        Some("GetModCatalogStatsPayload"),
     );
     command::<ModCatalogDependencyResolutionResult>(
         &mut commands,
@@ -552,6 +565,7 @@ fn schemas() -> Map<String, Value> {
     payload_schema::<SetSelectedSaveFilesPayload>(&mut schemas, "SetSelectedSaveFilesPayload");
     payload_schema::<SearchModCatalogPayload>(&mut schemas, "SearchModCatalogPayload");
     payload_schema::<RefreshModCatalogCachePayload>(&mut schemas, "RefreshModCatalogCachePayload");
+    payload_schema::<GetModCatalogStatsPayload>(&mut schemas, "GetModCatalogStatsPayload");
     payload_schema::<ResolveModCatalogDependenciesPayload>(
         &mut schemas,
         "ResolveModCatalogDependenciesPayload",
@@ -600,6 +614,8 @@ fn schemas() -> Map<String, Value> {
     response_schema::<EverestInstallResult>(&mut schemas, "EverestInstallResult");
     response_schema::<EverestRelease>(&mut schemas, "EverestRelease");
     response_schema::<EverestReleaseList>(&mut schemas, "EverestReleaseList");
+    response_schema::<GameBananaCatalogStats>(&mut schemas, "GameBananaCatalogStats");
+    response_schema::<GameBananaCatalogStatsResult>(&mut schemas, "GameBananaCatalogStatsResult");
     response_schema::<GameStatus>(&mut schemas, "GameStatus");
     response_schema::<InstalledModMatch>(&mut schemas, "InstalledModMatch");
     response_schema::<LaunchResult>(&mut schemas, "LaunchResult");

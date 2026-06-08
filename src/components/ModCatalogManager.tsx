@@ -1,7 +1,14 @@
 import { Download, ExternalLink, Info, PackageCheck, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { searchModCatalog } from "../api";
-import type { AppNotifier, ModCatalogEntry, ModCatalogSearchResult, ModCatalogSourceKind, ScanResult } from "../types";
+import { getModCatalogStats, searchModCatalog } from "../api";
+import type {
+  AppNotifier,
+  GameBananaCatalogStats,
+  ModCatalogEntry,
+  ModCatalogSearchResult,
+  ModCatalogSourceKind,
+  ScanResult
+} from "../types";
 import type { DownloadTask } from "../utils/downloadTask";
 import {
   buildCatalogEntryViews,
@@ -56,8 +63,10 @@ export function ModCatalogManager({
   const [filters, setFilters] = useState<CatalogFilters>(defaultFilters);
   const [catalogSearching, setCatalogSearching] = useState(false);
   const [sortKey, setSortKey] = useState<CatalogSortKey>("relevance");
+  const [statsByGameBananaId, setStatsByGameBananaId] = useState(() => new Map<number, GameBananaCatalogStats>());
   const [page, setPage] = useState(1);
   const searchRequestRef = useRef(0);
+  const statsRequestRef = useRef(0);
 
   const sourceList = useMemo(() => (sources.length ? sources : defaultSources), [sources]);
   const allViews = useMemo(
@@ -65,9 +74,10 @@ export function ModCatalogManager({
     [downloadTask, query, scan.maps, scan.otherMods, searchResult.entries]
   );
   const typeOptions = useMemo(() => catalogTypeOptions(allViews), [allViews]);
+  const filteredViews = useMemo(() => filterCatalogEntryViews(allViews, filters), [allViews, filters]);
   const visibleViews = useMemo(
-    () => sortCatalogEntryViews(filterCatalogEntryViews(allViews, filters), sortKey),
-    [allViews, filters, sortKey]
+    () => sortCatalogEntryViews(filteredViews, sortKey, statsByGameBananaId),
+    [filteredViews, sortKey, statsByGameBananaId]
   );
   const pagedViews = useMemo(() => paginateCatalogEntryViews(visibleViews, page), [page, visibleViews]);
   const detailView = detailEntry
@@ -104,6 +114,30 @@ export function ModCatalogManager({
       window.clearTimeout(timer);
     };
   }, [notifier, query, sourceList]);
+
+  useEffect(() => {
+    const ids = catalogStatsRequestIds(allViews, statsByGameBananaId);
+    if (!ids.length) return;
+    const requestId = statsRequestRef.current + 1;
+    statsRequestRef.current = requestId;
+    let disposed = false;
+    getModCatalogStats(ids)
+      .then((result) => {
+        if (disposed || statsRequestRef.current !== requestId) return;
+        if (!result.stats.length) return;
+        setStatsByGameBananaId((current) => {
+          const next = new Map(current);
+          for (const item of result.stats) {
+            next.set(item.gameBananaId, item);
+          }
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+    };
+  }, [allViews, statsByGameBananaId]);
 
   useEffect(() => {
     setPage(1);
@@ -225,6 +259,8 @@ function CatalogFilterBar({
         <option value="updatedDesc">更新时间</option>
         <option value="nameAsc">名称</option>
         <option value="sizeDesc">大小</option>
+        <option value="viewsDesc">浏览量</option>
+        <option value="likesDesc">点赞量</option>
       </Select>
       <label className={`catalog-downloadable-toggle ${filters.downloadableOnly ? "active" : ""}`}>
         <input
@@ -444,6 +480,15 @@ function formatCatalogResultText(page: CatalogPage<CatalogEntryView>, visibleCou
   const range = visibleCount ? `${page.start}-${page.end} / ${visibleCount}` : "0 / 0";
   const matched = visibleCount === matchedCount ? "" : ` · ${matchedCount} 个匹配`;
   return `${range} 个结果${matched} · ${sourceLabels}`;
+}
+
+function catalogStatsRequestIds(views: CatalogEntryView[], statsByGameBananaId: Map<number, GameBananaCatalogStats>) {
+  const ids = new Set<number>();
+  for (const view of views) {
+    const id = view.entry.gameBananaId;
+    if (id !== null && !statsByGameBananaId.has(id)) ids.add(id);
+  }
+  return [...ids];
 }
 
 function catalogTypeLabel(view: CatalogEntryView) {

@@ -1,11 +1,11 @@
 use super::common::{run_blocking, run_with_celeste_path};
 use crate::api_contract::{
-    CheckModUpdatesPayload, PreviewModUpdateMetadataPayload, RefreshModCatalogCachePayload,
-    ResolveModCatalogDependenciesPayload, SearchModCatalogPayload,
+    CheckModUpdatesPayload, GetModCatalogStatsPayload, PreviewModUpdateMetadataPayload,
+    RefreshModCatalogCachePayload, ResolveModCatalogDependenciesPayload, SearchModCatalogPayload,
 };
 use crate::domain::{
-    EverestReleaseList, ModCatalogDependencyResolutionResult, ModCatalogSearchResult, ModMetadata,
-    ModUpdateCheckResult,
+    EverestReleaseList, GameBananaCatalogStatsResult, ModCatalogDependencyResolutionResult,
+    ModCatalogSearchResult, ModMetadata, ModUpdateCheckResult,
 };
 use crate::services;
 
@@ -27,6 +27,17 @@ pub async fn refresh_mod_catalog_cache(
     let RefreshModCatalogCachePayload { sources } = payload;
     run_blocking("刷新 Mod 目录缓存任务失败", move || {
         Ok(services::mod_catalog::refresh_catalog_cache(&sources))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_mod_catalog_stats(
+    payload: GetModCatalogStatsPayload,
+) -> Result<GameBananaCatalogStatsResult, String> {
+    let GetModCatalogStatsPayload { game_banana_ids } = payload;
+    run_blocking("读取 Mod 目录统计任务失败", move || {
+        Ok(services::mod_catalog::get_catalog_stats(&game_banana_ids))
     })
     .await
 }

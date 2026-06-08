@@ -27,6 +27,7 @@ pub fn run() {
             commands::scan::rescan_celeste,
             commands::catalog::search_mod_catalog,
             commands::catalog::refresh_mod_catalog_cache,
+            commands::catalog::get_mod_catalog_stats,
             commands::catalog::resolve_mod_catalog_dependencies,
             commands::catalog::check_mod_updates,
             commands::catalog::preview_mod_update_metadata,

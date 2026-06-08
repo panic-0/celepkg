@@ -7,7 +7,9 @@ import { createSearchMatcher, matchSearchFields, type SearchField, type SearchMa
 export type CatalogTypeFilter = "all" | string;
 export type CatalogSourceFilter = "all" | ModCatalogEntry["source"];
 export type CatalogInstallFilter = "all" | "installed" | "notInstalled";
-export type CatalogSortKey = "relevance" | "updatedDesc" | "nameAsc" | "sizeDesc";
+export type CatalogSortKey = "relevance" | "updatedDesc" | "nameAsc" | "sizeDesc" | "viewsDesc" | "likesDesc";
+export type CatalogStats = { likeCount: number; viewCount: number };
+export type CatalogStatsByGameBananaId = ReadonlyMap<number, CatalogStats>;
 
 export const CATALOG_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -85,7 +87,11 @@ export function filterCatalogEntryViews(views: CatalogEntryView[], filters: Cata
   });
 }
 
-export function sortCatalogEntryViews(views: CatalogEntryView[], sortKey: CatalogSortKey) {
+export function sortCatalogEntryViews(
+  views: CatalogEntryView[],
+  sortKey: CatalogSortKey,
+  statsByGameBananaId: CatalogStatsByGameBananaId = new Map()
+) {
   return [...views].sort((left, right) => {
     if (sortKey === "updatedDesc") {
       return (right.entry.lastUpdate ?? 0) - (left.entry.lastUpdate ?? 0) || compareByOriginalIndex(left, right);
@@ -95,6 +101,12 @@ export function sortCatalogEntryViews(views: CatalogEntryView[], sortKey: Catalo
     }
     if (sortKey === "sizeDesc") {
       return (right.entry.size ?? 0) - (left.entry.size ?? 0) || compareByOriginalIndex(left, right);
+    }
+    if (sortKey === "viewsDesc") {
+      return compareByCatalogStats(left, right, statsByGameBananaId, "viewCount") || compareByOriginalIndex(left, right);
+    }
+    if (sortKey === "likesDesc") {
+      return compareByCatalogStats(left, right, statsByGameBananaId, "likeCount") || compareByOriginalIndex(left, right);
     }
     return right.relevance - left.relevance || compareByOriginalIndex(left, right);
   });
@@ -148,6 +160,24 @@ function findTaskItemForEntry(entry: ModCatalogEntry, task: DownloadTask | null)
 
 function compareByOriginalIndex(left: CatalogEntryView, right: CatalogEntryView) {
   return left.originalIndex - right.originalIndex;
+}
+
+function compareByCatalogStats(
+  left: CatalogEntryView,
+  right: CatalogEntryView,
+  statsByGameBananaId: CatalogStatsByGameBananaId,
+  key: keyof CatalogStats
+) {
+  const leftValue = catalogStatsValue(left.entry, statsByGameBananaId, key);
+  const rightValue = catalogStatsValue(right.entry, statsByGameBananaId, key);
+  if (leftValue === null && rightValue === null) return 0;
+  if (leftValue === null) return 1;
+  if (rightValue === null) return -1;
+  return rightValue - leftValue;
+}
+
+function catalogStatsValue(entry: ModCatalogEntry, statsByGameBananaId: CatalogStatsByGameBananaId, key: keyof CatalogStats) {
+  return entry.gameBananaId === null ? null : (statsByGameBananaId.get(entry.gameBananaId)?.[key] ?? null);
 }
 
 function searchFieldsForCatalogEntry(entry: ModCatalogEntry): SearchField[] {

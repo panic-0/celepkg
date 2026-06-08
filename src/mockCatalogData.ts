@@ -206,6 +206,7 @@ export function catalogEntry(
   categoryName = gameBananaType,
   subCategoryName = ""
 ): ModCatalogEntry {
+  const gameBananaId = mockGameBananaId(name);
   return {
     source,
     id: `${source}-${name.toLowerCase().replace(/\s+/g, "-")}`,
@@ -216,10 +217,14 @@ export function catalogEntry(
     gameBananaType,
     categoryName,
     subCategoryName,
-    gameBananaId: 1000,
-    gameBananaFileId: 2000,
+    gameBananaId,
+    gameBananaFileId: gameBananaId + 1000,
     size: 12_345_678,
     lastUpdate: 1770040000,
     xxHash
   };
+}
+
+function mockGameBananaId(name: string) {
+  return 1000 + [...name].reduce((total, char, index) => total + char.charCodeAt(0) * (index + 1), 0);
 }

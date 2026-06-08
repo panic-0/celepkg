@@ -99,8 +99,11 @@ export interface ApiTypes {
   EverestInstallResult: EverestInstallResult;
   EverestRelease: EverestRelease;
   EverestReleaseList: EverestReleaseList;
+  GameBananaCatalogStats: GameBananaCatalogStats;
+  GameBananaCatalogStatsResult: GameBananaCatalogStatsResult;
   GameStatus: GameStatus;
   GameStatusPhase: GameStatusPhase;
+  GetModCatalogStatsPayload: GetModCatalogStatsPayload;
   InstallStagedEverestPayload: InstallStagedEverestPayload;
   InstallStagedModPayload: InstallStagedModPayload;
   InstalledModMatch: InstalledModMatch;
@@ -495,6 +498,23 @@ export interface EverestReleaseList {
 }
 /**
  * This interface was referenced by `ApiTypes`'s JSON-Schema
+ * via the `definition` "GameBananaCatalogStats".
+ */
+export interface GameBananaCatalogStats {
+  gameBananaId: number;
+  likeCount: number;
+  viewCount: number;
+}
+/**
+ * This interface was referenced by `ApiTypes`'s JSON-Schema
+ * via the `definition` "GameBananaCatalogStatsResult".
+ */
+export interface GameBananaCatalogStatsResult {
+  stats: GameBananaCatalogStats[];
+  warnings: string[];
+}
+/**
+ * This interface was referenced by `ApiTypes`'s JSON-Schema
  * via the `definition` "GameStatus".
  */
 export interface GameStatus {
@@ -506,6 +526,13 @@ export interface GameStatus {
   running: boolean;
   stopped: boolean;
   windowTitle: string;
+}
+/**
+ * This interface was referenced by `ApiTypes`'s JSON-Schema
+ * via the `definition` "GetModCatalogStatsPayload".
+ */
+export interface GetModCatalogStatsPayload {
+  gameBananaIds: number[];
 }
 /**
  * This interface was referenced by `ApiTypes`'s JSON-Schema
@@ -852,6 +879,7 @@ export type ApiCommandName =
   | "download_mod_to_staging"
   | "get_config"
   | "get_game_status"
+  | "get_mod_catalog_stats"
   | "install_staged_everest"
   | "install_staged_mod"
   | "launch_game"
@@ -899,6 +927,7 @@ export interface ApiCommandPayloads {
   download_mod_to_staging: DownloadModToStagingPayload;
   get_config: undefined;
   get_game_status: CelestePathPayload;
+  get_mod_catalog_stats: GetModCatalogStatsPayload;
   install_staged_everest: InstallStagedEverestPayload;
   install_staged_mod: InstallStagedModPayload;
   launch_game: LaunchGamePayload;
@@ -946,6 +975,7 @@ export interface ApiCommandResponses {
   download_mod_to_staging: StagedDownload;
   get_config: ConfigResponse;
   get_game_status: GameStatus;
+  get_mod_catalog_stats: GameBananaCatalogStatsResult;
   install_staged_everest: EverestInstallResult;
   install_staged_mod: ModInstallResult;
   launch_game: LaunchResult;

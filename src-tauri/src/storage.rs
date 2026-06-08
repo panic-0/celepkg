@@ -405,6 +405,12 @@ pub fn mod_catalog_cache_path(source: ModCatalogSourceKind) -> PathBuf {
         .join(format!("{source:?}.json").to_ascii_lowercase())
 }
 
+pub fn game_banana_catalog_stats_cache_path() -> PathBuf {
+    app_dir()
+        .join("mod-catalog-cache")
+        .join("gamebanana-stats.json")
+}
+
 pub fn installed_mod_hash_cache_path() -> PathBuf {
     app_dir().join("installed-mod-hashes.json")
 }

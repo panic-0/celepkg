@@ -4,6 +4,7 @@ import type {
   ConfigResponse,
   EverestInstallResult,
   EverestReleaseList,
+  GameBananaCatalogStatsResult,
   ModCatalogDependencyResolutionResult,
   ModCatalogSearchResult,
   ModInstallResult,
@@ -49,6 +50,10 @@ export function validateBackupList(value: unknown): BackupInfo[] {
 
 export function validateModCatalogSearchResult(value: unknown): ModCatalogSearchResult {
   return validateSchemaValue("ModCatalogSearchResult", value, "API 返回数据格式异常：mod catalog search");
+}
+
+export function validateGameBananaCatalogStatsResult(value: unknown): GameBananaCatalogStatsResult {
+  return validateSchemaValue("GameBananaCatalogStatsResult", value, "API 返回数据格式异常：mod catalog stats");
 }
 
 export function validateModCatalogDependencyResolutionResult(value: unknown): ModCatalogDependencyResolutionResult {
