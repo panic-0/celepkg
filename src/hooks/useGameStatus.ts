@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getGameStatus, stopGame } from "../api";
-import type { AppNotifier, GameStatus } from "../types";
+import type { AppNotifier, GameStatus, LaunchMethod } from "../types";
 import { readError } from "../utils/format";
 import type { AppConfirmPromptState } from "../components/AppDialogs";
 import {
   GAME_STATUS_BACKGROUND_POLL_INTERVAL_MS,
-  gameRunningNoticeForTransition,
+  gameStatusNoticeForTransition,
   watchGameLaunch,
   type GameStatusRefreshSource
 } from "../utils/gameStatusWatcher";
+import type { FrontendGameStatusPhase } from "../utils/gameStatusText";
 
 const idleStatus: GameStatus = {
+  busy: false,
+  detail: "",
+  phase: "idle",
   running: false,
   stopped: false,
   executable: "",
-  pid: null
+  pid: null,
+  windowTitle: ""
 };
 
 type GameStatusOptions = {
@@ -32,6 +37,7 @@ export function useGameStatus({ celestePath, configLoaded, notifier, requestAppC
   const gameStatusRef = useRef(idleStatus);
   const launchWatchAbortRef = useRef<AbortController | null>(null);
   const launchWatchActiveRef = useRef(false);
+  const launchWatchMethodRef = useRef<LaunchMethod>("direct");
 
   const setKnownGameStatus = useCallback((status: GameStatus) => {
     gameStatusRef.current = status;
@@ -40,10 +46,11 @@ export function useGameStatus({ celestePath, configLoaded, notifier, requestAppC
 
   const applyGameStatus = useCallback(
     (status: GameStatus, source: GameStatusRefreshSource) => {
-      const notice = gameRunningNoticeForTransition(gameStatusRef.current.running, status.running, source, launchWatchActiveRef.current);
+      const notice = gameStatusNoticeForTransition(gameStatusRef.current.phase, status.phase, source, launchWatchActiveRef.current);
       setKnownGameStatus(status);
       if (notice === "launch") notifier.showSuccess("Celeste 已启动。");
       else if (notice === "detected") notifier.showInfo("检测到 Celeste 正在运行。");
+      else if (notice === "preparing") notifier.showInfo(status.detail || "Everest 正在准备 Celeste。");
     },
     [notifier, setKnownGameStatus]
   );
@@ -89,41 +96,48 @@ export function useGameStatus({ celestePath, configLoaded, notifier, requestAppC
     };
   }, [celestePath]);
 
-  const startWatchingGameLaunch = useCallback(() => {
-    if (!configLoaded || !celestePath.trim()) return;
+  const startWatchingGameLaunch = useCallback(
+    (launchMethod: LaunchMethod = "direct") => {
+      if (!configLoaded || !celestePath.trim()) return;
 
-    launchWatchAbortRef.current?.abort();
-    const abortController = new AbortController();
-    launchWatchAbortRef.current = abortController;
-    launchWatchActiveRef.current = true;
-    setGameLaunchPending(true);
+      launchWatchAbortRef.current?.abort();
+      const abortController = new AbortController();
+      launchWatchAbortRef.current = abortController;
+      launchWatchActiveRef.current = true;
+      launchWatchMethodRef.current = launchMethod;
+      setGameLaunchPending(true);
 
-    void watchGameLaunch({
-      getStatus: () => refreshGameStatus({ resetOnError: false, silent: true, source: "launch" }),
-      signal: abortController.signal
-    })
-      .then((outcome) => {
-        if (launchWatchAbortRef.current !== abortController) return;
-        if (outcome === "timeout" && !gameStatusRef.current.running) {
-          notifier.showWarning("已发出启动命令，但暂未检测到 Celeste 进程，可稍后刷新状态。");
-        }
+      void watchGameLaunch({
+        getStatus: () => refreshGameStatus({ resetOnError: false, silent: true, source: "launch" }),
+        signal: abortController.signal
       })
-      .finally(() => {
-        if (launchWatchAbortRef.current !== abortController) return;
-        launchWatchAbortRef.current = null;
-        launchWatchActiveRef.current = false;
-        setGameLaunchPending(false);
-      });
-  }, [celestePath, configLoaded, notifier, refreshGameStatus]);
+        .then((outcome) => {
+          if (launchWatchAbortRef.current !== abortController) return;
+          if (outcome === "timeout" && !gameStatusRef.current.running) {
+            notifier.showWarning("Steam 或 Everest 可能仍在准备；暂未检测到 Celeste 主窗口。");
+          }
+        })
+        .finally(() => {
+          if (launchWatchAbortRef.current !== abortController) return;
+          launchWatchAbortRef.current = null;
+          launchWatchActiveRef.current = false;
+          setGameLaunchPending(false);
+        });
+    },
+    [celestePath, configLoaded, notifier, refreshGameStatus]
+  );
 
   async function stopGameWithConfirm() {
-    if (!gameStatus.running) {
+    if (!gameStatus.busy) {
       await refreshGameStatus();
       return;
     }
+    const isPreparing = gameStatus.phase === "processStarting" || gameStatus.phase === "everestPreparing";
     const confirmed = await requestAppConfirm({
       title: "停止 Celeste",
-      description: "Celeste 正在运行。继续操作会关闭当前游戏进程，未保存的游戏状态可能丢失。",
+      description: isPreparing
+        ? "Celeste 或 Everest 正在启动准备中。继续操作会关闭当前相关进程。"
+        : "Celeste 正在运行。继续操作会关闭当前游戏进程，未保存的游戏状态可能丢失。",
       confirmLabel: "停止游戏",
       variant: "danger",
       facts: [
@@ -146,8 +160,20 @@ export function useGameStatus({ celestePath, configLoaded, notifier, requestAppC
     }
   }
 
+  const effectivePhase: FrontendGameStatusPhase =
+    gameLaunchPending && gameStatus.phase === "idle"
+      ? launchWatchMethodRef.current === "steam"
+        ? "steamStarting"
+        : "processStarting"
+      : gameStatus.phase;
+  const gameBusy = gameStatus.busy || gameLaunchPending;
+  const canStopGame = gameStatus.busy;
+
   return {
+    canStopGame,
+    gameBusy,
     gameLaunchPending,
+    gamePhase: effectivePhase,
     gameRunning: gameStatus.running,
     gameStatus,
     refreshGameStatus,

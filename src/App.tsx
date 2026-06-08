@@ -216,7 +216,7 @@ export function App() {
   });
   const showWorkspaceLoading = loading && isWorkspaceLoadingMessage(loadingMessage);
   const showingModRecords = workspaceView.activeView === "mods";
-  const writeActionsDisabled = gameStatus.gameRunning;
+  const writeActionsDisabled = gameStatus.gameBusy;
   const activeUpdateRecordIds = useMemo(
     () => new Set((showingModRecords ? filters.filteredMods : filters.filteredMaps).map((record) => record.id)),
     [filters.filteredMaps, filters.filteredMods, showingModRecords]
@@ -237,16 +237,16 @@ export function App() {
 
   async function launchSelectedProfiles() {
     const result = await profileDraft.launchSelectedProfiles();
-    if (shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch();
+    if (result && shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch(result.launchMethod);
   }
 
   async function launchOrStopGame() {
-    if (gameStatus.gameRunning) {
+    if (gameStatus.canStopGame) {
       await gameStatus.stopGameWithConfirm();
       return;
     }
     const result = await profileDraft.launchCurrentGame();
-    if (shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch();
+    if (result && shouldWatchGameLaunch(result)) gameStatus.startWatchingGameLaunch(result.launchMethod);
   }
 
   return (
@@ -256,8 +256,11 @@ export function App() {
         loading={loading}
         loadingMessage={loadingMessage}
         canLaunch={Boolean(scan.gameExecutable)}
+        canStopGame={gameStatus.canStopGame}
         gameLaunchPending={gameStatus.gameLaunchPending}
+        gamePhase={gameStatus.gamePhase}
         gameRunning={gameStatus.gameRunning}
+        gameStatusDetail={gameStatus.gameStatus.detail}
         issueCount={issueCount}
         scan={scan}
         onApplyAndLaunch={launchSelectedProfiles}

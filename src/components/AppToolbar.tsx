@@ -1,11 +1,15 @@
 import { AlertTriangle, CheckCircle2, DatabaseZap, FolderOpen, Play, RefreshCcw, Square } from "lucide-react";
 import type { ScanResult } from "../types";
+import { gameStatusText, type FrontendGameStatusPhase } from "../utils/gameStatusText";
 
 type AppToolbarProps = {
   canLaunch: boolean;
+  canStopGame: boolean;
   celestePath: string;
   gameLaunchPending: boolean;
+  gamePhase: FrontendGameStatusPhase;
   gameRunning: boolean;
+  gameStatusDetail: string;
   issueCount: number;
   loading: boolean;
   loadingMessage: string;
@@ -21,9 +25,12 @@ type AppToolbarProps = {
 
 export function AppToolbar({
   canLaunch,
+  canStopGame,
   celestePath,
   gameLaunchPending,
+  gamePhase,
   gameRunning,
+  gameStatusDetail,
   issueCount,
   loading,
   loadingMessage,
@@ -37,15 +44,8 @@ export function AppToolbar({
   onRescan
 }: AppToolbarProps) {
   const completedCount = scan.maps.filter((map) => map.completionStatus === "completed").length;
-  const statusText = loading
-    ? loadingMessage || "正在处理"
-    : gameLaunchPending
-      ? "等待 Celeste 启动"
-      : gameRunning
-        ? "Celeste 正在运行"
-        : scan.modsPath
-          ? "已连接 Celeste"
-          : "等待目录";
+  const statusText = loading ? loadingMessage || "正在处理" : gameStatusText(gamePhase, gameStatusDetail, Boolean(scan.modsPath));
+  const launchWaitingWithoutProcess = gameLaunchPending && !canStopGame;
 
   return (
     <header className="app-toolbar">
@@ -92,8 +92,8 @@ export function AppToolbar({
           title={
             gameRunning
               ? "Celeste 运行中，停止游戏后再应用 Profile"
-              : gameLaunchPending
-                ? "正在等待 Celeste 启动"
+              : gameLaunchPending || canStopGame
+                ? statusText
                 : "应用当前 Profile 并启动"
           }
         >
@@ -102,11 +102,13 @@ export function AppToolbar({
         </button>
         <button
           onClick={onDirectLaunch}
-          disabled={loading || gameLaunchPending || (!canLaunch && !gameRunning)}
-          title={gameRunning ? "停止当前 Celeste 进程" : gameLaunchPending ? "正在等待 Celeste 启动" : "不应用 Profile，直接启动 Celeste"}
+          disabled={loading || launchWaitingWithoutProcess || (!canLaunch && !canStopGame)}
+          title={
+            canStopGame ? "停止当前 Celeste / Everest 进程" : launchWaitingWithoutProcess ? statusText : "不应用 Profile，直接启动 Celeste"
+          }
         >
-          {gameRunning ? <Square size={18} /> : <Play size={18} />}
-          {gameRunning ? "停止游戏" : "直接启动"}
+          {canStopGame ? <Square size={18} /> : <Play size={18} />}
+          {canStopGame ? "停止游戏" : "直接启动"}
         </button>
       </div>
     </header>

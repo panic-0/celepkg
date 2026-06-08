@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gameRunningNoticeForTransition, shouldWatchGameLaunch, watchGameLaunch, type GameLaunchWatchOptions } from "./gameStatusWatcher";
+import { gameStatusNoticeForTransition, shouldWatchGameLaunch, watchGameLaunch, type GameLaunchWatchOptions } from "./gameStatusWatcher";
 
 describe("game status watcher", () => {
   it("keeps polling until a delayed launch becomes visible", async () => {
@@ -34,10 +34,11 @@ describe("game status watcher", () => {
   });
 
   it("uses background transitions for manual launch notices", () => {
-    expect(gameRunningNoticeForTransition(false, true, "background", false)).toBe("detected");
-    expect(gameRunningNoticeForTransition(true, true, "background", false)).toBeNull();
-    expect(gameRunningNoticeForTransition(false, true, "background", true)).toBe("launch");
-    expect(gameRunningNoticeForTransition(false, true, "initial", false)).toBeNull();
+    expect(gameStatusNoticeForTransition("idle", "running", "background", false)).toBe("detected");
+    expect(gameStatusNoticeForTransition("running", "running", "background", false)).toBeNull();
+    expect(gameStatusNoticeForTransition("idle", "running", "background", true)).toBe("launch");
+    expect(gameStatusNoticeForTransition("idle", "running", "initial", false)).toBeNull();
+    expect(gameStatusNoticeForTransition("processStarting", "everestPreparing", "launch", true)).toBe("preparing");
   });
 
   it("only starts launch watching after a successful launch result", () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { delayNextMockGameLaunchStatusChecks, mockApi, setMockGameRunningForTests } from "./mockApi";
+import {
+  delayNextMockGameLaunchStatusChecks,
+  mockApi,
+  setMockGameRunningForTests,
+  setMockGameStatusPhaseSequenceForTests
+} from "./mockApi";
 import { buildLocalDependencyTree } from "./utils/dependencyTree";
 
 describe("mock staged downloads", () => {
@@ -19,6 +24,18 @@ describe("mock staged downloads", () => {
     await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ running: true, stopped: false, pid: 1234 });
 
     await expect(mockApi.stopGame("D:\\Games\\Celeste")).resolves.toMatchObject({ running: false, stopped: true, pid: null });
+  });
+
+  it("can play a mock game status phase sequence", async () => {
+    setMockGameStatusPhaseSequenceForTests(["idle", "processStarting", "everestPreparing", "running"]);
+
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ phase: "idle", busy: false });
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ phase: "processStarting", busy: true });
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({
+      phase: "everestPreparing",
+      detail: "Everest 正在加载 Mod 12/87"
+    });
+    await expect(mockApi.getGameStatus("D:\\Games\\Celeste")).resolves.toMatchObject({ phase: "running", running: true });
   });
 
   it("can delay mock game running status after launch", async () => {

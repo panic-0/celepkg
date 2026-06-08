@@ -1,13 +1,14 @@
 export const GAME_STATUS_BACKGROUND_POLL_INTERVAL_MS = 5000;
 export const GAME_LAUNCH_POLL_INTERVAL_MS = 1000;
-export const GAME_LAUNCH_TIMEOUT_MS = 60000;
+export const GAME_LAUNCH_TIMEOUT_MS = 120000;
 
 export type GameStatusRefreshSource = "initial" | "manual" | "background" | "launch";
 export type GameLaunchWatchOutcome = "running" | "timeout" | "aborted";
-export type GameRunningNotice = "launch" | "detected" | null;
+export type GameStatusNotice = "launch" | "detected" | "preparing" | null;
 
 type RunnableStatus = {
   running: boolean;
+  phase?: string;
 };
 
 type SleepResult = "completed" | "aborted";
@@ -45,13 +46,16 @@ export async function watchGameLaunch<TStatus extends RunnableStatus>({
   }
 }
 
-export function gameRunningNoticeForTransition(
-  previousRunning: boolean,
-  nextRunning: boolean,
+export function gameStatusNoticeForTransition(
+  previousPhase: string,
+  nextPhase: string,
   source: GameStatusRefreshSource,
   launchWatchActive: boolean
-): GameRunningNotice {
-  if (previousRunning || !nextRunning) return null;
+): GameStatusNotice {
+  if (previousPhase !== "everestPreparing" && nextPhase === "everestPreparing" && (source === "launch" || launchWatchActive)) {
+    return "preparing";
+  }
+  if (previousPhase === "running" || nextPhase !== "running") return null;
   if (source === "launch" || launchWatchActive) return "launch";
   if (source === "background") return "detected";
   return null;

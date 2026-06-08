@@ -284,15 +284,37 @@ pub struct LaunchResult {
     pub executable: String,
     pub map_profile_id: String,
     pub mod_profile_id: String,
+    pub launch_method: LaunchMethod,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum LaunchMethod {
+    Direct,
+    Steam,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GameStatus {
     pub running: bool,
+    pub busy: bool,
     pub stopped: bool,
     pub executable: String,
     pub pid: Option<u32>,
+    pub phase: GameStatusPhase,
+    pub detail: String,
+    pub window_title: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum GameStatusPhase {
+    Idle,
+    ProcessStarting,
+    EverestPreparing,
+    Running,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

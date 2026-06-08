@@ -485,7 +485,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       const applied = await enqueueProfileSave(() => applyProfile(celestePath, mapId, modId));
       setScan(applied);
       const result = await launchGame(celestePath, launchArgs);
-      notifier.showSuccess(`已启动：${result.executable}`);
+      showLaunchResult(result);
       return result;
     });
   }
@@ -493,7 +493,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   async function launchCurrentGame() {
     return await runProfileTask<LaunchResult>(async () => {
       const result = await launchGame(celestePath, launchArgs);
-      notifier.showSuccess(`已启动：${result.executable}`);
+      showLaunchResult(result);
       return result;
     });
   }
@@ -589,6 +589,12 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
 
   function shouldNormalizeProfileContent(controller: ProfileDraftController, profile: Profile) {
     return controller.profileType === "maps" ? !profile.enabledMapIds || !profile.enabledModIds : !profile.enabledModIds;
+  }
+
+  function showLaunchResult(result: LaunchResult) {
+    if (result.launchMethod === "steam") notifier.showSuccess("已交给 Steam 启动 Celeste。");
+    else notifier.showSuccess(`已启动：${result.executable}`);
+    for (const warning of result.warnings) notifier.showWarning(warning);
   }
 
   function toggleMap(id: string) {

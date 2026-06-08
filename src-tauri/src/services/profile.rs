@@ -1,5 +1,7 @@
 use crate::dependency_rules::collect_required_dependency_closure_mod_ids;
-use crate::domain::{LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult};
+use crate::domain::{
+    LaunchMethod, LaunchResult, Profile, ProfileInput, ProfileType, ProfilesState, ScanResult,
+};
 use crate::services::game::{resolve_game_executable, split_launch_args};
 use crate::services::scan::{full_scan_cached, write_profile_blacklist};
 use crate::storage::{
@@ -9,6 +11,8 @@ use crate::storage::{
 use crate::utils::{now_string, stable_id};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+const CELESTE_STEAM_APP_ID: &str = "504230";
 
 pub fn save_profile(profile: ProfileInput) -> Result<ProfilesState, String> {
     let now = now_string();
@@ -117,16 +121,15 @@ pub fn launch_profile(
         return Err("没有找到 Celeste 可执行文件".to_string());
     }
     let args = split_launch_args(&applied.map_profile.launch_args);
-    Command::new(&executable)
-        .args(args)
-        .current_dir(&applied.path)
-        .spawn()
-        .map_err(|error| format!("启动失败：{error}"))?;
+    let launch_method = launch_celeste(&applied.path, &executable, &args)?;
+    let warnings = launch_warnings(launch_method, &args);
     Ok(LaunchResult {
         launched: true,
         executable,
         map_profile_id: applied.map_profile.id,
         mod_profile_id: applied.mod_profile.id,
+        launch_method,
+        warnings,
     })
 }
 
@@ -137,17 +140,100 @@ pub fn launch_game(celeste_path: String, launch_args: String) -> Result<LaunchRe
     if executable.is_empty() {
         return Err("没有找到 Celeste 可执行文件".to_string());
     }
-    Command::new(&executable)
-        .args(split_launch_args(&launch_args))
-        .current_dir(&path)
-        .spawn()
-        .map_err(|error| format!("启动失败：{error}"))?;
+    let args = split_launch_args(&launch_args);
+    let launch_method = launch_celeste(&path, &executable, &args)?;
+    let warnings = launch_warnings(launch_method, &args);
     Ok(LaunchResult {
         launched: true,
         executable,
         map_profile_id: String::new(),
         mod_profile_id: String::new(),
+        launch_method,
+        warnings,
     })
+}
+
+fn launch_celeste(
+    celeste_path: &Path,
+    executable: &str,
+    args: &[String],
+) -> Result<LaunchMethod, String> {
+    if is_steam_celeste_path(celeste_path) {
+        launch_steam_celeste()?;
+        return Ok(LaunchMethod::Steam);
+    }
+
+    Command::new(executable)
+        .args(args)
+        .current_dir(celeste_path)
+        .spawn()
+        .map_err(|error| format!("启动失败：{error}"))?;
+    Ok(LaunchMethod::Direct)
+}
+
+fn launch_warnings(launch_method: LaunchMethod, args: &[String]) -> Vec<String> {
+    if launch_method == LaunchMethod::Steam && !args.is_empty() {
+        return vec!["Steam 启动暂不传递自定义启动参数。".to_string()];
+    }
+    vec![]
+}
+
+fn is_steam_celeste_path(celeste_path: &Path) -> bool {
+    steam_manifest_path(celeste_path).is_some_and(|path| path.exists())
+}
+
+fn steam_manifest_path(celeste_path: &Path) -> Option<PathBuf> {
+    let common = celeste_path.parent()?;
+    if !common
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("common"))
+    {
+        return None;
+    }
+    let steamapps = common.parent()?;
+    if !steamapps
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("steamapps"))
+    {
+        return None;
+    }
+    Some(steamapps.join(format!("appmanifest_{CELESTE_STEAM_APP_ID}.acf")))
+}
+
+#[cfg(target_os = "windows")]
+fn launch_steam_celeste() -> Result<(), String> {
+    let url = format!("steam://rungameid/{CELESTE_STEAM_APP_ID}");
+    let mut command = Command::new("cmd");
+    command.args(["/C", "start", "", &url]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("通过 Steam 启动失败：{error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn launch_steam_celeste() -> Result<(), String> {
+    Command::new("open")
+        .arg(format!("steam://rungameid/{CELESTE_STEAM_APP_ID}"))
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("通过 Steam 启动失败：{error}"))
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn launch_steam_celeste() -> Result<(), String> {
+    Command::new("xdg-open")
+        .arg(format!("steam://rungameid/{CELESTE_STEAM_APP_ID}"))
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("通过 Steam 启动失败：{error}"))
 }
 
 struct AppliedProfile {
@@ -437,6 +523,34 @@ mod tests {
             vec!["snapshot-protected".to_string()]
         );
         assert_eq!(scan.selected_save_files, vec!["2.celeste".to_string()]);
+    }
+
+    #[test]
+    fn steam_manifest_path_matches_steam_celeste_directory() {
+        let root = temp_celeste_root("steam-library");
+        let celeste = root.join("steamapps").join("common").join("Celeste");
+        fs::create_dir_all(&celeste).expect("create celeste dir");
+        let manifest = root
+            .join("steamapps")
+            .join(format!("appmanifest_{CELESTE_STEAM_APP_ID}.acf"));
+        fs::write(&manifest, "\"appid\" \"504230\"").expect("write manifest");
+
+        assert_eq!(steam_manifest_path(&celeste), Some(manifest));
+        assert!(is_steam_celeste_path(&celeste));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn steam_manifest_path_rejects_non_steam_directory() {
+        let root = temp_celeste_root("non-steam");
+        let celeste = root.join("Celeste");
+        fs::create_dir_all(&celeste).expect("create celeste dir");
+
+        assert_eq!(steam_manifest_path(&celeste), None);
+        assert!(!is_steam_celeste_path(&celeste));
+
+        let _ = fs::remove_dir_all(root);
     }
 
     fn dependency(name: &str) -> Dependency {

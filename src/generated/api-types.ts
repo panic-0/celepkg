@@ -40,6 +40,16 @@ export type ProfileType = "maps" | "mods";
 export type ModKind = "map" | "mod";
 /**
  * This interface was referenced by `ApiTypes`'s JSON-Schema
+ * via the `definition` "GameStatusPhase".
+ */
+export type GameStatusPhase = "idle" | "processStarting" | "everestPreparing" | "running";
+/**
+ * This interface was referenced by `ApiTypes`'s JSON-Schema
+ * via the `definition` "LaunchMethod".
+ */
+export type LaunchMethod = "direct" | "steam";
+/**
+ * This interface was referenced by `ApiTypes`'s JSON-Schema
  * via the `definition` "ModDownloadPhase".
  */
 export type ModDownloadPhase = "downloading" | "verifying" | "installing" | "done" | "error";
@@ -90,10 +100,12 @@ export interface ApiTypes {
   EverestRelease: EverestRelease;
   EverestReleaseList: EverestReleaseList;
   GameStatus: GameStatus;
+  GameStatusPhase: GameStatusPhase;
   InstallStagedEverestPayload: InstallStagedEverestPayload;
   InstallStagedModPayload: InstallStagedModPayload;
   InstalledModMatch: InstalledModMatch;
   LaunchGamePayload: LaunchGamePayload;
+  LaunchMethod: LaunchMethod;
   LaunchProfilePayload: LaunchProfilePayload;
   LaunchResult: LaunchResult;
   MapStats: MapStats;
@@ -486,10 +498,14 @@ export interface EverestReleaseList {
  * via the `definition` "GameStatus".
  */
 export interface GameStatus {
+  busy: boolean;
+  detail: string;
   executable: string;
+  phase: GameStatusPhase;
   pid: number | null;
   running: boolean;
   stopped: boolean;
+  windowTitle: string;
 }
 /**
  * This interface was referenced by `ApiTypes`'s JSON-Schema
@@ -546,9 +562,11 @@ export interface LaunchProfilePayload {
  */
 export interface LaunchResult {
   executable: string;
+  launchMethod: LaunchMethod;
   launched: boolean;
   mapProfileId: string;
   modProfileId: string;
+  warnings: string[];
 }
 /**
  * This interface was referenced by `ApiTypes`'s JSON-Schema

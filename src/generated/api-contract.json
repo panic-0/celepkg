@@ -1326,10 +1326,25 @@
       "type": "object"
     },
     "GameStatus": {
+      "$defs": {
+        "GameStatusPhase": {
+          "enum": ["idle", "processStarting", "everestPreparing", "running"],
+          "type": "string"
+        }
+      },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "busy": {
+          "type": "boolean"
+        },
+        "detail": {
+          "type": "string"
+        },
         "executable": {
           "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/GameStatusPhase"
         },
         "pid": {
           "format": "uint32",
@@ -1341,9 +1356,12 @@
         },
         "stopped": {
           "type": "boolean"
+        },
+        "windowTitle": {
+          "type": "string"
         }
       },
-      "required": ["running", "stopped", "executable", "pid"],
+      "required": ["running", "busy", "stopped", "executable", "pid", "phase", "detail", "windowTitle"],
       "title": "GameStatus",
       "type": "object"
     },
@@ -1551,10 +1569,19 @@
       "type": "object"
     },
     "LaunchResult": {
+      "$defs": {
+        "LaunchMethod": {
+          "enum": ["direct", "steam"],
+          "type": "string"
+        }
+      },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "executable": {
           "type": "string"
+        },
+        "launchMethod": {
+          "$ref": "#/$defs/LaunchMethod"
         },
         "launched": {
           "type": "boolean"
@@ -1564,9 +1591,15 @@
         },
         "modProfileId": {
           "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
-      "required": ["launched", "executable", "mapProfileId", "modProfileId"],
+      "required": ["launched", "executable", "mapProfileId", "modProfileId", "launchMethod", "warnings"],
       "title": "LaunchResult",
       "type": "object"
     },
@@ -6378,10 +6411,25 @@
       "type": "object"
     },
     "GameStatus": {
+      "$defs": {
+        "GameStatusPhase": {
+          "enum": ["idle", "processStarting", "everestPreparing", "running"],
+          "type": "string"
+        }
+      },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
+        "busy": {
+          "type": "boolean"
+        },
+        "detail": {
+          "type": "string"
+        },
         "executable": {
           "type": "string"
+        },
+        "phase": {
+          "$ref": "#/$defs/GameStatusPhase"
         },
         "pid": {
           "format": "uint32",
@@ -6393,9 +6441,12 @@
         },
         "stopped": {
           "type": "boolean"
+        },
+        "windowTitle": {
+          "type": "string"
         }
       },
-      "required": ["running", "stopped", "executable", "pid"],
+      "required": ["running", "busy", "stopped", "executable", "pid", "phase", "detail", "windowTitle"],
       "title": "GameStatus",
       "type": "object"
     },
@@ -6603,10 +6654,19 @@
       "type": "object"
     },
     "LaunchResult": {
+      "$defs": {
+        "LaunchMethod": {
+          "enum": ["direct", "steam"],
+          "type": "string"
+        }
+      },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "executable": {
           "type": "string"
+        },
+        "launchMethod": {
+          "$ref": "#/$defs/LaunchMethod"
         },
         "launched": {
           "type": "boolean"
@@ -6616,9 +6676,15 @@
         },
         "modProfileId": {
           "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
-      "required": ["launched", "executable", "mapProfileId", "modProfileId"],
+      "required": ["launched", "executable", "mapProfileId", "modProfileId", "launchMethod", "warnings"],
       "title": "LaunchResult",
       "type": "object"
     },
