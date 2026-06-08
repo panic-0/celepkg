@@ -104,7 +104,7 @@ export function useModFilters({
         record: modItem
       }))
       .filter(({ match, record: modItem }) => {
-        const draftEnabled = modItem.readOnly || enabledModDraft.has(modItem.id);
+        const draftEnabled = isDraftEnabled(modItem, enabledMapDraft, enabledModDraft);
         if (modEnabledFilter === "enabled" && !draftEnabled) return false;
         if (modEnabledFilter === "disabled" && draftEnabled) return false;
         if (modProgressFilter === "warnings" && !modItem.warnings.length) return false;
@@ -135,6 +135,7 @@ export function useModFilters({
       .map((item) => item.record);
   }, [
     availableUpdateRecordOrder,
+    enabledMapDraft,
     enabledModDraft,
     downloadableUpdateRecordOrder,
     latestUpdateRecordOrder,

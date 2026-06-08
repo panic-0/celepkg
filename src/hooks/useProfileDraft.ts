@@ -175,9 +175,13 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     () => inferDependencyMods(scan, enabledMapDraft, new Set([...enabledMapModDraft, ...enabledExplicitModDraft])),
     [enabledExplicitModDraft, enabledMapDraft, enabledMapModDraft, scan]
   );
+  const protectedModDraft = useMemo(
+    () => new Set(scan.otherMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id)),
+    [scan.otherMods]
+  );
   const enabledModDraft = useMemo(
-    () => new Set([...enabledMapModDraft, ...enabledExplicitModDraft, ...inferredDependencyModDraft]),
-    [enabledExplicitModDraft, enabledMapModDraft, inferredDependencyModDraft]
+    () => new Set([...protectedModDraft, ...enabledMapModDraft, ...enabledExplicitModDraft, ...inferredDependencyModDraft]),
+    [enabledExplicitModDraft, enabledMapModDraft, inferredDependencyModDraft, protectedModDraft]
   );
 
   const mapDraftController = useMemo<ProfileDraftController>(

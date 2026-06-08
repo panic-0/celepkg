@@ -146,7 +146,7 @@ export function useRecordActions({
 
   function isModEnabled(id: string) {
     const record = scan.otherMods.find((modItem) => modItem.id === id);
-    return Boolean(record?.readOnly) || enabledModDraft.has(id);
+    return Boolean(record && isDraftEnabled(record, enabledMapDraft, enabledModDraft));
   }
 
   function enableVisibleMaps() {

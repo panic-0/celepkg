@@ -49,8 +49,9 @@ export function profileNameExists(profiles: Profile[], name: string, currentProf
 }
 
 export function inferDependencyMods(scan: ScanResult, enabledMapIds: Set<string>, baseModIds: Set<string>) {
+  const protectedModIds = scan.otherMods.filter((modItem) => modItem.protected).map((modItem) => modItem.id);
   return collectTransitiveRequiredDependencyModIds({
-    baseModIds,
+    baseModIds: new Set([...baseModIds, ...protectedModIds]),
     isSourceEnabled: (record) => record.protected || enabledMapIds.has(record.id),
     sourceRecords: scan.maps,
     targetMods: scan.otherMods

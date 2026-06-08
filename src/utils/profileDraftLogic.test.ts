@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModRecord, Profile, ScanResult } from "../types";
+import { isDraftEnabled } from "./format";
 import {
   inferDependencyMods,
   nextCopyName,
@@ -72,6 +73,23 @@ describe("profile draft logic", () => {
     });
 
     expect([...inferDependencyMods(scan, new Set(["map"]), new Set(["explicit"]))]).toEqual(["helper", "library"]);
+  });
+
+  it("infers dependencies for always-enabled mods", () => {
+    const scan = scanWithRecords({
+      otherMods: [
+        record("root", "Root", "mod", { protected: true, dependencies: [{ name: "Helper", version: "" }] }),
+        record("helper", "Helper", "mod", { dependencies: [{ name: "Library", version: "" }] }),
+        record("library", "Library", "mod")
+      ]
+    });
+
+    expect([...inferDependencyMods(scan, new Set(), new Set())]).toEqual(["helper", "library"]);
+  });
+
+  it("treats always-enabled records as enabled in profile drafts", () => {
+    expect(isDraftEnabled(record("protected-map", "Protected Map", "map", { protected: true }), new Set(), new Set())).toBe(true);
+    expect(isDraftEnabled(record("protected-mod", "Protected Mod", "mod", { protected: true }), new Set(), new Set())).toBe(true);
   });
 });
 

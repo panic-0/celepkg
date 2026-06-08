@@ -18,7 +18,7 @@ export function profileSummary(profile: Profile) {
 }
 
 export function isDraftEnabled(record: ModRecord, enabledMapDraft: Set<string>, enabledModDraft: Set<string>) {
-  if (record.readOnly) return true;
+  if (record.readOnly || record.protected) return true;
   return record.kind === "mod" ? enabledModDraft.has(record.id) : enabledMapDraft.has(record.id);
 }
 

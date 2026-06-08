@@ -341,7 +341,12 @@ test("bulk disable ignores always-enabled dependents", async ({ page }) => {
   await page.locator(".confirm-dialog", { hasText: "确认禁用当前结果" }).getByRole("button", { name: "禁用当前结果" }).click();
 
   await expect(page.getByText("部分 Mod 未禁用")).toHaveCount(0);
-  await expect(outdatedRow.getByTitle("启用Mod")).toBeVisible();
+  await expect(outdatedRow.getByTitle("禁用Mod")).toBeVisible();
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Mock Dependency Tree");
+  await page.getByLabel("启用状态").selectOption("enabled");
+  await expect(page.locator("tbody tr", { hasText: "Mock Dependency Tree Root" })).toHaveCount(1);
+  await expect(page.locator("tbody tr", { hasText: "Mock Dependency Tree Outdated" })).toHaveCount(1);
 });
 
 test("mod update status grouping separates update, unknown, and latest records", async ({ page }) => {
