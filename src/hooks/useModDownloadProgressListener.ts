@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { readEventPayload } from "../generated/api-validators";
+import { loadApiValidators } from "../apiValidatorsLoader";
 import { isMockMode } from "../mockApi";
 import type { ModDownloadProgress } from "../types";
 
@@ -8,8 +8,8 @@ export function useModDownloadProgressListener(applyProgress: (progress: ModDown
     if (isMockMode()) return;
     let disposed = false;
     let unlisten: (() => void) | undefined;
-    void import("@tauri-apps/api/event")
-      .then(({ listen }) =>
+    void Promise.all([import("@tauri-apps/api/event"), loadApiValidators()])
+      .then(([{ listen }, { readEventPayload }]) =>
         listen<unknown>("mod-download-progress", (event) => {
           const progress = readEventPayload("mod-download-progress", event.payload);
           if (!progress) return;

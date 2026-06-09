@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { validateCommandPayload, validateCommandResponse } from "./generated/api-validators";
+import { loadApiValidators } from "./apiValidatorsLoader";
 import { isMockMode, mockApi } from "./mockApi";
 import type { ApiCommandName, ApiCommandPayloads, ApiCommandResponses } from "./generated/api-types";
 import type {
@@ -32,6 +32,7 @@ async function callCommand<Name extends ApiCommandName>(
   payload: ApiCommandPayloads[Name],
   mockCall: () => Promise<unknown>
 ): Promise<ApiCommandResponses[Name]> {
+  const { validateCommandPayload, validateCommandResponse } = await loadApiValidators();
   const checkedPayload = validateCommandPayload(command, payload);
   const value = isMockMode()
     ? await mockCall()

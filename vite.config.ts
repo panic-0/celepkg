@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      chunkSizeWarningLimit: 700
+    },
     server: {
       host: env.CELEPKG_DEV_HOST || DEFAULT_DEV_HOST,
       port: readPort(env.CELEPKG_DEV_PORT, DEFAULT_DEV_PORT),
