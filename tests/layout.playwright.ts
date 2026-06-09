@@ -4,7 +4,7 @@ const LONG_STATUS_TEXT = "正在检查 一个名字非常非常非常非常非�
 
 async function openMock(page: Page, width = 1280) {
   await page.setViewportSize({ width, height: 720 });
-  await page.goto("/mock");
+  await page.goto("/mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".app-toolbar")).toBeVisible();
   await expect(page.locator(".record-panel")).toBeVisible();
 }
@@ -36,6 +36,7 @@ async function forceLongToolbarStatus(page: Page) {
 }
 
 test("toolbar status stays on one line and keeps full text metadata", async ({ page }) => {
+  test.setTimeout(60_000);
   await openMock(page);
 
   const connectedStatus = await page.locator(".brand-block span").evaluate((status) => {

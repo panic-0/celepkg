@@ -31,14 +31,15 @@ export function useModFilters({
   scan
 }: ModFiltersOptions) {
   const [query, setQuery] = useState("");
+  const [groupByUpdateStatus, setGroupByUpdateStatus] = useState(false);
+  const [pinFavorites, setPinFavorites] = useState(true);
+  const [pinProtected, setPinProtected] = useState(false);
   const [mapEnabledFilter, setMapEnabledFilter] = useState<EnabledFilter>("all");
   const [mapProgressFilter, setMapProgressFilter] = useState<ProgressFilter>("all");
-  const [mapGroupByUpdateStatus, setMapGroupByUpdateStatus] = useState(false);
   const [mapSortKey, setMapSortKey] = useState<SortKey>("name");
   const [showHelperMaps, setShowHelperMaps] = useState(false);
   const [modEnabledFilter, setModEnabledFilter] = useState<EnabledFilter>("all");
   const [modProgressFilter, setModProgressFilter] = useState<ProgressFilter>("all");
-  const [modGroupByUpdateStatus, setModGroupByUpdateStatus] = useState(false);
   const [modReferenceFilter, setModReferenceFilter] = useState<ReferenceFilter>("all");
 
   const helperMapMods = useMemo(() => scan.otherMods.filter((modItem) => modItem.subMaps.length > 0), [scan.otherMods]);
@@ -64,7 +65,12 @@ export function useModFilters({
       });
     return [...maps]
       .sort((a, b) => {
-        if (mapGroupByUpdateStatus) {
+        const pinnedSort = comparePinnedRecordPriority(a.record, b.record, {
+          pinFavorites,
+          pinProtected
+        });
+        if (pinnedSort !== 0) return pinnedSort;
+        if (groupByUpdateStatus) {
           const updateStatusSort = compareUpdateStatusRecords(
             a.record.id,
             b.record.id,
@@ -86,10 +92,12 @@ export function useModFilters({
     enabledMapDraft,
     enabledModDraft,
     latestUpdateRecordOrder,
+    groupByUpdateStatus,
     mapEnabledFilter,
-    mapGroupByUpdateStatus,
     mapProgressFilter,
     mapSortKey,
+    pinFavorites,
+    pinProtected,
     searchMatcher,
     visibleMapRecords
   ]);
@@ -117,7 +125,12 @@ export function useModFilters({
       });
     return [...mods]
       .sort((a, b) => {
-        if (modGroupByUpdateStatus) {
+        const pinnedSort = comparePinnedRecordPriority(a.record, b.record, {
+          pinFavorites,
+          pinProtected
+        });
+        if (pinnedSort !== 0) return pinnedSort;
+        if (groupByUpdateStatus) {
           const updateStatusSort = compareUpdateStatusRecords(
             a.record.id,
             b.record.id,
@@ -138,13 +151,15 @@ export function useModFilters({
     enabledMapDraft,
     enabledModDraft,
     downloadableUpdateRecordOrder,
+    groupByUpdateStatus,
     latestUpdateRecordOrder,
     modEnabledFilter,
-    modGroupByUpdateStatus,
     modProgressFilter,
     modReferenceFilter,
     optionalReferencesByModId,
     optionalReferencedModIds,
+    pinFavorites,
+    pinProtected,
     referencedModIds,
     requiredReferencesByModId,
     searchMatcher,
@@ -171,31 +186,49 @@ export function useModFilters({
   return {
     filteredMaps,
     filteredMods,
+    groupByUpdateStatus,
     helperMapMods,
-    mapGroupByUpdateStatus,
     mapEnabledFilter,
     mapProgressFilter,
     mapSortKey,
     modEnabledFilter,
-    modGroupByUpdateStatus,
     modProgressFilter,
     modReferenceFilter,
+    pinFavorites,
+    pinProtected,
     query,
     recordSearchMatches,
     referencedModIds,
+    setGroupByUpdateStatus,
     setMapEnabledFilter,
-    setMapGroupByUpdateStatus,
     setMapProgressFilter,
     setMapSortKey,
     setModEnabledFilter,
-    setModGroupByUpdateStatus,
     setModProgressFilter,
     setModReferenceFilter,
+    setPinFavorites,
+    setPinProtected,
     setQuery,
     setShowHelperMaps,
     showHelperMaps,
     visibleMapRecords
   };
+}
+
+export function comparePinnedRecordPriority(
+  left: ModRecord,
+  right: ModRecord,
+  { pinFavorites, pinProtected }: { pinFavorites: boolean; pinProtected: boolean }
+) {
+  const leftRank = pinnedRecordRank(left, pinFavorites, pinProtected);
+  const rightRank = pinnedRecordRank(right, pinFavorites, pinProtected);
+  return leftRank - rightRank;
+}
+
+function pinnedRecordRank(record: ModRecord, pinFavorites: boolean, pinProtected: boolean) {
+  if (pinFavorites && record.favorite) return 0;
+  if (pinProtected && record.protected) return pinFavorites ? 1 : 0;
+  return (pinFavorites ? 1 : 0) + (pinProtected ? 1 : 0);
 }
 
 function updateStatusGroupRank(

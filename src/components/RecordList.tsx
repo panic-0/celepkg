@@ -36,6 +36,8 @@ type RecordListProps = {
   enabledFilter: EnabledFilter;
   groupByUpdateStatus: boolean;
   helperMapCount: number;
+  pinFavorites: boolean;
+  pinProtected: boolean;
   progressFilter: ProgressFilter;
   query: string;
   referenceFilter: ReferenceFilter;
@@ -62,6 +64,8 @@ type RecordListProps = {
   onCheckModUpdates: () => void;
   onEnabledFilterChange: (value: EnabledFilter) => void;
   onGroupByUpdateStatusChange: (value: boolean) => void;
+  onPinFavoritesChange: (value: boolean) => void;
+  onPinProtectedChange: (value: boolean) => void;
   onMapSelect: (id: string) => void;
   onMapToggle: (record: ModRecord) => void;
   onModSelect: (id: string) => void;
@@ -87,6 +91,8 @@ export function RecordList({
   enabledFilter,
   groupByUpdateStatus,
   helperMapCount,
+  pinFavorites,
+  pinProtected,
   progressFilter,
   query,
   referenceFilter,
@@ -113,6 +119,8 @@ export function RecordList({
   onCheckModUpdates,
   onEnabledFilterChange,
   onGroupByUpdateStatusChange,
+  onPinFavoritesChange,
+  onPinProtectedChange,
   onMapSelect,
   onMapToggle,
   onModSelect,
@@ -219,18 +227,24 @@ export function RecordList({
             onChange={onQueryChange}
             placeholder="搜索地图、SID、Mod、依赖"
           />
+          <RecordPriorityToggle label="收藏置顶" value={pinFavorites} onChange={onPinFavoritesChange} title="将收藏条目放到当前列表前面" />
+          <RecordPriorityToggle
+            label="始终启用置顶"
+            value={pinProtected}
+            onChange={onPinProtectedChange}
+            title="将始终启用条目放到当前列表前面，收藏条目仍优先"
+          />
+          <UpdateStatusGroupToggle value={groupByUpdateStatus} onChange={onGroupByUpdateStatusChange} />
         </div>
         <RecordFilterBar
           activeView={activeView}
           enabledFilter={enabledFilter}
-          groupByUpdateStatus={groupByUpdateStatus}
           helperMapCount={helperMapCount}
           progressFilter={progressFilter}
           referenceFilter={referenceFilter}
           showHelperMaps={showHelperMaps}
           sortKey={sortKey}
           onEnabledFilterChange={onEnabledFilterChange}
-          onGroupByUpdateStatusChange={onGroupByUpdateStatusChange}
           onProgressFilterChange={onProgressFilterChange}
           onReferenceFilterChange={onReferenceFilterChange}
           onShowHelperMapsChange={onShowHelperMapsChange}
@@ -283,14 +297,12 @@ export function RecordList({
 function RecordFilterBar({
   activeView,
   enabledFilter,
-  groupByUpdateStatus,
   helperMapCount,
   progressFilter,
   referenceFilter,
   showHelperMaps,
   sortKey,
   onEnabledFilterChange,
-  onGroupByUpdateStatusChange,
   onProgressFilterChange,
   onReferenceFilterChange,
   onShowHelperMapsChange,
@@ -298,14 +310,12 @@ function RecordFilterBar({
 }: {
   activeView: RecordView;
   enabledFilter: EnabledFilter;
-  groupByUpdateStatus: boolean;
   helperMapCount: number;
   progressFilter: ProgressFilter;
   referenceFilter: ReferenceFilter;
   showHelperMaps: boolean;
   sortKey: SortKey;
   onEnabledFilterChange: (value: EnabledFilter) => void;
-  onGroupByUpdateStatusChange: (value: boolean) => void;
   onProgressFilterChange: (value: ProgressFilter) => void;
   onReferenceFilterChange: (value: ReferenceFilter) => void;
   onShowHelperMapsChange: (value: boolean) => void;
@@ -328,7 +338,6 @@ function RecordFilterBar({
             <option value="withStats">有存档统计</option>
             <option value="warnings">有依赖警告</option>
           </Select>
-          <UpdateStatusGroupToggle value={groupByUpdateStatus} onChange={onGroupByUpdateStatusChange} />
           <Select label="排序" value={sortKey} onChange={(value) => onSortKeyChange(value as SortKey)}>
             <option value="name">名称</option>
             <option value="deaths">死亡数</option>
@@ -358,10 +367,28 @@ function RecordFilterBar({
             <option value="updates">有更新</option>
             <option value="warnings">有警告</option>
           </Select>
-          <UpdateStatusGroupToggle value={groupByUpdateStatus} onChange={onGroupByUpdateStatusChange} />
         </>
       )}
     </div>
+  );
+}
+
+function RecordPriorityToggle({
+  label,
+  title,
+  value,
+  onChange
+}: {
+  label: string;
+  title: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className={`catalog-downloadable-toggle record-priority-toggle ${value ? "active" : ""}`}>
+      <input type="checkbox" checked={value} onChange={(event) => onChange(event.target.checked)} title={title} />
+      <span>{label}</span>
+    </label>
   );
 }
 

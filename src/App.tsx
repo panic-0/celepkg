@@ -499,8 +499,10 @@ export function App() {
             enabledFilter={showingModRecords ? filters.modEnabledFilter : filters.mapEnabledFilter}
             filteredMaps={filters.filteredMaps}
             filteredMods={filters.filteredMods}
-            groupByUpdateStatus={showingModRecords ? filters.modGroupByUpdateStatus : filters.mapGroupByUpdateStatus}
+            groupByUpdateStatus={filters.groupByUpdateStatus}
             helperMapCount={filters.helperMapMods.length}
+            pinFavorites={filters.pinFavorites}
+            pinProtected={filters.pinProtected}
             progressFilter={showingModRecords ? filters.modProgressFilter : filters.mapProgressFilter}
             query={filters.query}
             referenceFilter={filters.modReferenceFilter}
@@ -526,7 +528,9 @@ export function App() {
             onEnableAll={enableAllInCurrentViewWithConfirm}
             onCheckModUpdates={checkUpdatesForMods}
             onEnabledFilterChange={showingModRecords ? filters.setModEnabledFilter : filters.setMapEnabledFilter}
-            onGroupByUpdateStatusChange={showingModRecords ? filters.setModGroupByUpdateStatus : filters.setMapGroupByUpdateStatus}
+            onGroupByUpdateStatusChange={filters.setGroupByUpdateStatus}
+            onPinFavoritesChange={filters.setPinFavorites}
+            onPinProtectedChange={filters.setPinProtected}
             onMapSelect={workspaceView.selectMap}
             onMapToggle={recordActions.toggleMapLikeRecord}
             onModSelect={workspaceView.selectMod}

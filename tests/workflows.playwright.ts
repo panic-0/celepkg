@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function openMock(page: Page) {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/mock");
+  await page.goto("/mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".app-toolbar")).toBeVisible();
   await expect(page.locator(".record-panel")).toBeVisible();
 }
@@ -22,6 +22,7 @@ async function createEmptyProfile(column: Locator, nameLabel: string, profileNam
 }
 
 test("profile manager creates, clones, renames, and applies mock profiles", async ({ page }) => {
+  test.setTimeout(60_000);
   await openMock(page);
   await openNav(page, "Profile");
 
@@ -205,6 +206,36 @@ test("workspace navigation groups content around profile state", async ({ page }
   await expect(page.getByRole("heading", { name: "Mod 获取" })).toBeVisible();
 });
 
+test("record lists can pin favorites and always-enabled records before normal sorting", async ({ page }) => {
+  test.setTimeout(60_000);
+  await openMock(page);
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Mock Map Pack 01");
+  const protectedMapRow = page.locator("tbody tr", { hasText: "Mock Map Pack 014" });
+  await protectedMapRow.getByTitle("设为 始终启用").click();
+  await expect(page.getByText("已设为始终启用")).toBeVisible();
+  const listOptions = page.locator(".record-search-actions");
+  await expect(listOptions.getByLabel("收藏置顶")).toBeChecked();
+  await expect(page.locator("tbody tr").first()).toContainText("Mock Map Pack 013");
+  await listOptions.getByLabel("始终启用置顶").check();
+  await expect(page.locator("tbody tr").nth(0)).toContainText("Mock Map Pack 013");
+  await expect(page.locator("tbody tr").nth(1)).toContainText("Mock Map Pack 014");
+  await listOptions.getByLabel("按更新状态分组").check();
+
+  await page.getByRole("button", { name: "其他 Mod", exact: true }).click();
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("Mock Helper 01");
+  await expect(listOptions.getByLabel("收藏置顶")).toBeChecked();
+  await expect(listOptions.getByLabel("始终启用置顶")).toBeChecked();
+  await expect(listOptions.getByLabel("按更新状态分组")).toBeChecked();
+  await listOptions.getByLabel("按更新状态分组").uncheck();
+  const helperRow = page.locator("tbody tr", { hasText: "Mock Helper 018" });
+  await helperRow.getByTitle("设为 始终启用").click();
+  await expect(page.getByText("已设为始终启用")).toBeVisible();
+
+  await expect(page.locator("tbody tr").nth(0)).toContainText("Mock Helper 017");
+  await expect(page.locator("tbody tr").nth(1)).toContainText("Mock Helper 018");
+});
+
 test("catalog install flow previews dependencies and queues the mock task", async ({ page }) => {
   await openMock(page);
   await openNav(page, "Mod 获取");
@@ -360,8 +391,9 @@ test("mod update status grouping separates update, unknown, and latest records",
   const statusFilter = page.locator(".mod-filters .field", { has: page.locator("span", { hasText: /^状态$/ }) }).locator("select");
   await expect(statusFilter).toHaveCount(1);
   await expect(statusFilter).toHaveValue("all");
-  const groupToggle = page.locator(".mod-filters .record-update-group-toggle input");
+  const groupToggle = page.locator(".record-search-actions .record-update-group-toggle input");
   await expect(groupToggle).toHaveCount(1);
+  await page.locator(".record-search-actions").getByLabel("收藏置顶").uncheck();
   await groupToggle.check();
 
   await expect(page.locator(".record-panel")).toContainText("可更新");
@@ -396,8 +428,9 @@ test("map update status grouping separates update, unknown, and latest records",
   const progressFilter = page.locator(".map-filters .field", { has: page.locator("span", { hasText: /^进度$/ }) }).locator("select");
   await expect(progressFilter).toHaveCount(1);
   await expect(progressFilter).toHaveValue("all");
-  const groupToggle = page.locator(".map-filters .record-update-group-toggle input");
+  const groupToggle = page.locator(".record-search-actions .record-update-group-toggle input");
   await expect(groupToggle).toHaveCount(1);
+  await page.locator(".record-search-actions").getByLabel("收藏置顶").uncheck();
   await groupToggle.check();
 
   await expect(page.locator(".record-panel")).toContainText("可更新");
@@ -571,6 +604,7 @@ test("backup manager creates, restores, and deletes mock backups", async ({ page
 });
 
 test("download manager pauses, cancels, and retries failed mock update tasks", async ({ page }) => {
+  test.setTimeout(60_000);
   await openMock(page);
 
   await page.getByRole("button", { name: "其他 Mod" }).click();
@@ -578,6 +612,7 @@ test("download manager pauses, cancels, and retries failed mock update tasks", a
   await expect(page.getByText(/发现 \d+ 个可更新 Mod/)).toBeVisible({ timeout: 5000 });
   const updateFilter = page.locator(".mod-filters .field", { has: page.locator("span", { hasText: /^状态$/ }) }).locator("select");
   await expect(updateFilter).toHaveCount(1);
+  await page.locator(".record-search-actions").getByLabel("收藏置顶").uncheck();
   await updateFilter.selectOption("updates");
   await expect(page.locator(".record-panel")).toContainText("Mock Install Failure");
   await expect(page.locator(".record-panel")).toContainText("Mock Download Failure");

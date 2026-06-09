@@ -157,14 +157,18 @@
   overflow-y: hidden;
 }
 
+.catalog-actions.record-search-actions {
+  grid-template-columns: minmax(280px, 1fr) repeat(3, max-content);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .record-filter-bar.map-filters {
-  grid-template-columns:
-    minmax(118px, 1fr) minmax(118px, 1fr) minmax(154px, max-content) minmax(118px, 1fr)
-    minmax(146px, max-content);
+  grid-template-columns: repeat(3, minmax(118px, 1fr)) minmax(146px, max-content);
 }
 
 .record-filter-bar.mod-filters {
-  grid-template-columns: repeat(3, minmax(118px, 1fr)) minmax(154px, max-content);
+  grid-template-columns: repeat(3, minmax(118px, 1fr));
 }
 
 .record-helper-toggle small {
