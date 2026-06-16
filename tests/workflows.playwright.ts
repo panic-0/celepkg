@@ -5,6 +5,8 @@ async function openMock(page: Page) {
   await page.goto("/mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".app-toolbar")).toBeVisible();
   await expect(page.locator(".record-panel")).toBeVisible();
+  await expect(page.locator(".brand-block span")).toHaveText("已连接 Celeste");
+  await expect(page.locator(".record-table tbody tr").first()).toBeVisible();
 }
 
 async function openNav(page: Page, name: string) {
@@ -601,6 +603,7 @@ test("backup manager creates, restores, and deletes mock backups", async ({ page
   await openNav(page, "备份还原");
 
   await expect(page.getByRole("heading", { name: "备份还原" })).toBeVisible();
+  await expect(page.locator(".backup-item")).toHaveCount(3);
   const initialBackupCount = await page.locator(".backup-item").count();
   const backupManager = page.locator(".backup-manager");
 

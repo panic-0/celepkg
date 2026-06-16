@@ -7,6 +7,8 @@ async function openMock(page: Page, width = 1280) {
   await page.goto("/mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".app-toolbar")).toBeVisible();
   await expect(page.locator(".record-panel")).toBeVisible();
+  await expect(page.locator(".brand-block span")).toHaveText("已连接 Celeste");
+  await expect(page.locator(".record-table tbody tr").first()).toBeVisible();
 }
 
 async function forceLongToolbarStatus(page: Page) {
