@@ -890,6 +890,7 @@ function ToggleButton({
     : (blockedReason ?? (enabled ? `禁用${label}` : `启用${label}`));
   return (
     <button
+      aria-label={title}
       className={`${enabled ? "record-toggle enabled" : "record-toggle disabled"}${blocked ? " blocked" : ""}`}
       disabled={blocked}
       onClick={(event) => {
@@ -898,7 +899,7 @@ function ToggleButton({
       }}
       title={title}
     >
-      {enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+      <span aria-hidden="true" className="record-toggle-label" />
     </button>
   );
 }

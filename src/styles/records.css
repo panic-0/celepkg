@@ -368,7 +368,7 @@
 }
 
 .record-table .col-actions {
-  width: 132px;
+  width: 168px;
   text-align: center;
 }
 
@@ -383,11 +383,11 @@
 
 .record-actions {
   display: inline-grid;
-  grid-template-columns: 36px auto;
+  grid-template-columns: 62px auto;
   justify-content: center;
   align-items: center;
   gap: 7px;
-  width: 112px;
+  width: 144px;
   max-width: 100%;
   vertical-align: middle;
 }
@@ -406,24 +406,63 @@
 }
 
 .record-toggle {
-  width: 36px;
+  position: relative;
+  width: 62px;
   padding: 0;
-  border-color: #d6dee7;
-  background: var(--color-panel-subtle);
-  color: #7b8794;
+  border-color: #cfd9e3;
+  border-radius: 999px;
+  background: #dfe7ee;
+  color: #5f6e7e;
 }
 
 .record-toggle.enabled {
-  border-color: #9fd3ba;
-  background: #eaf8f1;
-  color: #12805a;
+  border-color: #88cfae;
+  background: #12805a;
+  color: #ffffff;
 }
 
-.record-toggle:disabled,
-.record-toggle.blocked {
+.record-toggle::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(33, 49, 66, 0.24);
+}
+
+.record-toggle.enabled::before {
+  right: 5px;
+  left: auto;
+}
+
+.record-toggle-label {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding-left: 20px;
+  text-align: center;
+}
+
+.record-toggle.enabled .record-toggle-label {
+  padding-right: 18px;
+  padding-left: 0;
+}
+
+.record-toggle:disabled:not(.enabled),
+.record-toggle.blocked:not(.enabled) {
   border-color: #d9e1e8;
   background: #f4f7f9;
   color: #73808d;
+  opacity: 1;
+}
+
+.record-toggle.enabled:disabled,
+.record-toggle.enabled.blocked {
+  border-color: #9fd3ba;
+  background: #eaf8f1;
+  color: #12805a;
   opacity: 1;
 }
 
@@ -460,7 +499,7 @@
 }
 
 .record-table col.w-actions {
-  width: 132px;
+  width: 168px;
 }
 
 .record-table col.w-small {
