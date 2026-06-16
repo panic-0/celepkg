@@ -30,6 +30,14 @@ type ProfileDraftContent = {
   launchArgs?: string;
 };
 
+type ResolveProfileContentOptions = {
+  fallbackToCurrentScan?: boolean;
+};
+
+type HydrateProfileDraftOptions = ResolveProfileContentOptions & {
+  persistLegacyContent?: boolean;
+};
+
 export type ProfileDraftBatchUpdate = {
   enabledExplicitModDraft?: SetStateAction<Set<string>>;
   enabledMapDraft?: SetStateAction<Set<string>>;
@@ -56,7 +64,7 @@ type ProfileDraftController = {
   profileType: Profile["profileType"];
   profiles: Profile[];
   renameMessage: string;
-  resolveContent: (profile?: Profile) => ProfileDraftContent;
+  resolveContent: (profile?: Profile, options?: ResolveProfileContentOptions) => ProfileDraftContent;
   savePayload: (options: {
     content: ProfileDraftContent;
     createdAt?: string;
@@ -227,8 +235,8 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       profiles: mapProfiles,
       profileType: "maps",
       renameMessage: "地图 Profile 已重命名。",
-      resolveContent: (profile) => {
-        if (profile) return { ...resolveMapProfileContent(profile, scan), launchArgs: profile.launchArgs };
+      resolveContent: (profile, options) => {
+        if (profile) return { ...resolveMapProfileContent(profile, scan, options), launchArgs: profile.launchArgs };
         const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
         const enabledMapIds = [...new Set([...scan.maps.filter((map) => map.enabled).map((map) => map.id), ...readOnlyMapIds])];
         const enabledModIds = scan.otherMods
@@ -279,9 +287,9 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       profiles: modProfiles,
       profileType: "mods",
       renameMessage: "Mod Profile 已重命名。",
-      resolveContent: (profile) =>
+      resolveContent: (profile, options) =>
         profile
-          ? resolveModProfileContent(profile, scan)
+          ? resolveModProfileContent(profile, scan, options)
           : { enabledModIds: scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id) },
       savePayload: ({ content, createdAt, id, name }) => ({
         ...(id ? { id } : {}),
@@ -300,14 +308,15 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
   );
 
   const hydrateProfileDraft = useCallback(
-    (controller: ProfileDraftController, profile: Profile | undefined) => {
+    (controller: ProfileDraftController, profile: Profile | undefined, options: HydrateProfileDraftOptions = {}) => {
+      const persistLegacyContent = options.persistLegacyContent ?? true;
       controller.autoSaveReadyRef.current = false;
       resetProfileDraftHistory();
       controller.setSelectedId(profile?.id ?? controller.defaultId);
-      const content = controller.resolveContent(profile);
+      const content = controller.resolveContent(profile, { fallbackToCurrentScan: options.fallbackToCurrentScan });
       controller.applyContent(content);
       controller.setDirty(false);
-      if (profile && profileContentNeedsSave(profile, content)) {
+      if (profile && persistLegacyContent && profileContentNeedsSave(profile, content)) {
         void enqueueProfileSave(() =>
           saveProfile(
             controller.savePayload({
@@ -331,12 +340,18 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     const activeMap = mapProfiles.find((profile) => profile.id === activeMapId) ?? mapProfiles[0];
     const activeMod = modProfiles.find((profile) => profile.id === activeModId) ?? modProfiles[0];
     const initializing = !initializedRef.current;
-    if (initializing || (lastSyncedActiveProfileIdsRef.current.map !== activeMapId && !mapDirty)) {
+    const lastSyncedMapId = lastSyncedActiveProfileIdsRef.current.map;
+    const lastSyncedModId = lastSyncedActiveProfileIdsRef.current.mod;
+    if (initializing || (lastSyncedMapId !== activeMapId && selectedMapProfileId === lastSyncedMapId && !mapDirty)) {
       hydrateProfileDraft(mapDraftController, activeMap);
       lastSyncedActiveProfileIdsRef.current.map = activeMapId;
+    } else if (selectedMapProfileId === activeMapId) {
+      lastSyncedActiveProfileIdsRef.current.map = activeMapId;
     }
-    if (initializing || (lastSyncedActiveProfileIdsRef.current.mod !== activeModId && !modDirty)) {
+    if (initializing || (lastSyncedModId !== activeModId && selectedModProfileId === lastSyncedModId && !modDirty)) {
       hydrateProfileDraft(modDraftController, activeMod);
+      lastSyncedActiveProfileIdsRef.current.mod = activeModId;
+    } else if (selectedModProfileId === activeModId) {
       lastSyncedActiveProfileIdsRef.current.mod = activeModId;
     }
     initializedRef.current = true;
@@ -349,7 +364,9 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
     modDirty,
     modProfiles,
     scan.profiles.activeMapProfileId,
-    scan.profiles.activeModProfileId
+    scan.profiles.activeModProfileId,
+    selectedMapProfileId,
+    selectedModProfileId
   ]);
 
   const persistProfile = useCallback(
@@ -405,12 +422,20 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
 
   function setMapProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
-    hydrateProfileDraft(mapDraftController, profile);
+    const isActiveProfile = profile.id === scan.profiles.activeMapProfileId;
+    hydrateProfileDraft(mapDraftController, profile, {
+      fallbackToCurrentScan: isActiveProfile,
+      persistLegacyContent: isActiveProfile
+    });
   }
 
   function setModProfileDraft(profile: Profile | undefined) {
     if (!profile) return;
-    hydrateProfileDraft(modDraftController, profile);
+    const isActiveProfile = profile.id === scan.profiles.activeModProfileId;
+    hydrateProfileDraft(modDraftController, profile, {
+      fallbackToCurrentScan: isActiveProfile,
+      persistLegacyContent: isActiveProfile
+    });
   }
 
   const updateEnabledMapDraft: Dispatch<SetStateAction<Set<string>>> = (action) => {
@@ -569,6 +594,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
       const mapId = mapDirty ? await persistProfile(mapDraftController) : selectedMapProfileId;
       const modId = modDirty ? await persistProfile(modDraftController) : selectedModProfileId;
       const applied = await enqueueProfileSave(() => applyProfile(celestePath, mapId, modId));
+      lastSyncedActiveProfileIdsRef.current = { map: mapId, mod: modId };
       setScan(applied);
       const result = await launchGame(celestePath, launchArgs);
       showLaunchResult(result);
@@ -656,6 +682,7 @@ export function useProfileDraft({ celestePath, notifier, scan, setLoading, setSc
 
   async function applyProfiles(mapProfileId: string, modProfileId: string, successMessage: string) {
     const result = await enqueueProfileSave(() => applyProfile(celestePath, mapProfileId, modProfileId));
+    lastSyncedActiveProfileIdsRef.current = { map: mapProfileId, mod: modProfileId };
     setMapDirty(false);
     setModDirty(false);
     setScan(result);

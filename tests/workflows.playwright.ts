@@ -68,6 +68,26 @@ test("profile manager keeps manually selected profiles before apply", async ({ p
   await expect(page.getByText("已应用地图和 Mod Profile。")).toBeVisible();
 });
 
+test("profile manager keeps main profile content after launching an empty profile", async ({ page }) => {
+  await openMock(page);
+  await openNav(page, "Profile");
+
+  const mapColumn = profileColumn(page, "地图 Profile");
+  await createEmptyProfile(mapColumn, "新建地图 Profile 名称", "临时空地图 Profile");
+
+  await page.getByRole("button", { name: "应用并启动" }).click();
+  await expect(page.getByRole("button", { name: "停止游戏" })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "停止游戏" }).click();
+  const stopDialog = page.locator(".confirm-dialog", { hasText: "停止 Celeste" });
+  await expect(stopDialog).toBeVisible();
+  await stopDialog.getByRole("button", { name: "停止游戏" }).click();
+  await expect(page.getByText("Celeste 已停止。")).toBeVisible();
+
+  await mapColumn.locator(".profile-row", { hasText: "主线推进" }).first().locator("button.profile").click();
+  await expect(mapColumn.locator(".profile-row.active")).toContainText("主线推进");
+  await expect(mapColumn.locator(".profile-current")).toContainText("3 图");
+});
+
 test("profile manager keeps selection when deleting another profile", async ({ page }) => {
   await openMock(page);
   await openNav(page, "Profile");

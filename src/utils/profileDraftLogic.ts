@@ -1,6 +1,10 @@
 import type { Profile, ScanResult } from "../types";
 import { collectTransitiveRequiredDependencyModIds } from "./dependencyRules";
 
+type ResolveProfileContentOptions = {
+  fallbackToCurrentScan?: boolean;
+};
+
 export function toggleSetValue(current: Set<string>, id: string) {
   const next = new Set(current);
   if (next.has(id)) next.delete(id);
@@ -8,16 +12,18 @@ export function toggleSetValue(current: Set<string>, id: string) {
   return next;
 }
 
-export function resolveMapProfileContent(profile: Profile, scan: ScanResult) {
+export function resolveMapProfileContent(profile: Profile, scan: ScanResult, options: ResolveProfileContentOptions = {}) {
+  const fallbackToCurrentScan = options.fallbackToCurrentScan ?? true;
   const readOnlyMapIds = scan.maps.filter((map) => map.readOnly).map((map) => map.id);
-  const enabledMapIds = [
-    ...new Set([...(profile.enabledMapIds ?? scan.maps.filter((map) => map.enabled).map((map) => map.id)), ...readOnlyMapIds])
-  ];
+  const fallbackMapIds = fallbackToCurrentScan ? scan.maps.filter((map) => map.enabled).map((map) => map.id) : [];
+  const enabledMapIds = [...new Set([...(profile.enabledMapIds ?? fallbackMapIds), ...readOnlyMapIds])];
   const helperMapMods = scan.otherMods.filter((modItem) => modItem.subMaps.length > 0);
   const helperMapModIds = new Set(helperMapMods.map((modItem) => modItem.id));
   const enabledModIds = profile.enabledModIds
     ? profile.enabledModIds.filter((id) => helperMapModIds.has(id))
-    : helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
+    : fallbackToCurrentScan
+      ? helperMapMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id)
+      : [];
   return { enabledMapIds, enabledModIds };
 }
 
@@ -30,8 +36,11 @@ export function profileContentNeedsSave(profile: Profile, content: { enabledMapI
   return !sameStringArray(profile.enabledModIds, content.enabledModIds);
 }
 
-export function resolveModProfileContent(profile: Profile, scan: ScanResult) {
-  const enabledModIds = profile.enabledModIds ?? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id);
+export function resolveModProfileContent(profile: Profile, scan: ScanResult, options: ResolveProfileContentOptions = {}) {
+  const fallbackToCurrentScan = options.fallbackToCurrentScan ?? true;
+  const enabledModIds =
+    profile.enabledModIds ??
+    (fallbackToCurrentScan ? scan.otherMods.filter((modItem) => modItem.enabled).map((modItem) => modItem.id) : []);
   return { enabledModIds };
 }
 

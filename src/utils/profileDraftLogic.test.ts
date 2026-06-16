@@ -33,6 +33,19 @@ describe("profile draft logic", () => {
     });
   });
 
+  it("does not fill inactive legacy map profiles from the current scan", () => {
+    const scan = scanWithRecords({
+      maps: [record("official", "Official", "map", { enabled: false, readOnly: true }), record("map-a", "Map A", "map", { enabled: true })],
+      otherMods: [record("helper", "Helper", "mod", { enabled: true, subMaps: [subMap("helper-test")] })]
+    });
+    const legacyProfile = profile({ enabledMapIds: null, enabledModIds: null });
+
+    expect(resolveMapProfileContent(legacyProfile, scan, { fallbackToCurrentScan: false })).toEqual({
+      enabledMapIds: ["official"],
+      enabledModIds: []
+    });
+  });
+
   it("removes regular mods from map profile content", () => {
     const scan = scanWithRecords({
       otherMods: [
@@ -52,6 +65,16 @@ describe("profile draft logic", () => {
     });
 
     expect(resolveModProfileContent(profile({ enabledModIds: null }), scan)).toEqual({ enabledModIds: ["enabled"] });
+  });
+
+  it("does not fill inactive legacy mod profiles from the current scan", () => {
+    const scan = scanWithRecords({
+      otherMods: [record("enabled", "Enabled", "mod", { enabled: true }), record("disabled", "Disabled", "mod")]
+    });
+
+    expect(resolveModProfileContent(profile({ enabledModIds: null }), scan, { fallbackToCurrentScan: false })).toEqual({
+      enabledModIds: []
+    });
   });
 
   it("generates non-conflicting clone names and detects duplicate profile names", () => {
