@@ -20,14 +20,17 @@ import { formatCompletionStatus, formatStrawberries, formatTime, strawberryColle
 import { formatModUpdateVersionChange } from "../utils/modUpdateTask";
 import { clampPage, paginateItems } from "../utils/pagination";
 import { rangesForField, type SearchMatch } from "../utils/search";
+import {
+  buildUpdateStatusGroups,
+  updateStatusGroupLabel,
+  type UpdateStatusGroup,
+  type UpdateStatusGroups
+} from "../utils/updateStatusGrouping";
 import type { ActiveView, EnabledFilter, ProgressFilter, ReferenceFilter, SortKey, StrawberryDenominator } from "../viewTypes";
 import { Pagination } from "./Pagination";
 import { HighlightedText, SearchBox, Select } from "./common";
 
 type RecordView = Extract<ActiveView, "maps" | "mods">;
-type UpdateStatusGroup = "available" | "latest" | "unknown";
-type UpdateStatusGroupCounts = Record<UpdateStatusGroup, number>;
-type UpdateStatusGroups = { counts: UpdateStatusGroupCounts; groups: Map<string, UpdateStatusGroup> };
 
 type RecordListProps = {
   activeView: RecordView;
@@ -676,25 +679,6 @@ function ModTable({
   );
 }
 
-function buildUpdateStatusGroups(
-  mods: ModRecord[],
-  updatesByRecordId: Map<string, ModUpdateCandidate>,
-  latestUpdatesByRecordId: Map<string, ModUpdateCandidate>
-) {
-  const groups = new Map<string, UpdateStatusGroup>();
-  const counts: UpdateStatusGroupCounts = { available: 0, latest: 0, unknown: 0 };
-  for (const modItem of mods) {
-    const group = updatesByRecordId.has(modItem.id)
-      ? "available"
-      : latestUpdatesByRecordId.has(modItem.id) || (modItem.kind === "map" && modItem.readOnly)
-        ? "latest"
-        : "unknown";
-    groups.set(modItem.id, group);
-    counts[group] += 1;
-  }
-  return { counts, groups };
-}
-
 function UpdateStatusGroupRow({ colSpan, count, group }: { colSpan: number; count: number; group: UpdateStatusGroup }) {
   return (
     <tr className="record-group-row">
@@ -704,12 +688,6 @@ function UpdateStatusGroupRow({ colSpan, count, group }: { colSpan: number; coun
       </td>
     </tr>
   );
-}
-
-function updateStatusGroupLabel(group: UpdateStatusGroup) {
-  if (group === "available") return "可更新";
-  if (group === "latest") return "已是最新";
-  return "未知状态";
 }
 
 function formatDependencyReferenceTitle(references: DependencyReference[]) {

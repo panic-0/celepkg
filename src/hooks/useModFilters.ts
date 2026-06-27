@@ -4,6 +4,7 @@ import type { DependencyReference } from "../utils/dependencies";
 import type { EnabledFilter, ProgressFilter, ReferenceFilter, SortKey } from "../viewTypes";
 import { isDraftEnabled } from "../utils/format";
 import { createSearchMatcher, matchSearchFields, type SearchField, type SearchMatch } from "../utils/search";
+import { compareUpdateStatusRecords } from "../utils/updateStatusGrouping";
 
 type ModFiltersOptions = {
   availableUpdateRecordOrder: Map<string, number>;
@@ -65,20 +66,18 @@ export function useModFilters({
       });
     return [...maps]
       .sort((a, b) => {
+        if (groupByUpdateStatus) {
+          const updateStatusSort = compareUpdateStatusRecords(a.record, b.record, {
+            availableUpdateRecordOrder,
+            latestUpdateRecordOrder
+          });
+          if (updateStatusSort !== 0) return updateStatusSort;
+        }
         const pinnedSort = comparePinnedRecordPriority(a.record, b.record, {
           pinFavorites,
           pinProtected
         });
         if (pinnedSort !== 0) return pinnedSort;
-        if (groupByUpdateStatus) {
-          const updateStatusSort = compareUpdateStatusRecords(
-            a.record.id,
-            b.record.id,
-            availableUpdateRecordOrder,
-            latestUpdateRecordOrder
-          );
-          if (updateStatusSort !== 0) return updateStatusSort;
-        }
         if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
         if (mapProgressFilter === "updates") {
           return (downloadableUpdateRecordOrder.get(a.record.id) ?? 0) - (downloadableUpdateRecordOrder.get(b.record.id) ?? 0);
@@ -125,20 +124,18 @@ export function useModFilters({
       });
     return [...mods]
       .sort((a, b) => {
+        if (groupByUpdateStatus) {
+          const updateStatusSort = compareUpdateStatusRecords(a.record, b.record, {
+            availableUpdateRecordOrder,
+            latestUpdateRecordOrder
+          });
+          if (updateStatusSort !== 0) return updateStatusSort;
+        }
         const pinnedSort = comparePinnedRecordPriority(a.record, b.record, {
           pinFavorites,
           pinProtected
         });
         if (pinnedSort !== 0) return pinnedSort;
-        if (groupByUpdateStatus) {
-          const updateStatusSort = compareUpdateStatusRecords(
-            a.record.id,
-            b.record.id,
-            availableUpdateRecordOrder,
-            latestUpdateRecordOrder
-          );
-          if (updateStatusSort !== 0) return updateStatusSort;
-        }
         if (searchMatcher.active && a.match.score !== b.match.score) return b.match.score - a.match.score;
         if (modProgressFilter === "updates") {
           return (downloadableUpdateRecordOrder.get(a.record.id) ?? 0) - (downloadableUpdateRecordOrder.get(b.record.id) ?? 0);
@@ -229,34 +226,6 @@ function pinnedRecordRank(record: ModRecord, pinFavorites: boolean, pinProtected
   if (pinFavorites && record.favorite) return 0;
   if (pinProtected && record.protected) return pinFavorites ? 1 : 0;
   return (pinFavorites ? 1 : 0) + (pinProtected ? 1 : 0);
-}
-
-function updateStatusGroupRank(
-  recordId: string,
-  availableUpdateRecordOrder: Map<string, number>,
-  latestUpdateRecordOrder: Map<string, number>
-) {
-  if (availableUpdateRecordOrder.has(recordId)) return 0;
-  if (latestUpdateRecordOrder.has(recordId)) return 2;
-  return 1;
-}
-
-function compareUpdateStatusRecords(
-  leftRecordId: string,
-  rightRecordId: string,
-  availableUpdateRecordOrder: Map<string, number>,
-  latestUpdateRecordOrder: Map<string, number>
-) {
-  const leftGroup = updateStatusGroupRank(leftRecordId, availableUpdateRecordOrder, latestUpdateRecordOrder);
-  const rightGroup = updateStatusGroupRank(rightRecordId, availableUpdateRecordOrder, latestUpdateRecordOrder);
-  if (leftGroup !== rightGroup) return leftGroup - rightGroup;
-  if (leftGroup === 0) {
-    return (availableUpdateRecordOrder.get(leftRecordId) ?? 0) - (availableUpdateRecordOrder.get(rightRecordId) ?? 0);
-  }
-  if (leftGroup === 2) {
-    return (latestUpdateRecordOrder.get(leftRecordId) ?? 0) - (latestUpdateRecordOrder.get(rightRecordId) ?? 0);
-  }
-  return 0;
 }
 
 function strawberrySortValue(record: { stats: { strawberries: number; strawberriesKnown: boolean } | null }) {

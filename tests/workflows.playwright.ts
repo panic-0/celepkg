@@ -452,8 +452,25 @@ test("map update status grouping separates update, unknown, and latest records",
   await expect(progressFilter).toHaveValue("all");
   const groupToggle = page.locator(".record-search-actions .record-update-group-toggle input");
   await expect(groupToggle).toHaveCount(1);
-  await page.locator(".record-search-actions").getByLabel("收藏置顶").uncheck();
   await groupToggle.check();
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("CommunalHelper");
+  const pinnedOrder = await page.locator(".record-panel").evaluate((panel) => {
+    const text = panel.textContent ?? "";
+    return {
+      latest: text.indexOf("已是最新"),
+      latestRecord: text.indexOf("Strawberry Jam Collab"),
+      update: text.indexOf("可更新"),
+      updateRecord: text.indexOf("Galactica")
+    };
+  });
+  expect(pinnedOrder.update).toBeLessThan(pinnedOrder.latest);
+  expect(pinnedOrder.updateRecord).toBeGreaterThan(pinnedOrder.update);
+  expect(pinnedOrder.updateRecord).toBeLessThan(pinnedOrder.latest);
+  expect(pinnedOrder.latestRecord).toBeGreaterThan(pinnedOrder.latest);
+
+  await page.getByPlaceholder("搜索地图、SID、Mod、依赖").fill("");
+  await page.locator(".record-search-actions").getByLabel("收藏置顶").uncheck();
 
   await expect(page.locator(".record-panel")).toContainText("可更新");
   await expect(page.locator(".record-panel")).toContainText("未知状态");
