@@ -389,9 +389,9 @@ fn merge_stats(target: &mut MapStats, source: &MapStats) {
 
 fn sub_map_completion_status(sub_map: &SubMapInfo) -> CompletionStatus {
     match &sub_map.stats {
+        _ if is_non_completable_sub_map(&sub_map.sid) => CompletionStatus::NotApplicable,
         Some(stats) if stats.completion_known && stats.completed => CompletionStatus::Completed,
         Some(stats) if stats.completion_known => CompletionStatus::Unfinished,
-        _ if is_non_completable_sub_map(&sub_map.sid) => CompletionStatus::NotApplicable,
         Some(_) => CompletionStatus::Unknown,
         None => CompletionStatus::Unfinished,
     }
@@ -426,7 +426,9 @@ fn is_non_completable_sub_map(sid: &str) -> bool {
         lower == "gym"
             || lower == "gyms"
             || lower.ends_with("-gym")
+            || lower.ends_with("-gyms")
             || lower.ends_with("_gym")
+            || lower.ends_with("_gyms")
             || lower.contains("training")
     })
 }

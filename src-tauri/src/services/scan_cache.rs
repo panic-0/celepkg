@@ -8,7 +8,7 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
-const SCAN_CACHE_VERSION: u32 = 17;
+const SCAN_CACHE_VERSION: u32 = 18;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

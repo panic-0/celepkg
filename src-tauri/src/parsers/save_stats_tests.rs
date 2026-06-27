@@ -328,10 +328,17 @@ fn gyms_do_not_count_against_pack_completion() {
         )),
         CompletionStatus::NotApplicable
     );
+    assert_eq!(
+        sub_map_completion_status(&sub_map(
+            "StrawberryJam2021/0-Gyms/5-Grandmaster",
+            CompletionStatus::Unknown
+        )),
+        CompletionStatus::NotApplicable
+    );
 }
 
 #[test]
-fn explicit_completion_beats_gym_heuristic() {
+fn gym_completion_marker_stays_not_applicable() {
     let mut sub_map = sub_map("Pack/Gym", CompletionStatus::Unknown);
     sub_map.stats = Some(MapStats {
         completion_known: true,
@@ -341,7 +348,25 @@ fn explicit_completion_beats_gym_heuristic() {
 
     assert_eq!(
         sub_map_completion_status(&sub_map),
-        CompletionStatus::Completed
+        CompletionStatus::NotApplicable
+    );
+}
+
+#[test]
+fn gym_incomplete_marker_stays_not_applicable() {
+    let mut sub_map = sub_map(
+        "StrawberryJam2021/0-Gyms/5-Grandmaster",
+        CompletionStatus::Unknown,
+    );
+    sub_map.stats = Some(MapStats {
+        completion_known: true,
+        completed: false,
+        ..MapStats::default()
+    });
+
+    assert_eq!(
+        sub_map_completion_status(&sub_map),
+        CompletionStatus::NotApplicable
     );
 }
 
